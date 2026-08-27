@@ -103,30 +103,30 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-8">
-        <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
+    <div className="fixed inset-0 bg-zinc-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="bg-white rounded-lg max-w-lg w-full shadow-2xl border border-zinc-200 overflow-hidden my-8">
+        <div className="bg-zinc-900 text-white p-5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold">
-              <FileText className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-md bg-indigo-600 flex items-center justify-center font-bold text-white shadow-xs">
+              <FileText className="w-4 h-4" />
             </div>
             <div>
               <h2 className="font-bold text-sm text-white">
                 {editingRenewal ? `Edit Lease Renewal: ${editingRenewal.tenantName}` : 'Record Lease Renewal Agreement'}
               </h2>
-              <p className="text-[11px] text-slate-400">Track expiration date, rate increase, and tenant decision</p>
+              <p className="text-[11px] text-zinc-400">Track expiration date, rate increase, and tenant decision</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+          <button onClick={onClose} className="text-zinc-400 hover:text-white p-1">✕</button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs max-h-[700px] overflow-y-auto">
           <div>
-            <label className="block font-bold text-slate-700 mb-1">Select Occupied Room / Resident *</label>
+            <label className="block font-bold text-zinc-700 mb-1">Select Occupied Room / Resident *</label>
             <select
               value={roomId}
               onChange={(e) => handleRoomChange(e.target.value)}
-              className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium"
+              className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium"
             >
               {occupiedRooms.map(r => (
                 <option key={r.id} value={r.id}>
@@ -138,50 +138,50 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Current Lease End Date *</label>
+              <label className="block font-bold text-zinc-700 mb-1">Current Lease End Date *</label>
               <input
                 type="date"
                 required
                 value={currentLeaseEndDate}
                 onChange={(e) => setCurrentLeaseEndDate(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Decision Deadline</label>
+              <label className="block font-bold text-zinc-700 mb-1">Decision Deadline</label>
               <input
                 type="date"
                 value={decisionDeadline}
                 onChange={(e) => setDecisionDeadline(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
             </div>
           </div>
 
           {/* Rent Adjuster Box */}
-          <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+          <div className="bg-zinc-50 p-3.5 rounded-md border border-zinc-200 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-800 text-xs">Rent Adjustment Calculator</span>
+              <span className="font-bold text-zinc-800 text-xs">Rent Adjustment Calculator</span>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => handleApplyPercent(3.0)}
-                  className="px-2 py-0.5 rounded bg-white border border-slate-300 text-[11px] font-bold text-blue-700 hover:bg-blue-50"
+                  className="px-2 py-0.5 rounded bg-white border border-zinc-300 text-[11px] font-bold text-indigo-700 hover:bg-indigo-50"
                 >
                   +3%
                 </button>
                 <button
                   type="button"
                   onClick={() => handleApplyPercent(4.5)}
-                  className="px-2 py-0.5 rounded bg-white border border-slate-300 text-[11px] font-bold text-blue-700 hover:bg-blue-50"
+                  className="px-2 py-0.5 rounded bg-white border border-zinc-300 text-[11px] font-bold text-indigo-700 hover:bg-indigo-50"
                 >
                   +4.5%
                 </button>
                 <button
                   type="button"
                   onClick={() => setProposedMonthlyRent(currentMonthlyRent + 50)}
-                  className="px-2 py-0.5 rounded bg-white border border-slate-300 text-[11px] font-bold text-blue-700 hover:bg-blue-50"
+                  className="px-2 py-0.5 rounded bg-white border border-zinc-300 text-[11px] font-bold text-indigo-700 hover:bg-indigo-50"
                 >
                   +$50
                 </button>
@@ -190,22 +190,22 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] text-slate-500 mb-1">Current Rent ($/mo)</label>
+                <label className="block text-[11px] text-zinc-500 mb-1">Current Rent ($/mo)</label>
                 <input
                   type="number"
                   value={currentMonthlyRent}
                   onChange={(e) => setCurrentMonthlyRent(Number(e.target.value))}
-                  className="w-full p-2 bg-white border border-slate-300 rounded-lg font-mono font-bold"
+                  className="w-full p-2 bg-white border border-zinc-300 rounded-md font-mono font-bold text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-500 mb-1">Proposed Renewal Rent ($/mo)</label>
+                <label className="block text-[11px] text-zinc-500 mb-1">Proposed Renewal Rent ($/mo)</label>
                 <input
                   type="number"
                   value={proposedMonthlyRent}
                   onChange={(e) => setProposedMonthlyRent(Number(e.target.value))}
-                  className="w-full p-2 bg-white border border-emerald-400 text-emerald-800 rounded-lg font-mono font-bold focus:ring-2 focus:ring-emerald-500"
+                  className="w-full p-2 bg-white border border-emerald-400 text-emerald-800 rounded-md font-mono font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -213,11 +213,11 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Renewal Status</label>
+              <label className="block font-bold text-zinc-700 mb-1">Renewal Status</label>
               <select
                 value={renewalStatus}
                 onChange={(e) => setRenewalStatus(e.target.value as any)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-semibold"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               >
                 <option value="Review Pending">Review Pending</option>
                 <option value="Notice Sent">Notice Sent</option>
@@ -229,11 +229,11 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Term Length (Months)</label>
+              <label className="block font-bold text-zinc-700 mb-1">Term Length (Months)</label>
               <select
                 value={proposedTermMonths}
                 onChange={(e) => setProposedTermMonths(Number(e.target.value))}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               >
                 <option value={12}>12 Months (Standard)</option>
                 <option value={6}>6 Months</option>
@@ -244,27 +244,27 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
           </div>
 
           <div>
-            <label className="block font-bold text-slate-700 mb-1">Tenant Feedback / Communication Notes</label>
+            <label className="block font-bold text-zinc-700 mb-1">Tenant Feedback / Communication Notes</label>
             <textarea
               rows={2}
               placeholder="e.g. Tenant requested renewed paint touch-up and accepted +$35/mo."
               value={tenantResponseNotes}
               onChange={(e) => setTenantResponseNotes(e.target.value)}
-              className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+              className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />
           </div>
 
-          <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200">
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-zinc-200">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium"
+              className="px-4 py-2 rounded-md border border-zinc-300 text-zinc-700 font-medium hover:bg-zinc-50 transition"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition"
+              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-bold shadow-xs transition"
             >
               {editingRenewal ? 'Save Changes' : 'Record Renewal'}
             </button>

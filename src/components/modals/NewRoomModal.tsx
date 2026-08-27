@@ -211,24 +211,24 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150">
-        <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
+    <div className="fixed inset-0 bg-zinc-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="bg-white rounded-lg max-w-lg w-full shadow-2xl border border-zinc-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150">
+        <div className="bg-zinc-900 text-white p-5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center font-bold text-slate-950">
+            <div className="w-8 h-8 rounded-md bg-indigo-600 flex items-center justify-center font-bold text-white shadow-xs">
               <Home className="w-4 h-4" />
             </div>
             <div>
               <h2 className="font-bold text-sm text-white">
                 {editingRoom ? `Edit ${editingRoom.name}` : 'Add Rental Room to Property'}
               </h2>
-              <p className="text-[11px] text-slate-400">Configure room rent, bathroom configuration, and tenancy</p>
+              <p className="text-[11px] text-zinc-400">Configure room rent, bathroom configuration, and tenancy</p>
             </div>
           </div>
           <button 
             type="button" 
             onClick={onClose} 
-            className="text-slate-400 hover:text-white p-1 rounded-sm transition-colors"
+            className="text-zinc-400 hover:text-white p-1 rounded-sm transition-colors"
             aria-label="Close modal"
           >
             <X className="w-5 h-5" />
@@ -238,7 +238,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs max-h-[750px] overflow-y-auto">
           {/* Error Banner */}
           {errorMessage && (
-            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg flex items-start gap-2 text-xs">
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-md flex items-start gap-2 text-xs">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="font-semibold">{errorMessage}</p>
@@ -248,7 +248,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
 
           {/* No Properties Warning / Creator */}
           {properties.length === 0 ? (
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-md space-y-3">
               <div className="flex items-start gap-2.5">
                 <Building className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                 <div>
@@ -265,7 +265,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
                     onClose();
                     onOpenNewPropertyModal();
                   }}
-                  className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                  className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-md text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>+ Create Property First</span>
@@ -275,7 +275,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
           ) : (
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="block font-bold text-slate-700">Parent Coliving Property *</label>
+                <label className="block font-bold text-zinc-700">Parent Coliving Property *</label>
                 {onOpenNewPropertyModal && (
                   <button
                     type="button"
@@ -283,7 +283,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
                       onClose();
                       onOpenNewPropertyModal();
                     }}
-                    className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1"
+                    className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1"
                   >
                     <PlusCircle className="w-3 h-3" />
                     + New Property
@@ -293,7 +293,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
               <select
                 value={propertyId}
                 onChange={(e) => setPropertyId(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md font-medium text-zinc-800 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
                 required
               >
                 {properties.map(p => (
@@ -305,32 +305,32 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Room Number *</label>
+              <label className="block font-bold text-zinc-700 mb-1">Room Number *</label>
               <input
                 type="text"
                 required
                 placeholder="e.g. 101 or Unit B"
                 value={roomNumber}
                 onChange={(e) => setRoomNumber(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-medium"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none font-medium"
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="block font-bold text-slate-700 mb-1">Descriptive Room Title *</label>
+              <label className="block font-bold text-zinc-700 mb-1">Descriptive Room Title *</label>
               <input
                 type="text"
                 required
                 placeholder="e.g. Room 101 - Primary Suite"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-medium"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none font-medium"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Monthly Rent ($) *</label>
+              <label className="block font-bold text-zinc-700 mb-1">Monthly Rent ($) *</label>
               <input
                 type="number"
                 required
@@ -338,39 +338,39 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
                 step="5"
                 value={monthlyRent}
                 onChange={(e) => setMonthlyRent(Number(e.target.value))}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-mono font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md font-mono font-bold text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Security Deposit ($)</label>
+              <label className="block font-bold text-zinc-700 mb-1">Security Deposit ($)</label>
               <input
                 type="number"
                 min="0"
                 step="5"
                 value={securityDeposit}
                 onChange={(e) => setSecurityDeposit(Number(e.target.value))}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-mono text-slate-900 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md font-mono text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Size (Sq Ft)</label>
+              <label className="block font-bold text-zinc-700 mb-1">Size (Sq Ft)</label>
               <input
                 type="number"
                 min="1"
                 value={sqft}
                 onChange={(e) => setSqft(Number(e.target.value))}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Floor Level</label>
+              <label className="block font-bold text-zinc-700 mb-1">Floor Level</label>
               <select
                 value={floor}
                 onChange={(e) => setFloor(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md text-zinc-800 font-medium focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
               >
                 <option value="Main Level">Main Level</option>
                 <option value="Lower Level">Lower Level</option>
@@ -383,11 +383,11 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
               </select>
             </div>
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Bathroom Setup</label>
+              <label className="block font-bold text-zinc-700 mb-1">Bathroom Setup</label>
               <select
                 value={bathroomType}
                 onChange={(e) => setBathroomType(e.target.value as RoomBathroomType)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md text-zinc-800 font-medium focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
               >
                 <option value="Private Ensuite">Private Ensuite</option>
                 <option value="1 Shared Bathroom">1 Shared Bathroom</option>
@@ -396,15 +396,15 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
               </select>
             </div>
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Status</label>
+              <label className="block font-bold text-zinc-700 mb-1">Status</label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as RoomStatus)}
-                className={`w-full p-2.5 border rounded-lg font-bold outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`w-full p-2.5 border rounded-md font-bold outline-none focus:ring-2 focus:ring-indigo-500 ${
                   status === 'Occupied' 
                     ? 'bg-emerald-50 border-emerald-300 text-emerald-800' 
                     : status === 'Available'
-                    ? 'bg-blue-50 border-blue-300 text-blue-800'
+                    ? 'bg-indigo-50 border-indigo-300 text-indigo-800'
                     : 'bg-amber-50 border-amber-300 text-amber-800'
                 }`}
               >
@@ -422,62 +422,62 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
               id="isFurnished"
               checked={isFurnished}
               onChange={(e) => setIsFurnished(e.target.checked)}
-              className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
             />
-            <label htmlFor="isFurnished" className="font-semibold text-slate-800 select-none cursor-pointer">
+            <label htmlFor="isFurnished" className="font-semibold text-zinc-800 select-none cursor-pointer">
               Furnished Room (Includes Bed Frame, Mattress & Dresser)
             </label>
           </div>
 
           {status === 'Occupied' && (
-            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5 animate-in fade-in duration-150">
-              <span className="font-bold text-slate-800 text-xs block">Active Resident Details</span>
+            <div className="bg-zinc-50 p-3.5 rounded-md border border-zinc-200 space-y-2.5 animate-in fade-in duration-150">
+              <span className="font-bold text-zinc-800 text-xs block">Active Resident Details</span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] text-slate-500">Tenant Name</label>
+                  <label className="block text-[11px] text-zinc-500">Tenant Name</label>
                   <input
                     type="text"
                     placeholder="e.g. Alex Morgan"
                     value={currentTenantName}
                     onChange={(e) => setCurrentTenantName(e.target.value)}
-                    className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs"
+                    className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] text-slate-500">Tenant Phone</label>
+                  <label className="block text-[11px] text-zinc-500">Tenant Phone</label>
                   <input
                     type="tel"
                     placeholder="e.g. (303) 555-0145"
                     value={currentTenantPhone}
                     onChange={(e) => setCurrentTenantPhone(e.target.value)}
-                    className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-mono"
+                    className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-[11px] text-slate-500">Lease Expiration Date</label>
+                <label className="block text-[11px] text-zinc-500">Lease Expiration Date</label>
                 <input
                   type="date"
                   value={leaseEndDate}
                   onChange={(e) => setLeaseEndDate(e.target.value)}
-                  className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs"
+                  className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
               </div>
             </div>
           )}
 
           <div>
-            <label className="block font-bold text-slate-700 mb-1">Room Amenities (comma separated)</label>
+            <label className="block font-bold text-zinc-700 mb-1">Room Amenities (comma separated)</label>
             <input
               type="text"
               placeholder="Queen Bed, Walk-in Closet, Blackout Curtains, Smart TV"
               value={amenities}
               onChange={(e) => setAmenities(e.target.value)}
-              className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none"
+              className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
             />
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-3 border-t border-slate-200">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-3 border-t border-zinc-200">
             {editingRoom && onDeleteRoom ? (
               <button
                 type="button"
@@ -487,7 +487,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
                     onClose();
                   }
                 }}
-                className="w-full sm:w-auto px-3.5 py-2 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+                className="w-full sm:w-auto px-3.5 py-2 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-md font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Delete Room</span>
@@ -500,17 +500,17 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full sm:w-auto px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-colors"
+                className="w-full sm:w-auto px-4 py-2 rounded-md border border-zinc-300 text-zinc-700 font-medium hover:bg-zinc-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting || properties.length === 0}
-                className={`w-full sm:w-auto px-5 py-2 rounded-lg font-bold text-white shadow-md transition-colors ${
+                className={`w-full sm:w-auto px-5 py-2 rounded-md font-bold text-white shadow-xs transition-colors ${
                   properties.length === 0
-                    ? 'bg-slate-400 cursor-not-allowed'
-                    : 'bg-slate-900 hover:bg-slate-800'
+                    ? 'bg-zinc-400 cursor-not-allowed'
+                    : 'bg-indigo-600 hover:bg-indigo-700'
                 }`}
               >
                 {editingRoom ? 'Save Room' : 'Add Room'}

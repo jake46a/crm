@@ -236,37 +236,37 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
     setNewComment('');
   };
 
-  return (
+    return (
     <div className="space-y-6 pb-12">
       {/* Top Tenant Header & Profile Switcher */}
-      <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-md border border-slate-800">
+      <div className="bg-zinc-900 text-white rounded-lg p-6 shadow-xs border border-zinc-800">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-inner">
-              <Building className="w-6 h-6" />
+            <div className="w-10 h-10 rounded-md bg-indigo-600 flex items-center justify-center text-white shadow-xs">
+              <Building className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] bg-blue-500/20 text-blue-300 font-bold px-2 py-0.5 rounded-full border border-blue-400/30 uppercase tracking-wide">
+                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 font-bold px-2 py-0.5 rounded-sm border border-indigo-400/30 uppercase tracking-wide">
                   Resident Maintenance Portal
                 </span>
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-400/30 uppercase tracking-wide">
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-sm border border-emerald-400/30 uppercase tracking-wide">
                   Month-to-Month Tenancy
                 </span>
               </div>
-              <h1 className="text-xl font-bold text-white tracking-tight mt-1">
+              <h1 className="text-lg font-bold text-white tracking-tight mt-1">
                 Moyer Resident Services & Repair Hub
               </h1>
-              <p className="text-xs text-slate-300">
+              <p className="text-xs text-zinc-400">
                 Submit repair requests, upload photos, and track work orders with real-time technician updates.
               </p>
             </div>
           </div>
 
           {/* Active Tenant Profile Switcher */}
-          <div className="bg-slate-800/90 border border-slate-700 rounded-xl p-3 flex flex-col gap-1 min-w-[280px]">
-            <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
-              <User className="w-3 h-3 text-blue-400" />
+          <div className="bg-zinc-800/90 border border-zinc-700 rounded-md p-3 flex flex-col gap-1 min-w-[280px]">
+            <label className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider flex items-center gap-1.5">
+              <User className="w-3 h-3 text-indigo-400" />
               Viewing as Resident Tenancy:
             </label>
             <select
@@ -275,7 +275,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                 setSelectedRoomId(e.target.value);
                 setSubmissionSuccessTicket(null);
               }}
-              className="bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-white font-medium focus:outline-none focus:border-blue-400"
+              className="bg-zinc-900 border border-zinc-600 rounded-sm px-2.5 py-1.5 text-xs text-white font-medium focus:outline-none focus:border-indigo-400"
             >
               {occupiedRooms.map(r => (
                 <option key={r.id} value={r.id}>
@@ -284,7 +284,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
               ))}
             </select>
             {currentRoom && (
-              <div className="flex items-center justify-between text-[11px] text-slate-300 pt-1 border-t border-slate-700/60 mt-1">
+              <div className="flex items-center justify-between text-[11px] text-zinc-300 pt-1 border-t border-zinc-700/60 mt-1">
                 <span>Rent: ${currentRoom.monthlyRent}/mo</span>
                 <span className="text-emerald-400 font-medium">● Active MTM Resident</span>
               </div>
@@ -294,39 +294,39 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
 
         {/* Quick Room & Property Specs Bar */}
         {currentProperty && currentRoom && (
-          <div className="mt-5 pt-4 border-t border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            <div className="bg-slate-800/50 p-2.5 rounded-lg border border-slate-700/50">
-              <p className="text-[10px] text-slate-400 font-semibold uppercase">Your Property</p>
+          <div className="mt-5 pt-4 border-t border-zinc-800 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div className="bg-zinc-800/50 p-2.5 rounded-sm border border-zinc-700/50">
+              <p className="text-[10px] text-zinc-400 font-semibold uppercase">Your Property</p>
               <p className="font-bold text-white truncate">{currentProperty.name}</p>
-              <p className="text-[11px] text-slate-400 truncate">{currentProperty.address}</p>
+              <p className="text-[11px] text-zinc-400 truncate">{currentProperty.address}</p>
             </div>
-            <div className="bg-slate-800/50 p-2.5 rounded-lg border border-slate-700/50">
-              <p className="text-[10px] text-slate-400 font-semibold uppercase">Assigned Room</p>
+            <div className="bg-zinc-800/50 p-2.5 rounded-sm border border-zinc-700/50">
+              <p className="text-[10px] text-zinc-400 font-semibold uppercase">Assigned Room</p>
               <p className="font-bold text-white truncate">{currentRoom.name}</p>
-              <p className="text-[11px] text-slate-400">{currentRoom.bathroomType}</p>
+              <p className="text-[11px] text-zinc-400">{currentRoom.bathroomType}</p>
             </div>
-            <div className="bg-slate-800/50 p-2.5 rounded-lg border border-slate-700/50">
-              <p className="text-[10px] text-slate-400 font-semibold uppercase">House Wi-Fi</p>
+            <div className="bg-zinc-800/50 p-2.5 rounded-sm border border-zinc-700/50">
+              <p className="text-[10px] text-zinc-400 font-semibold uppercase">House Wi-Fi</p>
               <p className="font-bold text-white flex items-center gap-1">
                 <Wifi className="w-3 h-3 text-cyan-400" />
                 <span className="truncate">{currentProperty.wifiNetwork || 'Moyer-Fiber-5G'}</span>
               </p>
-              <p className="text-[11px] text-slate-400 font-mono">Pass: {currentProperty.wifiPassword || 'MoyerGuest2026'}</p>
+              <p className="text-[11px] text-zinc-400 font-mono">Pass: {currentProperty.wifiPassword || 'MoyerGuest2026'}</p>
             </div>
-            <div className="bg-slate-800/50 p-2.5 rounded-lg border border-slate-700/50">
-              <p className="text-[10px] text-slate-400 font-semibold uppercase">Front Door Keypad</p>
+            <div className="bg-zinc-800/50 p-2.5 rounded-sm border border-zinc-700/50">
+              <p className="text-[10px] text-zinc-400 font-semibold uppercase">Front Door Keypad</p>
               <p className="font-bold text-amber-400 flex items-center gap-1 font-mono">
                 <Key className="w-3 h-3 text-amber-400" />
                 {currentProperty.keypadMasterCode || '5829'}
               </p>
-              <p className="text-[11px] text-slate-400">24/7 Access Active</p>
+              <p className="text-[11px] text-zinc-400">24/7 Access Active</p>
             </div>
           </div>
         )}
       </div>
 
       {/* Navigation Sub-Tabs */}
-      <div className="flex border-b border-slate-200 gap-2">
+      <div className="flex border-b border-zinc-200 gap-2">
         <button
           onClick={() => {
             setActivePortalTab('submit');
@@ -334,8 +334,8 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
           }}
           className={`pb-3 px-4 font-bold text-xs flex items-center gap-2 border-b-2 transition ${
             activePortalTab === 'submit'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-zinc-600 hover:text-zinc-900'
           }`}
         >
           <Plus className="w-4 h-4" />
@@ -346,8 +346,8 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
           onClick={() => setActivePortalTab('track')}
           className={`pb-3 px-4 font-bold text-xs flex items-center gap-2 border-b-2 transition ${
             activePortalTab === 'track'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-zinc-600 hover:text-zinc-900'
           }`}
         >
           <Clock className="w-4 h-4" />
@@ -358,8 +358,8 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
           onClick={() => setActivePortalTab('house-guide')}
           className={`pb-3 px-4 font-bold text-xs flex items-center gap-2 border-b-2 transition ${
             activePortalTab === 'house-guide'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-zinc-600 hover:text-zinc-900'
           }`}
         >
           <Info className="w-4 h-4" />
@@ -369,10 +369,10 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
 
       {/* SUCCESS BANNER WHEN SUBMITTED */}
       {submissionSuccessTicket && (
-        <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-4 flex items-center justify-between gap-4">
+        <div className="bg-emerald-50 border border-emerald-300 rounded-sm p-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold">
-              <Check className="w-5 h-5" />
+            <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold">
+              <Check className="w-4 h-4" />
             </div>
             <div>
               <p className="font-bold text-emerald-950 text-sm">
@@ -385,7 +385,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
           </div>
           <button
             onClick={() => setActivePortalTab('track')}
-            className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg shadow-sm transition whitespace-nowrap"
+            className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-sm shadow-xs transition whitespace-nowrap"
           >
             View Live Tracker →
           </button>
@@ -396,15 +396,15 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
       {activePortalTab === 'submit' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Submission Form */}
-          <div className="lg:col-span-2 bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="lg:col-span-2 bg-white rounded-sm p-6 border border-zinc-200 shadow-xs space-y-5">
+            <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
               <div>
-                <h2 className="font-bold text-slate-900 text-sm">New Maintenance Work Order Request</h2>
-                <p className="text-xs text-slate-500">Provide details so we can assign the correct certified contractor promptly.</p>
+                <h2 className="font-bold text-zinc-900 text-sm">New Maintenance Work Order Request</h2>
+                <p className="text-xs text-zinc-500">Provide details so we can assign the correct certified contractor promptly.</p>
               </div>
-              <div className="bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200 text-right">
-                <span className="text-[10px] text-slate-500 font-semibold uppercase block">Assigned Ticket #</span>
-                <span className="font-mono font-bold text-xs text-blue-700">Auto-Generated</span>
+              <div className="bg-zinc-100 px-2.5 py-1 rounded-sm border border-zinc-200 text-right">
+                <span className="text-[10px] text-zinc-500 font-semibold uppercase block">Assigned Ticket #</span>
+                <span className="font-mono font-bold text-xs text-indigo-700">Auto-Generated</span>
               </div>
             </div>
 
@@ -412,13 +412,13 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
               {/* Category & Location Type */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">
+                  <label className="block font-bold text-zinc-700 mb-1">
                     Maintenance Category *
                   </label>
                   <select
                     value={ticketCategory}
                     onChange={(e) => setTicketCategory(e.target.value as WorkOrderCategory)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-medium text-slate-900 focus:bg-white focus:border-blue-500"
+                    className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-sm font-medium text-zinc-900 focus:bg-white focus:border-indigo-500"
                   >
                     <option value="Plumbing">Plumbing (Faucets, Drains, Toilet, Shower)</option>
                     <option value="HVAC / Heating">HVAC / Heating & Baseboard Radiators</option>
@@ -433,18 +433,18 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">
+                  <label className="block font-bold text-zinc-700 mb-1">
                     Priority Level *
                   </label>
                   <select
                     value={ticketPriority}
                     onChange={(e) => setTicketPriority(e.target.value as WorkOrderPriority)}
-                    className={`w-full p-2.5 border rounded-lg font-bold ${
+                    className={`w-full p-2.5 border rounded-sm font-bold ${
                       ticketPriority === 'Emergency'
-                        ? 'bg-red-50 text-red-700 border-red-300'
+                        ? 'bg-rose-50 text-rose-700 border-rose-300'
                         : ticketPriority === 'High'
                         ? 'bg-amber-50 text-amber-800 border-amber-300'
-                        : 'bg-slate-50 text-slate-900 border-slate-300'
+                        : 'bg-zinc-50 text-zinc-900 border-zinc-300'
                     }`}
                   >
                     <option value="Low">Low — Routine maintenance or non-urgent repair</option>
@@ -456,10 +456,10 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
               </div>
 
               {/* Location Scope */}
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex items-center justify-between">
+              <div className="bg-zinc-50 p-3.5 rounded-sm border border-zinc-200 flex items-center justify-between">
                 <div>
-                  <p className="font-bold text-slate-900">Location of Issue</p>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="font-bold text-zinc-900">Location of Issue</p>
+                  <p className="text-[11px] text-zinc-500">
                     {isCommonArea ? 'Shared House Common Area (Kitchen/Living/Bath)' : `Your Private Room: ${currentRoom?.name || 'Assigned Bedroom'}`}
                   </p>
                 </div>
@@ -467,8 +467,8 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsCommonArea(false)}
-                    className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition ${
-                      !isCommonArea ? 'bg-blue-600 text-white shadow-xs' : 'bg-white border border-slate-300 text-slate-700'
+                    className={`px-3 py-1.5 rounded-sm font-semibold text-xs transition ${
+                      !isCommonArea ? 'bg-indigo-600 text-white shadow-xs' : 'bg-white border border-zinc-300 text-zinc-700'
                     }`}
                   >
                     My Private Room
@@ -476,8 +476,8 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsCommonArea(true)}
-                    className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition ${
-                      isCommonArea ? 'bg-blue-600 text-white shadow-xs' : 'bg-white border border-slate-300 text-slate-700'
+                    className={`px-3 py-1.5 rounded-sm font-semibold text-xs transition ${
+                      isCommonArea ? 'bg-indigo-600 text-white shadow-xs' : 'bg-white border border-zinc-300 text-zinc-700'
                     }`}
                   >
                     Shared Common Area
@@ -487,7 +487,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
 
               {/* Title */}
               <div>
-                <label className="block font-bold text-slate-700 mb-1">
+                <label className="block font-bold text-zinc-700 mb-1">
                   Brief Issue Title *
                 </label>
                 <input
@@ -496,13 +496,13 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                   value={ticketTitle}
                   onChange={(e) => setTicketTitle(e.target.value)}
                   placeholder="e.g. Under-sink pipe dripping slowly into bathroom cabinet"
-                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-medium focus:bg-white focus:border-blue-500"
+                  className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-sm text-zinc-900 font-medium focus:bg-white focus:border-indigo-500"
                 />
               </div>
 
               {/* Description */}
               <div>
-                <label className="block font-bold text-slate-700 mb-1">
+                <label className="block font-bold text-zinc-700 mb-1">
                   Detailed Description & Observations *
                 </label>
                 <textarea
@@ -511,19 +511,19 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                   value={ticketDescription}
                   onChange={(e) => setTicketDescription(e.target.value)}
                   placeholder="Please describe when you first noticed the issue, exact symptoms, noises, and any temporary steps taken (e.g. placed a bucket or towel)..."
-                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:bg-white focus:border-blue-500"
+                  className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-sm text-zinc-900 focus:bg-white focus:border-indigo-500"
                 />
               </div>
 
               {/* Photo Upload Area */}
               <div>
-                <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                <label className="block font-bold text-zinc-700 mb-1 flex items-center justify-between">
                   <span>Attach Photos of the Issue (Recommended)</span>
-                  <span className="text-[11px] text-slate-500 font-normal">{uploadedPhotos.length} photo(s) attached</span>
+                  <span className="text-[11px] text-zinc-500 font-normal">{uploadedPhotos.length} photo(s) attached</span>
                 </label>
 
                 {/* Upload Drag/Click Zone */}
-                <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 bg-slate-50/50 hover:bg-slate-50 text-center transition">
+                <div className="border-2 border-dashed border-zinc-300 rounded-sm p-4 bg-zinc-50/50 hover:bg-zinc-50 text-center transition">
                   <input
                     type="file"
                     id="tenant-photo-upload"
@@ -534,41 +534,41 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                   />
                   <label
                     htmlFor="tenant-photo-upload"
-                    className="cursor-pointer flex flex-col items-center justify-center gap-1.5 text-slate-600"
+                    className="cursor-pointer flex flex-col items-center justify-center gap-1.5 text-zinc-600"
                   >
-                    <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
                       <Upload className="w-5 h-5" />
                     </div>
-                    <span className="font-bold text-xs text-blue-600 hover:underline">
+                    <span className="font-bold text-xs text-indigo-600 hover:underline">
                       Click to upload photos from device
                     </span>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-[11px] text-zinc-400">
                       JPG, PNG, or WEBP up to 10MB each
                     </span>
                   </label>
                 </div>
 
-                {/* Sample Photo Presets for Easy Demonstrations */}
+                {/* Sample Photo Presets */}
                 <div className="mt-2 flex items-center gap-2 flex-wrap text-[11px]">
-                  <span className="text-slate-500 font-semibold">Or attach sample photo:</span>
+                  <span className="text-zinc-500 font-semibold">Or attach sample photo:</span>
                   <button
                     type="button"
                     onClick={() => handleAddSamplePhoto('https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=600&q=80')}
-                    className="text-blue-600 hover:underline bg-blue-50 border border-blue-200 px-2 py-0.5 rounded"
+                    className="text-indigo-600 hover:underline bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-sm"
                   >
                     + Plumbing Leak
                   </button>
                   <button
                     type="button"
                     onClick={() => handleAddSamplePhoto('https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=600&q=80')}
-                    className="text-blue-600 hover:underline bg-blue-50 border border-blue-200 px-2 py-0.5 rounded"
+                    className="text-indigo-600 hover:underline bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-sm"
                   >
                     + Kitchen Appliance
                   </button>
                   <button
                     type="button"
                     onClick={() => handleAddSamplePhoto('https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=600&q=80')}
-                    className="text-blue-600 hover:underline bg-blue-50 border border-blue-200 px-2 py-0.5 rounded"
+                    className="text-indigo-600 hover:underline bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-sm"
                   >
                     + Electric Fixture
                   </button>
@@ -578,7 +578,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                 {uploadedPhotos.length > 0 && (
                   <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 gap-2.5">
                     {uploadedPhotos.map((url, idx) => (
-                      <div key={idx} className="relative group rounded-lg overflow-hidden border border-slate-200 bg-slate-100 aspect-square">
+                      <div key={idx} className="relative group rounded-sm overflow-hidden border border-zinc-200 bg-zinc-100 aspect-square">
                         <img
                           src={url}
                           alt={`Attachment ${idx + 1}`}
@@ -588,7 +588,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                         <button
                           type="button"
                           onClick={() => handleRemovePhoto(idx)}
-                          className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 shadow-md hover:bg-red-700 opacity-90 transition"
+                          className="absolute top-1 right-1 bg-rose-600 text-white rounded-full p-1 shadow-md hover:bg-rose-700 opacity-90 transition"
                           title="Remove photo"
                         >
                           <X className="w-3 h-3" />
@@ -596,7 +596,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                         <button
                           type="button"
                           onClick={() => setPreviewPhoto(url)}
-                          className="absolute bottom-1 right-1 bg-slate-900/80 text-white rounded p-1 opacity-0 group-hover:opacity-100 transition"
+                          className="absolute bottom-1 right-1 bg-zinc-900/80 text-white rounded p-1 opacity-0 group-hover:opacity-100 transition"
                           title="Preview full image"
                         >
                           <Maximize2 className="w-3 h-3" />
@@ -608,21 +608,21 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
               </div>
 
               {/* Permission to Enter & Access Notes */}
-              <div className="space-y-2 pt-2 border-t border-slate-100">
+              <div className="space-y-2 pt-2 border-t border-zinc-100">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={entryPermission}
                     onChange={(e) => setEntryPermission(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded border-slate-300"
+                    className="w-4 h-4 text-indigo-600 rounded border-zinc-300"
                   />
-                  <span className="font-semibold text-slate-800">
+                  <span className="font-semibold text-zinc-800">
                     Permission to Enter: Authorized technician may enter the room using keypad code if I am away
                   </span>
                 </label>
 
                 <div>
-                  <label className="block text-slate-600 text-[11px] mb-1">
+                  <label className="block text-zinc-600 text-[11px] mb-1">
                     Special Access Instructions / Pets / Preferred Contact Time
                   </label>
                   <input
@@ -630,20 +630,20 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                     value={accessNotes}
                     onChange={(e) => setAccessNotes(e.target.value)}
                     placeholder="e.g. Please call 15 minutes prior; cat will be inside carrier"
-                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800"
+                    className="w-full p-2 bg-zinc-50 border border-zinc-300 rounded-sm text-zinc-800"
                   />
                 </div>
               </div>
 
               {/* Submit Button */}
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
-                <span className="text-[11px] text-slate-500">
+              <div className="pt-3 border-t border-zinc-200 flex items-center justify-between">
+                <span className="text-[11px] text-zinc-500">
                   Submitting automatically notifies Moyer dispatch & logs your ticket.
                 </span>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition flex items-center gap-2 disabled:opacity-50"
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-sm shadow-xs transition flex items-center gap-2 disabled:opacity-50"
                 >
                   {isSubmitting ? (
                     <span>Submitting Request...</span>
@@ -661,36 +661,36 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
           {/* Side Info & Resident Advice */}
           <div className="space-y-4">
             {/* Emergency Info Card */}
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-2.5">
-              <div className="flex items-center gap-2 text-red-800 font-bold text-xs">
-                <ShieldAlert className="w-4 h-4 text-red-600" />
+            <div className="bg-rose-50 border border-rose-200 rounded-sm p-4 space-y-2.5">
+              <div className="flex items-center gap-2 text-rose-800 font-bold text-xs">
+                <ShieldAlert className="w-4 h-4 text-rose-600" />
                 <span>Urgent Maintenance Helpline</span>
               </div>
-              <p className="text-red-900 text-[11px] leading-relaxed">
+              <p className="text-rose-900 text-[11px] leading-relaxed">
                 For active uncontrolled water leaks, gas odor, or total winter furnace loss, please submit this form and call the 24/7 dispatch line immediately:
               </p>
-              <div className="bg-white/80 p-2.5 rounded-lg border border-red-300 font-mono font-bold text-red-700 text-center text-sm">
+              <div className="bg-white/80 p-2.5 rounded-sm border border-rose-300 font-mono font-bold text-rose-700 text-center text-sm">
                 📞 (303) 555-0199 (Ext 1)
               </div>
             </div>
 
             {/* Roommate Coliving Respect Guidelines */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2.5 text-xs">
-              <h3 className="font-bold text-slate-800 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-blue-600" />
+            <div className="bg-white border border-zinc-200 rounded-sm p-4 space-y-2.5 text-xs">
+              <h3 className="font-bold text-zinc-800 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-indigo-600" />
                 <span>Coliving Work Order Tips</span>
               </h3>
-              <ul className="space-y-2 text-slate-600 text-[11px]">
+              <ul className="space-y-2 text-zinc-600 text-[11px]">
                 <li className="flex items-start gap-1.5">
-                  <span className="text-blue-600 font-bold">•</span>
+                  <span className="text-indigo-600 font-bold">•</span>
                   <span><strong>Clear the area:</strong> Please remove personal toiletries or items around sinks/appliances before the technician arrives.</span>
                 </li>
                 <li className="flex items-start gap-1.5">
-                  <span className="text-blue-600 font-bold">•</span>
+                  <span className="text-indigo-600 font-bold">•</span>
                   <span><strong>Shared Areas:</strong> Housemates will be notified automatically via house email when repairs are scheduled.</span>
                 </li>
                 <li className="flex items-start gap-1.5">
-                  <span className="text-blue-600 font-bold">•</span>
+                  <span className="text-indigo-600 font-bold">•</span>
                   <span><strong>Month-to-Month Guarantee:</strong> Maintenance repairs are covered at 100% by Moyer Property Management with zero deductible.</span>
                 </li>
               </ul>
@@ -703,37 +703,37 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
       {activePortalTab === 'track' && (
         <div className="space-y-4">
           {/* Filter and Search Bar */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="bg-white rounded-sm p-4 border border-zinc-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex items-center gap-2 overflow-x-auto">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Status:</span>
+              <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Status:</span>
               <button
                 onClick={() => setStatusFilter('all')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
-                  statusFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                className={`px-3 py-1 rounded-sm text-xs font-bold transition ${
+                  statusFilter === 'all' ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                 }`}
               >
                 All ({tenantTickets.length})
               </button>
               <button
                 onClick={() => setStatusFilter('New')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
-                  statusFilter === 'New' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                className={`px-3 py-1 rounded-sm text-xs font-bold transition ${
+                  statusFilter === 'New' ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                 }`}
               >
                 New
               </button>
               <button
                 onClick={() => setStatusFilter('In Progress')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
-                  statusFilter === 'In Progress' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                className={`px-3 py-1 rounded-sm text-xs font-bold transition ${
+                  statusFilter === 'In Progress' ? 'bg-amber-600 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                 }`}
               >
                 In Progress / Scheduled
               </button>
               <button
                 onClick={() => setStatusFilter('Completed')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
-                  statusFilter === 'Completed' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                className={`px-3 py-1 rounded-sm text-xs font-bold transition ${
+                  statusFilter === 'Completed' ? 'bg-emerald-600 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                 }`}
               >
                 Completed
@@ -741,30 +741,30 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
             </div>
 
             <div className="relative min-w-[240px]">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-zinc-400" />
               <input
                 type="text"
                 placeholder="Search ticket # or keyword..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:bg-white focus:outline-none"
+                className="w-full pl-8 pr-3 py-1.5 bg-zinc-50 border border-zinc-300 rounded-sm text-xs font-medium focus:bg-white focus:outline-none"
               />
             </div>
           </div>
 
           {/* Split View: Tickets List & Active Ticket Tracker */}
           {tenantTickets.length === 0 ? (
-            <div className="bg-white rounded-xl p-12 border border-slate-200 text-center space-y-3">
-              <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+            <div className="bg-white rounded-sm p-12 border border-zinc-200 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-zinc-100 text-zinc-400 flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
-              <h3 className="font-bold text-slate-700 text-sm">No Maintenance Tickets Found</h3>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              <h3 className="font-bold text-zinc-700 text-sm">No Maintenance Tickets Found</h3>
+              <p className="text-xs text-zinc-500 max-w-sm mx-auto">
                 There are no open or matching repair tickets for this property/room filter.
               </p>
               <button
                 onClick={() => setActivePortalTab('submit')}
-                className="px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded-lg shadow-sm"
+                className="px-4 py-2 bg-indigo-600 text-white font-bold text-xs rounded-sm shadow-xs"
               >
                 Submit a Repair Request
               </button>
@@ -779,15 +779,15 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                     <div
                       key={ticket.id}
                       onClick={() => setSelectedTicketId(ticket.id)}
-                      className={`p-4 rounded-xl border cursor-pointer transition ${
+                      className={`p-4 rounded-sm border cursor-pointer transition ${
                         isSelected
-                          ? 'bg-blue-50/70 border-blue-400 shadow-sm ring-1 ring-blue-400'
-                          : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-xs'
+                          ? 'bg-indigo-50/70 border-indigo-400 shadow-xs ring-1 ring-indigo-400'
+                          : 'bg-white border-zinc-200 hover:border-zinc-300 hover:shadow-xs'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-xs text-blue-700 bg-white px-2 py-0.5 rounded border border-blue-200">
+                          <span className="font-mono font-bold text-xs text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200">
                             {ticket.ticketNumber}
                           </span>
                           <PriorityBadge priority={ticket.priority} />
@@ -795,14 +795,14 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                         <WorkOrderStatusBadge status={ticket.status} />
                       </div>
 
-                      <h4 className="font-bold text-slate-900 text-xs line-clamp-1 mb-1">
+                      <h4 className="font-bold text-zinc-900 text-xs line-clamp-1 mb-1">
                         {ticket.title}
                       </h4>
-                      <p className="text-[11px] text-slate-500 line-clamp-2 mb-2">
+                      <p className="text-[11px] text-zinc-500 line-clamp-2 mb-2">
                         {ticket.description}
                       </p>
 
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-2 border-t border-slate-100">
+                      <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-2 border-t border-zinc-100">
                         <span>Reported: {ticket.dateReported}</span>
                         <span>{ticket.roomName || 'Common Area'}</span>
                       </div>
@@ -814,56 +814,56 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
               {/* Right Active Ticket Tracker Card */}
               <div className="lg:col-span-7">
                 {selectedTicket ? (
-                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-5">
+                  <div className="bg-white rounded-sm border border-zinc-200 shadow-xs p-5 space-y-5">
                     {/* Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-4">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm font-extrabold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+                          <span className="font-mono text-sm font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
                             {selectedTicket.ticketNumber}
                           </span>
                           <WorkOrderStatusBadge status={selectedTicket.status} />
                           <PriorityBadge priority={selectedTicket.priority} />
                         </div>
-                        <h3 className="font-bold text-base text-slate-900 mt-1">
+                        <h3 className="font-bold text-base text-zinc-900 mt-1">
                           {selectedTicket.title}
                         </h3>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-zinc-500">
                           {selectedTicket.propertyName} • {selectedTicket.roomName || 'Common Area'}
                         </p>
                       </div>
                       <div className="text-right text-xs">
-                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Reported Date</span>
-                        <span className="font-bold text-slate-700">{selectedTicket.dateReported}</span>
+                        <span className="text-zinc-400 block text-[10px] uppercase font-semibold">Reported Date</span>
+                        <span className="font-bold text-zinc-700">{selectedTicket.dateReported}</span>
                       </div>
                     </div>
 
                     {/* Visual Timeline Stepper */}
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                      <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-3">
+                    <div className="bg-zinc-50 p-4 rounded-sm border border-zinc-200">
+                      <p className="text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-3">
                         Live Status Tracker
                       </p>
                       <div className="grid grid-cols-4 gap-2 relative">
                         {/* Step 1: New */}
                         <div className="flex flex-col items-center text-center">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-                            selectedTicket.status ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-500'
+                            selectedTicket.status ? 'bg-indigo-600 text-white' : 'bg-zinc-200 text-zinc-500'
                           }`}>
                             1
                           </div>
-                          <span className="text-[10px] font-bold text-slate-700 mt-1">Submitted</span>
-                          <span className="text-[9px] text-slate-400">Ticket Logged</span>
+                          <span className="text-[10px] font-bold text-zinc-700 mt-1">Submitted</span>
+                          <span className="text-[9px] text-zinc-400">Ticket Logged</span>
                         </div>
 
                         {/* Step 2: Under Review / Assigned */}
                         <div className="flex flex-col items-center text-center">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-                            selectedTicket.status !== 'New' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'
+                            selectedTicket.status !== 'New' ? 'bg-indigo-700 text-white' : 'bg-zinc-200 text-zinc-500'
                           }`}>
                             2
                           </div>
-                          <span className="text-[10px] font-bold text-slate-700 mt-1">Assigned</span>
-                          <span className="text-[9px] text-slate-400">Tech Dispatched</span>
+                          <span className="text-[10px] font-bold text-zinc-700 mt-1">Assigned</span>
+                          <span className="text-[9px] text-zinc-400">Tech Dispatched</span>
                         </div>
 
                         {/* Step 3: In Progress / Scheduled */}
@@ -871,49 +871,49 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
                             selectedTicket.status === 'In Progress' || selectedTicket.status === 'Scheduled' || selectedTicket.status === 'Completed'
                               ? 'bg-amber-600 text-white'
-                              : 'bg-slate-200 text-slate-500'
+                              : 'bg-zinc-200 text-zinc-500'
                           }`}>
                             3
                           </div>
-                          <span className="text-[10px] font-bold text-slate-700 mt-1">In Progress</span>
-                          <span className="text-[9px] text-slate-400">Service On-Site</span>
+                          <span className="text-[10px] font-bold text-zinc-700 mt-1">In Progress</span>
+                          <span className="text-[9px] text-zinc-400">Service On-Site</span>
                         </div>
 
                         {/* Step 4: Completed */}
                         <div className="flex flex-col items-center text-center">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-                            selectedTicket.status === 'Completed' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'
+                            selectedTicket.status === 'Completed' ? 'bg-emerald-600 text-white' : 'bg-zinc-200 text-zinc-500'
                           }`}>
                             4
                           </div>
-                          <span className="text-[10px] font-bold text-slate-700 mt-1">Completed</span>
-                          <span className="text-[9px] text-slate-400">Resolved & Closed</span>
+                          <span className="text-[10px] font-bold text-zinc-700 mt-1">Completed</span>
+                          <span className="text-[9px] text-zinc-400">Resolved & Closed</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Ticket Details & Assigned Tech */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
-                        <p className="font-bold text-slate-800">Issue Details</p>
-                        <p className="text-slate-600 text-[11px] leading-relaxed">
+                      <div className="bg-zinc-50 p-3 rounded-sm border border-zinc-200 space-y-1.5">
+                        <p className="font-bold text-zinc-800">Issue Details</p>
+                        <p className="text-zinc-600 text-[11px] leading-relaxed">
                           {selectedTicket.description}
                         </p>
                         {selectedTicket.accessInstructions && (
-                          <p className="text-[11px] text-blue-700 font-medium pt-1 border-t border-slate-200">
+                          <p className="text-[11px] text-indigo-700 font-medium pt-1 border-t border-zinc-200">
                             🔑 {selectedTicket.accessInstructions}
                           </p>
                         )}
                       </div>
 
-                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
-                        <p className="font-bold text-slate-800">Assigned Technician</p>
+                      <div className="bg-zinc-50 p-3 rounded-sm border border-zinc-200 space-y-1.5">
+                        <p className="font-bold text-zinc-800">Assigned Technician</p>
                         {selectedTicket.assignedVendorName ? (
                           <div className="space-y-1 text-[11px]">
                             <p className="font-bold text-indigo-900">{selectedTicket.assignedVendorName}</p>
                             {selectedTicket.assignedVendorPhone && (
-                              <p className="text-slate-600 flex items-center gap-1">
-                                <Phone className="w-3 h-3 text-slate-400" />
+                              <p className="text-zinc-600 flex items-center gap-1">
+                                <Phone className="w-3 h-3 text-zinc-400" />
                                 <span>{selectedTicket.assignedVendorPhone}</span>
                               </p>
                             )}
@@ -925,7 +925,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                             )}
                           </div>
                         ) : (
-                          <p className="text-slate-500 text-[11px] italic">
+                          <p className="text-zinc-500 text-[11px] italic">
                             Moyer Operations is reviewing this ticket to dispatch the best certified contractor.
                           </p>
                         )}
@@ -935,8 +935,8 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                     {/* Photos Attached Section */}
                     {selectedTicket.photos && selectedTicket.photos.length > 0 && (
                       <div className="space-y-2">
-                        <p className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                          <ImageIcon className="w-4 h-4 text-blue-600" />
+                        <p className="font-bold text-zinc-800 text-xs flex items-center gap-1.5">
+                          <ImageIcon className="w-4 h-4 text-indigo-600" />
                           <span>Attached Photos ({selectedTicket.photos.length})</span>
                         </p>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -944,7 +944,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                             <div
                               key={pIdx}
                               onClick={() => setPreviewPhoto(photoUrl)}
-                              className="group relative aspect-square rounded-lg overflow-hidden border border-slate-200 cursor-pointer bg-slate-100"
+                              className="group relative aspect-square rounded-sm overflow-hidden border border-zinc-200 cursor-pointer bg-zinc-100"
                             >
                               <img
                                 src={photoUrl}
@@ -952,7 +952,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                                 className="w-full h-full object-cover group-hover:scale-105 transition"
                                 referrerPolicy="no-referrer"
                               />
-                              <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition">
+                              <div className="absolute inset-0 bg-zinc-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition">
                                 <Maximize2 className="w-4 h-4" />
                               </div>
                             </div>
@@ -962,9 +962,9 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                     )}
 
                     {/* Interactive Message Thread */}
-                    <div className="space-y-3 pt-3 border-t border-slate-200">
-                      <p className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                        <MessageSquare className="w-4 h-4 text-blue-600" />
+                    <div className="space-y-3 pt-3 border-t border-zinc-200">
+                      <p className="font-bold text-zinc-800 text-xs flex items-center gap-1.5">
+                        <MessageSquare className="w-4 h-4 text-indigo-600" />
                         <span>Ticket Notes & Communication</span>
                       </p>
 
@@ -974,13 +974,13 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                           selectedTicket.comments.map((comment) => (
                             <div
                               key={comment.id}
-                              className={`p-2.5 rounded-lg border text-[11px] ${
+                              className={`p-2.5 rounded-sm border text-[11px] ${
                                 comment.isTenant
-                                  ? 'bg-blue-50 border-blue-200 text-slate-900 ml-4'
-                                  : 'bg-slate-100 border-slate-200 text-slate-900 mr-4'
+                                  ? 'bg-indigo-50 border-indigo-200 text-zinc-900 ml-4'
+                                  : 'bg-zinc-100 border-zinc-200 text-zinc-900 mr-4'
                               }`}
                             >
-                              <div className="flex items-center justify-between font-bold text-[10px] text-slate-600 mb-1">
+                              <div className="flex items-center justify-between font-bold text-[10px] text-zinc-600 mb-1">
                                 <span>{comment.author} {comment.isTenant ? '(Resident)' : '(Property Ops)'}</span>
                                 <span>{comment.timestamp}</span>
                               </div>
@@ -988,7 +988,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                             </div>
                           ))
                         ) : (
-                          <p className="text-[11px] text-slate-400 italic">No additional notes on this ticket yet.</p>
+                          <p className="text-[11px] text-zinc-400 italic">No additional notes on this ticket yet.</p>
                         )}
                       </div>
 
@@ -999,12 +999,12 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                           value={newComment}
                           onChange={(e) => setNewComment(e.target.value)}
                           placeholder="Type an update, question, or note for property management..."
-                          className="flex-1 p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:bg-white focus:outline-none"
+                          className="flex-1 p-2 bg-zinc-50 border border-zinc-300 rounded-sm text-xs focus:bg-white focus:outline-none"
                         />
                         <button
                           type="submit"
                           disabled={!newComment.trim()}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs transition disabled:opacity-40 flex items-center gap-1"
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-sm text-xs transition disabled:opacity-40 flex items-center gap-1 shadow-xs"
                         >
                           <Send className="w-3.5 h-3.5" />
                           <span>Send</span>
@@ -1013,7 +1013,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-white rounded-xl p-8 border border-slate-200 text-center text-slate-400 text-xs">
+                  <div className="bg-white rounded-sm p-8 border border-zinc-200 text-center text-zinc-400 text-xs">
                     Select a ticket to view live details and communication thread.
                   </div>
                 )}
@@ -1026,53 +1026,53 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
       {/* TAB 3: HOUSE RULES & GUIDE */}
       {activePortalTab === 'house-guide' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-              <Building className="w-4 h-4 text-blue-600" />
+          <div className="bg-white p-5 rounded-sm border border-zinc-200 shadow-xs space-y-4">
+            <h3 className="font-bold text-zinc-900 text-sm flex items-center gap-2">
+              <Building className="w-4 h-4 text-indigo-600" />
               <span>Coliving House Guide & Amenities</span>
             </h3>
             
             <div className="space-y-3">
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <p className="font-bold text-slate-800">Quiet Hours</p>
-                <p className="text-slate-600 text-[11px]">10:00 PM – 7:00 AM daily. Please use headphones in private bedrooms and keep kitchen chatter mindful.</p>
+              <div className="bg-zinc-50 p-3 rounded-sm border border-zinc-200">
+                <p className="font-bold text-zinc-800">Quiet Hours</p>
+                <p className="text-zinc-600 text-[11px]">10:00 PM – 7:00 AM daily. Please use headphones in private bedrooms and keep kitchen chatter mindful.</p>
               </div>
 
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <p className="font-bold text-slate-800">Trash & Recycling Schedule</p>
-                <p className="text-slate-600 text-[11px]">Bins rolled out Tuesday evenings. Professional house cleaning of shared areas occurs every other Thursday.</p>
+              <div className="bg-zinc-50 p-3 rounded-sm border border-zinc-200">
+                <p className="font-bold text-zinc-800">Trash & Recycling Schedule</p>
+                <p className="text-zinc-600 text-[11px]">Bins rolled out Tuesday evenings. Professional house cleaning of shared areas occurs every other Thursday.</p>
               </div>
 
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <p className="font-bold text-slate-800">Month-to-Month Notice Terms</p>
-                <p className="text-slate-600 text-[11px]">All leases operate on a rolling Month-to-Month term. 30 days written notice required prior to move-out.</p>
+              <div className="bg-zinc-50 p-3 rounded-sm border border-zinc-200">
+                <p className="font-bold text-zinc-800">Month-to-Month Notice Terms</p>
+                <p className="text-zinc-600 text-[11px]">All leases operate on a rolling Month-to-Month term. 30 days written notice required prior to move-out.</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-              <Phone className="w-4 h-4 text-blue-600" />
+          <div className="bg-white p-5 rounded-sm border border-zinc-200 shadow-xs space-y-4">
+            <h3 className="font-bold text-zinc-900 text-sm flex items-center gap-2">
+              <Phone className="w-4 h-4 text-indigo-600" />
               <span>Property Management Contacts</span>
             </h3>
 
             <div className="space-y-2.5">
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <p className="font-bold text-slate-900">Jake Moyer (Managing Director)</p>
-                <p className="text-[11px] text-slate-600">Operations & Lease Renewals</p>
-                <p className="font-mono text-blue-600 text-[11px]">(303) 555-0100 • jake@moyerpm.com</p>
+              <div className="p-3 bg-zinc-50 rounded-sm border border-zinc-200">
+                <p className="font-bold text-zinc-900">Jake Moyer (Managing Director)</p>
+                <p className="text-[11px] text-zinc-600">Operations & Lease Renewals</p>
+                <p className="font-mono text-indigo-600 text-[11px]">(303) 555-0100 • jake@moyerpm.com</p>
               </div>
 
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <p className="font-bold text-slate-900">Sarah Jenkins (Resident Coordinator)</p>
-                <p className="text-[11px] text-slate-600">Showing schedules & Move-in inspections</p>
-                <p className="font-mono text-blue-600 text-[11px]">(303) 555-0102 • sarah@moyerpm.com</p>
+              <div className="p-3 bg-zinc-50 rounded-sm border border-zinc-200">
+                <p className="font-bold text-zinc-900">Sarah Jenkins (Resident Coordinator)</p>
+                <p className="text-[11px] text-zinc-600">Showing schedules & Move-in inspections</p>
+                <p className="font-mono text-indigo-600 text-[11px]">(303) 555-0102 • sarah@moyerpm.com</p>
               </div>
 
-              <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                <p className="font-bold text-red-900">24/7 Emergency Dispatch</p>
-                <p className="text-[11px] text-red-700">Immediate dispatch for gas, water flood, or heating failure</p>
-                <p className="font-mono font-bold text-red-800 text-[11px]">(303) 555-0199 (Option 1)</p>
+              <div className="p-3 bg-rose-50 rounded-sm border border-rose-200">
+                <p className="font-bold text-rose-900">24/7 Emergency Dispatch</p>
+                <p className="text-[11px] text-rose-700">Immediate dispatch for gas, water flood, or heating failure</p>
+                <p className="font-mono font-bold text-rose-800 text-[11px]">(303) 555-0199 (Option 1)</p>
               </div>
             </div>
           </div>
@@ -1081,13 +1081,13 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
 
       {/* Photo Lightbox Modal */}
       {previewPhoto && (
-        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="relative max-w-3xl w-full bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-700">
-            <div className="p-3 bg-slate-900 flex items-center justify-between text-white border-b border-slate-800">
-              <span className="text-xs font-bold text-slate-300">Attached Maintenance Photo</span>
+        <div className="fixed inset-0 bg-zinc-950/85 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="relative max-w-3xl w-full bg-zinc-900 rounded-lg overflow-hidden shadow-2xl border border-zinc-700">
+            <div className="p-3 bg-zinc-900 flex items-center justify-between text-white border-b border-zinc-800">
+              <span className="text-xs font-bold text-zinc-300">Attached Maintenance Photo</span>
               <button
                 onClick={() => setPreviewPhoto(null)}
-                className="text-slate-400 hover:text-white p-1"
+                className="text-zinc-400 hover:text-white p-1"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1096,7 +1096,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
               <img
                 src={previewPhoto}
                 alt="Enlarged photo preview"
-                className="max-h-[75vh] w-auto object-contain rounded-lg"
+                className="max-h-[75vh] w-auto object-contain rounded"
                 referrerPolicy="no-referrer"
               />
             </div>

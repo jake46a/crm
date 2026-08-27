@@ -57,12 +57,12 @@ export const DeletePropertyModal: React.FC<DeletePropertyModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-rose-200 overflow-hidden my-8 animate-in fade-in zoom-in duration-150">
+    <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="bg-white rounded-lg max-w-xl w-full shadow-2xl border border-zinc-200 overflow-hidden my-8 animate-in fade-in zoom-in duration-150">
         {/* Modal Header */}
-        <div className="bg-gradient-to-r from-rose-900 to-slate-900 text-white p-5 flex items-center justify-between border-b border-rose-800">
+        <div className="bg-zinc-900 text-white p-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-rose-600/30 border border-rose-500/50 flex items-center justify-center text-rose-300 font-bold">
+            <div className="w-10 h-10 rounded-md bg-rose-600/30 border border-rose-500/50 flex items-center justify-center text-rose-300 font-bold shadow-xs">
               <Trash2 className="w-5 h-5" />
             </div>
             <div>
@@ -72,14 +72,14 @@ export const DeletePropertyModal: React.FC<DeletePropertyModalProps> = ({
                   Cascade Deletion
                 </span>
               </h2>
-              <p className="text-xs text-rose-200/80">
+              <p className="text-xs text-zinc-400">
                 Choose a property to remove. All associated rooms will be permanently deleted.
               </p>
             </div>
           </div>
           <button 
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+            className="text-zinc-400 hover:text-white p-1 rounded-md hover:bg-zinc-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -88,11 +88,11 @@ export const DeletePropertyModal: React.FC<DeletePropertyModalProps> = ({
         <div className="p-6 space-y-5">
           {/* Step 1: Choose Property */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
               1. Choose Property to Delete:
             </label>
             {properties.length === 0 ? (
-              <p className="text-xs text-slate-500 italic p-3 bg-slate-50 border rounded-lg">No properties available to delete.</p>
+              <p className="text-xs text-zinc-500 italic p-3 bg-zinc-50 border border-zinc-200 rounded-md">No properties available to delete.</p>
             ) : (
               <select
                 value={chosenPropertyId}
@@ -100,7 +100,7 @@ export const DeletePropertyModal: React.FC<DeletePropertyModalProps> = ({
                   setChosenPropertyId(e.target.value);
                   setConfirmText('');
                 }}
-                className="w-full p-2.5 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:border-rose-500 focus:ring-0 focus:outline-none"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md text-xs font-bold text-zinc-800 focus:ring-2 focus:ring-rose-500 focus:outline-none"
               >
                 {properties.map(p => {
                   const pRoomCount = rooms.filter(r => r.propertyId === p.id).length;
@@ -117,7 +117,7 @@ export const DeletePropertyModal: React.FC<DeletePropertyModalProps> = ({
           {currentProp && (
             <>
               {/* Cascade Warning Banner */}
-              <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-start gap-3 text-rose-900">
+              <div className="bg-rose-50 border border-rose-200 rounded-md p-4 flex items-start gap-3 text-rose-900">
                 <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
                 <div className="text-xs space-y-1">
                   <p className="font-bold text-rose-950">
@@ -131,23 +131,23 @@ export const DeletePropertyModal: React.FC<DeletePropertyModalProps> = ({
 
               {/* Property Summary Cards */}
               <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Rooms</span>
-                  <span className="text-lg font-bold text-slate-900 font-mono flex items-center justify-center gap-1 mt-0.5">
-                    <Layers className="w-4 h-4 text-slate-600" />
+                <div className="bg-zinc-50 border border-zinc-200 rounded-md p-3">
+                  <span className="text-[10px] uppercase font-bold text-zinc-500 block">Total Rooms</span>
+                  <span className="text-lg font-bold text-zinc-900 font-mono flex items-center justify-center gap-1 mt-0.5">
+                    <Layers className="w-4 h-4 text-zinc-600" />
                     {propRooms.length}
                   </span>
                 </div>
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Active Tenants</span>
-                  <span className={`text-lg font-bold font-mono flex items-center justify-center gap-1 mt-0.5 ${occupiedRooms.length > 0 ? 'text-amber-700' : 'text-slate-700'}`}>
+                <div className="bg-zinc-50 border border-zinc-200 rounded-md p-3">
+                  <span className="text-[10px] uppercase font-bold text-zinc-500 block">Active Tenants</span>
+                  <span className={`text-lg font-bold font-mono flex items-center justify-center gap-1 mt-0.5 ${occupiedRooms.length > 0 ? 'text-amber-700' : 'text-zinc-700'}`}>
                     <Users className="w-4 h-4" />
                     {occupiedRooms.length}
                   </span>
                 </div>
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Monthly Revenue</span>
-                  <span className="text-lg font-bold text-slate-900 font-mono flex items-center justify-center gap-0.5 mt-0.5">
+                <div className="bg-zinc-50 border border-zinc-200 rounded-md p-3">
+                  <span className="text-[10px] uppercase font-bold text-zinc-500 block">Monthly Revenue</span>
+                  <span className="text-lg font-bold text-zinc-900 font-mono flex items-center justify-center gap-0.5 mt-0.5">
                     ${totalRent.toLocaleString()}
                   </span>
                 </div>
@@ -156,20 +156,20 @@ export const DeletePropertyModal: React.FC<DeletePropertyModalProps> = ({
               {/* List of rooms to be deleted */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <span className="text-xs font-bold text-zinc-700 uppercase tracking-wider">
                     Rooms that will be deleted ({propRooms.length}):
                   </span>
-                  <span className="text-[11px] text-slate-500 font-mono">
+                  <span className="text-[11px] text-zinc-500 font-mono">
                     Owner: {currentProp.ownerName}
                   </span>
                 </div>
                 
                 {propRooms.length === 0 ? (
-                  <p className="text-xs text-slate-500 p-3 bg-slate-50 rounded-lg border border-dashed border-slate-300 text-center">
+                  <p className="text-xs text-zinc-500 p-3 bg-zinc-50 rounded-md border border-dashed border-zinc-300 text-center">
                     This property has 0 rooms configured.
                   </p>
                 ) : (
-                  <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 bg-slate-50/50">
+                  <div className="max-h-48 overflow-y-auto border border-zinc-200 rounded-md divide-y divide-zinc-100 bg-zinc-50/50">
                     {propRooms.map(room => (
                       <div key={room.id} className="p-2.5 flex items-center justify-between text-xs hover:bg-white transition-colors">
                         <div className="flex items-center gap-2">
@@ -177,8 +177,8 @@ export const DeletePropertyModal: React.FC<DeletePropertyModalProps> = ({
                             {room.roomNumber}
                           </div>
                           <div>
-                            <span className="font-bold text-slate-800">{room.name}</span>
-                            <span className="text-slate-500 text-[11px] ml-1.5">
+                            <span className="font-bold text-zinc-800">{room.name}</span>
+                            <span className="text-zinc-500 text-[11px] ml-1.5">
                               ({room.bathroomType} • {room.sqft} sqft)
                             </span>
                           </div>
@@ -190,11 +190,11 @@ export const DeletePropertyModal: React.FC<DeletePropertyModalProps> = ({
                               Tenant: {room.currentTenantName}
                             </span>
                           ) : (
-                            <span className="text-[11px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md font-medium">
+                            <span className="text-[11px] bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
                               {room.status}
                             </span>
                           )}
-                          <span className="font-bold text-slate-900 font-mono">${room.monthlyRent}/mo</span>
+                          <span className="font-bold text-zinc-900 font-mono">${room.monthlyRent}/mo</span>
                         </div>
                       </div>
                     ))}
@@ -205,11 +205,11 @@ export const DeletePropertyModal: React.FC<DeletePropertyModalProps> = ({
           )}
 
           {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-slate-200">
+          <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-zinc-200">
             <button
               type="button"
               onClick={onClose}
-              className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50 text-xs transition-colors"
+              className="w-full sm:w-auto px-4 py-2.5 rounded-md border border-zinc-300 text-zinc-700 font-semibold hover:bg-zinc-50 text-xs transition-colors"
             >
               Cancel
             </button>
@@ -217,7 +217,7 @@ export const DeletePropertyModal: React.FC<DeletePropertyModalProps> = ({
               type="button"
               disabled={!currentProp}
               onClick={handleDelete}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs shadow-md transition-colors"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-md font-bold text-xs shadow-xs transition-colors"
             >
               <Trash2 className="w-4 h-4" />
               <span>

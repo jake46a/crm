@@ -568,7 +568,7 @@ export default function App() {
   const openWorkOrdersCount = workOrders.filter(w => w.status !== 'Completed' && w.status !== 'Cancelled').length;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col lg:flex-row selection:bg-blue-500 selection:text-white">
+    <div className="min-h-screen bg-zinc-50 text-zinc-900 font-sans flex flex-col lg:flex-row selection:bg-indigo-500 selection:text-white">
       {/* Sidebar & Top Navigation Header */}
       <Header
         currentTab={activeTab}
@@ -612,8 +612,8 @@ export default function App() {
         <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
           {/* Toast Notification */}
           {toastMessage && (
-            <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-sm shadow-xl border border-slate-700 text-xs font-semibold flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-400" />
+            <div className="fixed bottom-6 right-6 z-50 bg-zinc-900 text-white px-4 py-2.5 rounded-sm shadow-xl border border-zinc-750 text-xs font-semibold flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-indigo-400" />
               <span>{toastMessage}</span>
             </div>
           )}

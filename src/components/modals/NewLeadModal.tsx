@@ -89,56 +89,56 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8">
-        <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
+    <div className="fixed inset-0 bg-zinc-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="bg-white rounded-lg max-w-xl w-full shadow-2xl border border-zinc-200 overflow-hidden my-8">
+        <div className="bg-zinc-900 text-white p-5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center font-bold">
-              <Users2 className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-md bg-indigo-600 flex items-center justify-center font-bold text-white shadow-xs">
+              <Users2 className="w-4 h-4" />
             </div>
             <div>
               <h2 className="font-bold text-sm text-white">
                 {editingLead ? `Edit Lead: ${editingLead.name}` : 'Record New Tenant Lead'}
               </h2>
-              <p className="text-[11px] text-slate-400">Add applicant profile, room preferences, and roommate survey</p>
+              <p className="text-[11px] text-zinc-400">Add applicant profile, room preferences, and roommate survey</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+          <button onClick={onClose} className="text-zinc-400 hover:text-white p-1">✕</button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs max-h-[700px] overflow-y-auto">
           {/* Contact Details */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Full Name *</label>
+              <label className="block font-bold text-zinc-700 mb-1">Full Name *</label>
               <input
                 type="text"
                 required
                 placeholder="e.g. Jordan Miller"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Email *</label>
+              <label className="block font-bold text-zinc-700 mb-1">Email *</label>
               <input
                 type="email"
                 required
                 placeholder="jordan@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Phone Number</label>
+              <label className="block font-bold text-zinc-700 mb-1">Phone Number</label>
               <input
                 type="tel"
                 placeholder="(303) 555-0182"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono"
               />
             </div>
           </div>
@@ -146,11 +146,11 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
           {/* Lead Source & Stage */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Acquisition Source</label>
+              <label className="block font-bold text-zinc-700 mb-1">Acquisition Source</label>
               <select
                 value={source}
                 onChange={(e) => setSource(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               >
                 <option value="Roomies.com">Roomies.com</option>
                 <option value="Zillow Room Rental">Zillow Room Rental</option>
@@ -162,11 +162,11 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Pipeline Stage</label>
+              <label className="block font-bold text-zinc-700 mb-1">Pipeline Stage</label>
               <select
                 value={stage}
                 onChange={(e) => setStage(e.target.value as any)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-semibold"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               >
                 <option value="New Inquiry">New Inquiry</option>
                 <option value="Tour Scheduled">Tour Scheduled</option>
@@ -179,14 +179,14 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Lead Score (0-100)</label>
+              <label className="block font-bold text-zinc-700 mb-1">Lead Score (0-100)</label>
               <input
                 type="number"
                 min="0"
                 max="100"
                 value={score}
                 onChange={(e) => setScore(Number(e.target.value))}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-bold text-emerald-800"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md font-bold text-emerald-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
             </div>
           </div>
@@ -194,33 +194,33 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
           {/* Financials & Preferences */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Occupation</label>
+              <label className="block font-bold text-zinc-700 mb-1">Occupation</label>
               <input
                 type="text"
                 placeholder="e.g. Registered Nurse"
                 value={occupation}
                 onChange={(e) => setOccupation(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Monthly Income ($)</label>
+              <label className="block font-bold text-zinc-700 mb-1">Monthly Income ($)</label>
               <input
                 type="number"
                 value={monthlyIncome}
                 onChange={(e) => setMonthlyIncome(Number(e.target.value))}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono"
               />
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Max Budget ($/mo)</label>
+              <label className="block font-bold text-zinc-700 mb-1">Max Budget ($/mo)</label>
               <input
                 type="number"
                 value={maxBudget}
                 onChange={(e) => setMaxBudget(Number(e.target.value))}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-bold"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono text-zinc-900"
               />
             </div>
           </div>
@@ -228,11 +228,11 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
           {/* Property & Room Preferences */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Preferred House</label>
+              <label className="block font-bold text-zinc-700 mb-1">Preferred House</label>
               <select
                 value={preferredPropertyId}
                 onChange={(e) => setPreferredPropertyId(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               >
                 {properties.map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
@@ -241,11 +241,11 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Bath Preference</label>
+              <label className="block font-bold text-zinc-700 mb-1">Bath Preference</label>
               <select
                 value={preferredBathroom}
                 onChange={(e) => setPreferredBathroom(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               >
                 <option value="Private Ensuite Preferred">Private Ensuite Preferred</option>
                 <option value="Shared Bathroom OK">Shared Bathroom OK</option>
@@ -254,26 +254,26 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Target Move-in</label>
+              <label className="block font-bold text-zinc-700 mb-1">Target Move-in</label>
               <input
                 type="date"
                 value={targetMoveInDate}
                 onChange={(e) => setTargetMoveInDate(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
             </div>
           </div>
 
           {/* Roommate Lifestyle Compatibility Survey */}
-          <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
-            <span className="font-bold text-slate-800 text-xs block">Coliving Compatibility Profile</span>
+          <div className="bg-zinc-50 p-3.5 rounded-md border border-zinc-200 space-y-3">
+            <span className="font-bold text-zinc-800 text-xs block">Coliving Compatibility Profile</span>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div>
-                <label className="block text-[11px] text-slate-500 mb-1">Cleanliness</label>
+                <label className="block text-[11px] text-zinc-500 mb-1">Cleanliness</label>
                 <select
                   value={cleanliness}
                   onChange={(e) => setCleanliness(e.target.value)}
-                  className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs"
+                  className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 >
                   <option value="Immaculate / Shared Chore Champion">Immaculate / Chore Champion</option>
                   <option value="Very Clean / Daily Tidy">Very Clean / Daily Tidy</option>
@@ -282,11 +282,11 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-500 mb-1">Work / Sleep Schedule</label>
+                <label className="block text-[11px] text-zinc-500 mb-1">Work / Sleep Schedule</label>
                 <select
                   value={schedule}
                   onChange={(e) => setSchedule(e.target.value)}
-                  className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs"
+                  className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 >
                   <option value="9-to-5 Daytime">9-to-5 Daytime</option>
                   <option value="Early Morning (6 AM)">Early Morning (6 AM)</option>
@@ -296,11 +296,11 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-500 mb-1">Social Style</label>
+                <label className="block text-[11px] text-zinc-500 mb-1">Social Style</label>
                 <select
                   value={socialLevel}
                   onChange={(e) => setSocialLevel(e.target.value)}
-                  className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs"
+                  className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 >
                   <option value="Quiet & Independent">Quiet & Independent</option>
                   <option value="Balanced (Polite & Independent)">Balanced (Polite & Indep.)</option>
@@ -311,27 +311,27 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
           </div>
 
           <div>
-            <label className="block font-bold text-slate-700 mb-1">Inquiry / Screening Notes</label>
+            <label className="block font-bold text-zinc-700 mb-1">Inquiry / Screening Notes</label>
             <textarea
               rows={2}
               placeholder="e.g. Relocating from Seattle for new tech role. Clean background, no pets."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+              className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />
           </div>
 
-          <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200">
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-zinc-200">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium"
+              className="px-4 py-2 rounded-md border border-zinc-300 text-zinc-700 font-medium hover:bg-zinc-50 transition"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-md transition"
+              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-bold shadow-xs transition"
             >
               {editingLead ? 'Save Lead' : 'Create Lead'}
             </button>

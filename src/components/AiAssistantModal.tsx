@@ -149,49 +149,49 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8">
+    <div className="fixed inset-0 bg-zinc-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="bg-white rounded-lg max-w-3xl w-full shadow-2xl border border-zinc-200 overflow-hidden my-8">
         {/* Modal Header */}
-        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-5 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 text-white p-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center text-slate-950 font-bold shadow-md">
+            <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold shadow-xs">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
               <h2 className="font-extrabold text-base tracking-tight text-white flex items-center gap-2">
                 <span>Moyer Smart Operations Assistant</span>
-                <span className="text-[10px] uppercase font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] uppercase font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">
                   AI Powered
                 </span>
               </h2>
-              <p className="text-xs text-slate-300">Fast room rental copywriting, lease renewals, and tenant triage</p>
+              <p className="text-xs text-zinc-300">Fast room rental copywriting, lease renewals, and tenant triage</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center"
+            className="w-8 h-8 rounded-md bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition"
           >
             ✕
           </button>
         </div>
 
         {/* Tool Navigation Bar */}
-        <div className="flex border-b border-slate-200 bg-slate-50 px-4 pt-2 overflow-x-auto text-xs">
+        <div className="flex border-b border-zinc-200 bg-zinc-50 px-4 pt-2 overflow-x-auto text-xs">
           <button
             onClick={() => { setActiveTool('renewal'); if (!renewalOutput) generateRenewalLetter(); }}
             className={`flex items-center gap-1.5 px-4 py-2.5 font-bold border-b-2 transition whitespace-nowrap ${
-              activeTool === 'renewal' ? 'border-amber-500 text-slate-900 bg-white rounded-t-lg' : 'border-transparent text-slate-600 hover:text-slate-900'
+              activeTool === 'renewal' ? 'border-indigo-600 text-zinc-900 bg-white rounded-t-md' : 'border-transparent text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <FileText className="w-4 h-4 text-blue-600" />
+            <FileText className="w-4 h-4 text-indigo-600" />
             <span>Lease Renewal Notice</span>
           </button>
 
           <button
             onClick={() => { setActiveTool('matcher'); if (!matchOutput) generateRoommateMatch(); }}
             className={`flex items-center gap-1.5 px-4 py-2.5 font-bold border-b-2 transition whitespace-nowrap ${
-              activeTool === 'matcher' ? 'border-amber-500 text-slate-900 bg-white rounded-t-lg' : 'border-transparent text-slate-600 hover:text-slate-900'
+              activeTool === 'matcher' ? 'border-indigo-600 text-zinc-900 bg-white rounded-t-md' : 'border-transparent text-zinc-600 hover:text-zinc-900'
             }`}
           >
             <Users2 className="w-4 h-4 text-emerald-600" />
@@ -201,7 +201,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
           <button
             onClick={() => { setActiveTool('triage'); if (!triageOutput) generateTriage(); }}
             className={`flex items-center gap-1.5 px-4 py-2.5 font-bold border-b-2 transition whitespace-nowrap ${
-              activeTool === 'triage' ? 'border-amber-500 text-slate-900 bg-white rounded-t-lg' : 'border-transparent text-slate-600 hover:text-slate-900'
+              activeTool === 'triage' ? 'border-indigo-600 text-zinc-900 bg-white rounded-t-md' : 'border-transparent text-zinc-600 hover:text-zinc-900'
             }`}
           >
             <Wrench className="w-4 h-4 text-rose-600" />
@@ -211,10 +211,10 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
           <button
             onClick={() => { setActiveTool('marketing'); if (!marketingOutput) generateMarketingListing(); }}
             className={`flex items-center gap-1.5 px-4 py-2.5 font-bold border-b-2 transition whitespace-nowrap ${
-              activeTool === 'marketing' ? 'border-amber-500 text-slate-900 bg-white rounded-t-lg' : 'border-transparent text-slate-600 hover:text-slate-900'
+              activeTool === 'marketing' ? 'border-indigo-600 text-zinc-900 bg-white rounded-t-md' : 'border-transparent text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <Home className="w-4 h-4 text-amber-600" />
+            <Home className="w-4 h-4 text-indigo-600" />
             <span>Room Marketing Copy</span>
           </button>
         </div>
@@ -226,11 +226,11 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Select Tenant & Lease Expiration:</label>
+                  <label className="block text-xs font-bold text-zinc-700 mb-1">Select Tenant & Lease Expiration:</label>
                   <select
                     value={selectedRenewalId}
                     onChange={(e) => setSelectedRenewalId(e.target.value)}
-                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                    className="w-full text-xs p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   >
                     {renewals.map(ren => (
                       <option key={ren.id} value={ren.id}>
@@ -241,11 +241,11 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Renewal Tone / Strategy:</label>
+                  <label className="block text-xs font-bold text-zinc-700 mb-1">Renewal Tone / Strategy:</label>
                   <select
                     value={renewalTone}
                     onChange={(e) => setRenewalTone(e.target.value as any)}
-                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                    className="w-full text-xs p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   >
                     <option value="warm">Warm Community Resident Offer</option>
                     <option value="incentive">Preferred Resident Incentive (Deep Clean Perk)</option>
@@ -257,7 +257,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
               <div className="flex justify-end">
                 <button
                   onClick={generateRenewalLetter}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold shadow transition"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-bold shadow-xs transition"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>Generate Notice Draft</span>
@@ -266,17 +266,17 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
 
               {renewalOutput && (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-bold text-slate-700">Customized Renewal Letter Preview:</span>
+                  <div className="flex items-center justify-between text-xs text-zinc-500">
+                    <span className="font-bold text-zinc-700">Customized Renewal Letter Preview:</span>
                     <button
                       onClick={() => copyToClipboard(renewalOutput)}
-                      className="flex items-center gap-1 text-amber-700 font-bold hover:text-amber-800"
+                      className="flex items-center gap-1 text-indigo-600 font-bold hover:text-indigo-700"
                     >
                       {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                       <span>{copied ? 'Copied to Clipboard!' : 'Copy Letter'}</span>
                     </button>
                   </div>
-                  <pre className="text-xs bg-slate-50 p-4 rounded-xl border border-slate-200 text-slate-800 font-sans whitespace-pre-wrap leading-relaxed shadow-inner">
+                  <pre className="text-xs bg-zinc-50 p-4 rounded-lg border border-zinc-200 text-zinc-800 font-sans whitespace-pre-wrap leading-relaxed shadow-inner">
                     {renewalOutput}
                   </pre>
                 </div>
@@ -289,11 +289,11 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Select Prospective Lead:</label>
+                  <label className="block text-xs font-bold text-zinc-700 mb-1">Select Prospective Lead:</label>
                   <select
                     value={selectedLeadId}
                     onChange={(e) => setSelectedLeadId(e.target.value)}
-                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                    className="w-full text-xs p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   >
                     {leads.map(lead => (
                       <option key={lead.id} value={lead.id}>
@@ -304,11 +304,11 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Match Against Room / House:</label>
+                  <label className="block text-xs font-bold text-zinc-700 mb-1">Match Against Room / House:</label>
                   <select
                     value={selectedRoomId}
                     onChange={(e) => setSelectedRoomId(e.target.value)}
-                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                    className="w-full text-xs p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   >
                     {rooms.map(room => (
                       <option key={room.id} value={room.id}>
@@ -322,7 +322,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
               <div className="flex justify-end">
                 <button
                   onClick={generateRoommateMatch}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold shadow transition"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold shadow-xs transition"
                 >
                   <Users2 className="w-3.5 h-3.5" />
                   <span>Analyze Compatibility</span>
@@ -330,30 +330,30 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
               </div>
 
               {matchOutput && (
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-3 text-xs">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <div className="bg-zinc-50 rounded-lg p-4 border border-zinc-200 space-y-3 text-xs">
+                  <div className="flex items-center justify-between pb-2 border-b border-zinc-200">
                     <div>
-                      <span className="font-bold text-slate-900 text-sm">{matchOutput.verdict}</span>
-                      <p className="text-slate-500 text-[11px]">Roommate Cohort Synthesis</p>
+                      <span className="font-bold text-zinc-900 text-sm">{matchOutput.verdict}</span>
+                      <p className="text-zinc-500 text-[11px]">Roommate Cohort Synthesis</p>
                     </div>
                     <div className="text-right">
-                      <span className="text-lg font-black text-emerald-700">{matchOutput.score}%</span>
-                      <p className="text-[10px] text-slate-400">Match Index</p>
+                      <span className="text-lg font-black text-emerald-600">{matchOutput.score}%</span>
+                      <p className="text-[10px] text-zinc-400">Match Index</p>
                     </div>
                   </div>
 
                   <div>
-                    <p className="font-bold text-slate-800 text-xs mb-1.5 text-emerald-800">✅ Key Fit Strengths:</p>
-                    <ul className="space-y-1 text-slate-700 text-[11px] list-disc list-inside">
+                    <p className="font-bold text-zinc-800 text-xs mb-1.5 text-emerald-700">✅ Key Fit Strengths:</p>
+                    <ul className="space-y-1 text-zinc-700 text-[11px] list-disc list-inside">
                       {matchOutput.highlights.map((h, i) => (
                         <li key={i}>{h}</li>
                       ))}
                     </ul>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-200">
-                    <p className="font-bold text-slate-800 text-xs mb-1.5 text-amber-800">⚠️ House Management Checklist:</p>
-                    <ul className="space-y-1 text-slate-700 text-[11px] list-disc list-inside">
+                  <div className="pt-2 border-t border-zinc-200">
+                    <p className="font-bold text-zinc-800 text-xs mb-1.5 text-amber-700">⚠️ House Management Checklist:</p>
+                    <ul className="space-y-1 text-zinc-700 text-[11px] list-disc list-inside">
                       {matchOutput.considerations.map((c, i) => (
                         <li key={i}>{c}</li>
                       ))}
@@ -368,19 +368,19 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
           {activeTool === 'triage' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Describe Maintenance Problem:</label>
+                <label className="block text-xs font-bold text-zinc-700 mb-1">Describe Maintenance Problem:</label>
                 <textarea
                   rows={3}
                   value={triageProblem}
                   onChange={(e) => setTriageProblem(e.target.value)}
-                  className="w-full text-xs p-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                  className="w-full text-xs p-3 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
               </div>
 
               <div className="flex justify-end">
                 <button
                   onClick={generateTriage}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow transition"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-xs font-bold shadow-xs transition"
                 >
                   <Wrench className="w-3.5 h-3.5" />
                   <span>Triage & Draft Dispatch</span>
@@ -388,31 +388,31 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
               </div>
 
               {triageOutput && (
-                <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                    <span className="font-bold text-slate-900">{triageOutput.category}</span>
+                <div className="space-y-3 bg-zinc-50 p-4 rounded-lg border border-zinc-200 text-xs">
+                  <div className="flex items-center justify-between pb-2 border-b border-zinc-200">
+                    <span className="font-bold text-zinc-900">{triageOutput.category}</span>
                     <span className="font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
                       {triageOutput.priority}
                     </span>
                   </div>
 
-                  <div className="bg-amber-50 border border-amber-200 p-2.5 rounded-lg text-amber-900 text-[11px]">
+                  <div className="bg-amber-50 border border-amber-200 p-2.5 rounded-md text-amber-900 text-[11px]">
                     <strong className="block mb-0.5">🛡️ Housemate Safety Protocol:</strong>
                     {triageOutput.safetyTips}
                   </div>
 
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-slate-800 text-[11px]">Contractor SMS Dispatch Text:</span>
+                      <span className="font-bold text-zinc-800 text-[11px]">Contractor SMS Dispatch Text:</span>
                       <button
                         onClick={() => copyToClipboard(triageOutput.vendorText)}
-                        className="text-amber-700 font-bold hover:text-amber-800 flex items-center gap-1 text-[11px]"
+                        className="text-indigo-600 font-bold hover:text-indigo-700 flex items-center gap-1 text-[11px]"
                       >
                         {copied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
                         <span>Copy Dispatch SMS</span>
                       </button>
                     </div>
-                    <pre className="text-[11px] bg-white p-3 rounded-lg border border-slate-200 text-slate-800 whitespace-pre-wrap font-mono">
+                    <pre className="text-[11px] bg-white p-3 rounded-md border border-zinc-200 text-zinc-800 whitespace-pre-wrap font-mono">
                       {triageOutput.vendorText}
                     </pre>
                   </div>
@@ -425,11 +425,11 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
           {activeTool === 'marketing' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Select Room to Advertise:</label>
+                <label className="block text-xs font-bold text-zinc-700 mb-1">Select Room to Advertise:</label>
                 <select
                   value={marketingRoomId}
                   onChange={(e) => setMarketingRoomId(e.target.value)}
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                  className="w-full text-xs p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 >
                   {rooms.map(room => (
                     <option key={room.id} value={room.id}>
@@ -442,7 +442,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
               <div className="flex justify-end">
                 <button
                   onClick={generateMarketingListing}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-bold shadow transition"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-bold shadow-xs transition"
                 >
                   <Home className="w-3.5 h-3.5" />
                   <span>Generate Zillow / Roomies Ad</span>
@@ -451,17 +451,17 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
 
               {marketingOutput && (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-bold text-slate-700">Listing Description Ready to Post:</span>
+                  <div className="flex items-center justify-between text-xs text-zinc-500">
+                    <span className="font-bold text-zinc-700">Listing Description Ready to Post:</span>
                     <button
                       onClick={() => copyToClipboard(marketingOutput)}
-                      className="flex items-center gap-1 text-amber-700 font-bold hover:text-amber-800"
+                      className="flex items-center gap-1 text-indigo-600 font-bold hover:text-indigo-700"
                     >
                       {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                       <span>Copy Listing</span>
                     </button>
                   </div>
-                  <pre className="text-xs bg-slate-50 p-4 rounded-xl border border-slate-200 text-slate-800 font-sans whitespace-pre-wrap leading-relaxed shadow-inner">
+                  <pre className="text-xs bg-zinc-50 p-4 rounded-lg border border-zinc-200 text-zinc-800 font-sans whitespace-pre-wrap leading-relaxed shadow-inner">
                     {marketingOutput}
                   </pre>
                 </div>
@@ -471,11 +471,11 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center text-xs">
-          <span className="text-slate-500 text-[11px]">Moyer Property Management Intelligence Hub</span>
+        <div className="bg-zinc-50 p-4 border-t border-zinc-200 flex justify-between items-center text-xs">
+          <span className="text-zinc-500 text-[11px]">Moyer Property Management Intelligence Hub</span>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800"
+            className="px-4 py-1.5 bg-zinc-900 text-white rounded-md font-bold hover:bg-zinc-800 transition"
           >
             Done
           </button>

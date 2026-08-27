@@ -123,46 +123,46 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-8">
-        <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
+    <div className="fixed inset-0 bg-zinc-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="bg-white rounded-lg max-w-lg w-full shadow-2xl border border-zinc-200 overflow-hidden my-8">
+        <div className="bg-zinc-900 text-white p-5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-rose-600 flex items-center justify-center font-bold">
-              <Wrench className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-md bg-indigo-600 flex items-center justify-center font-bold text-white shadow-xs">
+              <Wrench className="w-4 h-4" />
             </div>
             <div>
               <h2 className="font-bold text-sm text-white">
                 {editingWorkOrder ? `Manage Work Order ${editingWorkOrder.ticketNumber}` : 'Create Maintenance Work Order'}
               </h2>
-              <p className="text-[11px] text-slate-400">Log repair, room fixture, or common area ticket</p>
+              <p className="text-[11px] text-zinc-400">Log repair, room fixture, or common area ticket</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+          <button onClick={onClose} className="text-zinc-400 hover:text-white p-1">✕</button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs max-h-[700px] overflow-y-auto">
           <div>
-            <label className="block font-bold text-slate-700 mb-1">Issue Title *</label>
+            <label className="block font-bold text-zinc-700 mb-1">Issue Title *</label>
             <input
               type="text"
               required
               placeholder="e.g. Master Bedroom Shower Faucet Dripping"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500"
+              className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Property *</label>
+              <label className="block font-bold text-zinc-700 mb-1">Property *</label>
               <select
                 value={propertyId}
                 onChange={(e) => {
                   setPropertyId(e.target.value);
                   setRoomId('common');
                 }}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               >
                 {properties.map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
@@ -171,11 +171,11 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Specific Room or Area *</label>
+              <label className="block font-bold text-zinc-700 mb-1">Specific Room or Area *</label>
               <select
                 value={roomId}
                 onChange={(e) => setRoomId(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               >
                 <option value="common">🏠 Shared Commons (Kitchen / Living / Yard)</option>
                 {propertyRooms.map(r => (
@@ -187,11 +187,11 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Category</label>
+              <label className="block font-bold text-zinc-700 mb-1">Category</label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as any)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               >
                 <option value="Plumbing">Plumbing</option>
                 <option value="HVAC / Heating">HVAC / Heating</option>
@@ -206,11 +206,11 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Priority</label>
+              <label className="block font-bold text-zinc-700 mb-1">Priority</label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as any)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-semibold"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               >
                 <option value="Low">Low Priority</option>
                 <option value="Medium">Medium Priority</option>
@@ -221,23 +221,23 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
           </div>
 
           <div>
-            <label className="block font-bold text-slate-700 mb-1">Problem Description</label>
+            <label className="block font-bold text-zinc-700 mb-1">Problem Description</label>
             <textarea
               rows={3}
               placeholder="Describe symptoms, noise, water leak location, or tenant report..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+              className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Assign Vendor / Contractor</label>
+              <label className="block font-bold text-zinc-700 mb-1">Assign Vendor / Contractor</label>
               <select
                 value={assignedVendorId}
                 onChange={(e) => setAssignedVendorId(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               >
                 <option value="">-- Leave Unassigned --</option>
                 {contractors.map(c => (
@@ -247,24 +247,24 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Estimated Cost ($)</label>
+              <label className="block font-bold text-zinc-700 mb-1">Estimated Cost ($)</label>
               <input
                 type="number"
                 value={estimatedCost}
                 onChange={(e) => setEstimatedCost(Number(e.target.value))}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono"
               />
             </div>
           </div>
 
           {editingWorkOrder && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-zinc-200">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Ticket Status</label>
+                <label className="block font-bold text-zinc-700 mb-1">Ticket Status</label>
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-bold"
+                  className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 >
                   <option value="New">New</option>
                   <option value="Assigned">Assigned</option>
@@ -275,13 +275,13 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Actual Final Cost ($)</label>
+                <label className="block font-bold text-zinc-700 mb-1">Actual Final Cost ($)</label>
                 <input
                   type="number"
                   placeholder="Invoiced cost"
                   value={actualCost !== undefined ? actualCost : ''}
                   onChange={(e) => setActualCost(e.target.value ? Number(e.target.value) : undefined)}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+                  className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono"
                 />
               </div>
             </div>
@@ -289,28 +289,28 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
 
           {editingWorkOrder && (
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Resolution Summary</label>
+              <label className="block font-bold text-zinc-700 mb-1">Resolution Summary</label>
               <input
                 type="text"
                 placeholder="e.g. Replaced P-trap and tested flow for 5 minutes without leaks"
                 value={resolutionSummary}
                 onChange={(e) => setResolutionSummary(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg"
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
             </div>
           )}
 
-          <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200">
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-zinc-200">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium"
+              className="px-4 py-2 rounded-md border border-zinc-300 text-zinc-700 font-medium hover:bg-zinc-50 transition"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold shadow-md transition"
+              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-bold shadow-xs transition"
             >
               {editingWorkOrder ? 'Save Changes' : 'Create Work Order'}
             </button>

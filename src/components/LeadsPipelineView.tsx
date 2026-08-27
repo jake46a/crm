@@ -52,8 +52,8 @@ export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const PIPELINE_STAGES: { id: LeadStage; title: string; subtitle: string; color: string }[] = [
-    { id: 'New Lead', title: '1. New Lead', subtitle: 'Inbound inquiries & web forms', color: 'border-slate-300 bg-slate-50 text-slate-800' },
-    { id: 'Contacted', title: '2. Contacted', subtitle: 'Screened for lifestyle & fit', color: 'border-blue-300 bg-blue-50 text-blue-900' },
+    { id: 'New Lead', title: '1. New Lead', subtitle: 'Inbound inquiries & web forms', color: 'border-zinc-300 bg-zinc-50 text-zinc-800' },
+    { id: 'Contacted', title: '2. Contacted', subtitle: 'Screened for lifestyle & fit', color: 'border-indigo-300 bg-indigo-50 text-indigo-900' },
     { id: 'Showing Scheduled', title: '3. Showing Scheduled', subtitle: 'Room & common area tours', color: 'border-purple-300 bg-purple-50 text-purple-900' },
     { id: 'Application Received', title: '4. Application Received', subtitle: 'ID, credit & income check', color: 'border-amber-300 bg-amber-50 text-amber-900' },
     { id: 'Lease Signed', title: '5. Lease Signed', subtitle: 'Month-to-Month lease executed', color: 'border-emerald-300 bg-emerald-50 text-emerald-950' }
@@ -122,18 +122,18 @@ export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
   return (
     <div className="space-y-6 pb-12">
       {/* Top Header */}
-      <div className="bg-white rounded-sm p-5 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white rounded-sm p-5 border border-zinc-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <Users2 className="w-4 h-4 text-blue-600" />
-            <h1 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <Users2 className="w-4 h-4 text-indigo-600" />
+            <h1 className="text-xs font-bold text-zinc-700 uppercase tracking-wider">
               Tenant Leads & Roommate Matching Pipeline
             </h1>
             <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] px-2 py-0.5 rounded-sm font-bold uppercase tracking-tight">
               {activeLeads.length} Active Prospects
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-zinc-500 mt-1">
             Track inquiries, background checks, roommate lifestyle compatibility, and convert applicants to tenants.
           </p>
         </div>
@@ -141,9 +141,9 @@ export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={onOpenAssistant}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 text-xs font-semibold uppercase tracking-wider transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 text-xs font-semibold uppercase tracking-wider transition-colors"
           >
-            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
             <span>AI Roommate Matcher</span>
           </button>
 
@@ -160,7 +160,7 @@ export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
 
           <button
             onClick={onOpenNewLeadModal}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-sm bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold uppercase tracking-wider transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-sm bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold uppercase tracking-wider transition-colors shadow-xs"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>+ Add Tenant Lead</span>
@@ -170,42 +170,42 @@ export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
 
       {/* KPI Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-sm p-5 border border-slate-200 shadow-xs">
-          <span className="text-xs font-bold uppercase tracking-tight text-slate-400">Total Prospects</span>
-          <p className="text-3xl font-light text-slate-900 mt-2">{totalLeads}</p>
-          <p className="text-xs text-slate-500 mt-1">{activeLeads.length} active in pipeline</p>
+        <div className="bg-white rounded-sm p-5 border border-zinc-200 shadow-xs">
+          <span className="text-xs font-bold uppercase tracking-tight text-zinc-400">Total Prospects</span>
+          <p className="text-3xl font-light text-zinc-900 mt-2">{totalLeads}</p>
+          <p className="text-xs text-zinc-500 mt-1">{activeLeads.length} active in pipeline</p>
         </div>
 
-        <div className="bg-white rounded-sm p-5 border border-slate-200 shadow-xs">
+        <div className="bg-white rounded-sm p-5 border border-zinc-200 shadow-xs">
           <span className="text-xs font-bold uppercase tracking-tight text-emerald-600">Top-Tier Qualified (★90+)</span>
           <p className="text-3xl font-light text-emerald-600 mt-2">{qualifiedScore90}</p>
-          <p className="text-xs text-slate-500 mt-1">High credit & verified income</p>
+          <p className="text-xs text-zinc-500 mt-1">High credit & verified income</p>
         </div>
 
-        <div className="bg-white rounded-sm p-5 border border-slate-200 shadow-xs">
+        <div className="bg-white rounded-sm p-5 border border-zinc-200 shadow-xs">
           <span className="text-xs font-bold uppercase tracking-tight text-amber-600">Applications Received</span>
           <p className="text-3xl font-light text-amber-600 mt-2">{inApplication}</p>
-          <p className="text-xs text-slate-500 mt-1">Paystubs & IDs in verification</p>
+          <p className="text-xs text-zinc-500 mt-1">Paystubs & IDs in verification</p>
         </div>
 
-        <div className="bg-white rounded-sm p-5 border border-slate-200 shadow-xs">
-          <span className="text-xs font-bold uppercase tracking-tight text-blue-600">Lease Signed / Converted</span>
-          <p className="text-3xl font-light text-blue-600 mt-2">{leaseSignedCount}</p>
-          <p className="text-xs text-slate-500 mt-1">Month-to-Month room agreements</p>
+        <div className="bg-white rounded-sm p-5 border border-zinc-200 shadow-xs">
+          <span className="text-xs font-bold uppercase tracking-tight text-indigo-600">Lease Signed / Converted</span>
+          <p className="text-3xl font-light text-indigo-600 mt-2">{leaseSignedCount}</p>
+          <p className="text-xs text-zinc-500 mt-1">Month-to-Month room agreements</p>
         </div>
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-white rounded-sm p-4 border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="bg-white rounded-sm p-4 border border-zinc-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="font-bold text-slate-500 uppercase tracking-tight text-[11px] flex items-center gap-1">
+          <span className="font-bold text-zinc-500 uppercase tracking-tight text-[11px] flex items-center gap-1">
             <Filter className="w-3.5 h-3.5" /> Stage:
           </span>
 
           <select
             value={stageFilter}
             onChange={(e) => setStageFilter(e.target.value)}
-            className="text-xs bg-slate-50 border border-slate-300 rounded-sm px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="text-xs bg-zinc-50 border border-zinc-300 rounded-sm px-2.5 py-1.5 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
             <option value="all">All Stages ({leads.length})</option>
             {PIPELINE_STAGES.map(st => (
@@ -216,7 +216,7 @@ export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
           <select
             value={propertyFilter}
             onChange={(e) => setPropertyFilter(e.target.value)}
-            className="text-xs bg-slate-50 border border-slate-300 rounded-sm px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="text-xs bg-zinc-50 border border-zinc-300 rounded-sm px-2.5 py-1.5 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
             <option value="all">All Desired Properties</option>
             {properties.map(p => (
@@ -230,7 +230,7 @@ export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
           placeholder="Search name, agent, email, or career..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="text-xs bg-slate-50 border border-slate-300 rounded-sm px-3 py-1.5 text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 w-full sm:w-64"
+          className="text-xs bg-zinc-50 border border-zinc-300 rounded-sm px-3 py-1.5 text-zinc-700 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full sm:w-64"
         />
       </div>
 
@@ -247,22 +247,22 @@ export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
           });
 
           return (
-            <div key={stage.id} className="bg-slate-100/70 rounded-lg p-3 border border-slate-200 min-h-[550px] flex flex-col">
+            <div key={stage.id} className="bg-zinc-100/70 rounded-lg p-3 border border-zinc-200 min-h-[550px] flex flex-col">
               {/* Column Header */}
-              <div className="px-3 py-2.5 rounded-md border border-slate-200 bg-white font-bold text-xs flex flex-col gap-1 mb-3 shadow-xs">
+              <div className="px-3 py-2.5 rounded-md border border-zinc-200 bg-white font-bold text-xs flex flex-col gap-1 mb-3 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <span className="uppercase tracking-tight text-slate-800 text-[11px] font-extrabold">{stage.title}</span>
-                  <span className="bg-slate-100 px-2 py-0.5 rounded-full font-mono text-[10px] font-bold text-slate-700">
+                  <span className="uppercase tracking-tight text-zinc-800 text-[11px] font-extrabold">{stage.title}</span>
+                  <span className="bg-zinc-100 px-2 py-0.5 rounded-full font-mono text-[10px] font-bold text-zinc-700">
                     {stageLeads.length}
                   </span>
                 </div>
-                <span className="text-[10px] text-slate-400 font-normal truncate">{stage.subtitle}</span>
+                <span className="text-[10px] text-zinc-400 font-normal truncate">{stage.subtitle}</span>
               </div>
 
               {/* Cards */}
               <div className="space-y-3 flex-1 overflow-y-auto max-h-[700px] pr-0.5">
                 {stageLeads.length === 0 ? (
-                  <div className="p-4 text-center text-slate-400 text-[11px] border border-dashed border-slate-300 rounded-md bg-white/40">
+                  <div className="p-4 text-center text-zinc-400 text-[11px] border border-dashed border-zinc-300 rounded-md bg-white/40">
                     No leads in this stage
                   </div>
                 ) : (
@@ -270,13 +270,13 @@ export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
                     <div
                       key={lead.id}
                       onClick={() => onOpenLeadDetailModal(lead)}
-                      className="bg-white rounded-lg p-3.5 border border-slate-200 hover:border-blue-400 hover:shadow-sm transition cursor-pointer space-y-2.5 text-xs group relative"
+                      className="bg-white rounded-lg p-3.5 border border-zinc-200 hover:border-indigo-400 hover:shadow-xs transition cursor-pointer space-y-2.5 text-xs group relative"
                     >
                       {/* Name, Score, and Actions */}
                       <div className="flex items-start justify-between gap-1">
                         <div>
-                          <span className="font-bold text-slate-900 text-xs block leading-tight">{lead.name}</span>
-                          <span className="text-[10px] text-slate-500 block truncate">{lead.occupation}</span>
+                          <span className="font-bold text-zinc-900 text-xs block leading-tight">{lead.name}</span>
+                          <span className="text-[10px] text-zinc-500 block truncate">{lead.occupation}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono shrink-0">
@@ -285,7 +285,7 @@ export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
                           {onDeleteLead && (
                             <button
                               onClick={(e) => handleDeleteSingleLead(e, lead)}
-                              className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 transition"
+                              className="opacity-0 group-hover:opacity-100 p-1 text-zinc-400 hover:text-rose-600 transition"
                               title="Delete lead"
                             >
                               <Trash2 className="w-3 h-3" />
@@ -295,40 +295,40 @@ export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
                       </div>
 
                       {/* Assigned Agent Pill */}
-                      <div className="bg-slate-50 p-2 rounded border border-slate-200 space-y-1 text-[11px]">
+                      <div className="bg-zinc-50 p-2 rounded border border-zinc-200 space-y-1 text-[11px]">
                         <div className="flex items-center justify-between text-[10px]">
-                          <span className="text-slate-400 font-medium uppercase tracking-tight">Assigned Agent:</span>
-                          <span className="font-semibold text-blue-700 truncate max-w-[130px]">
+                          <span className="text-zinc-400 font-medium uppercase tracking-tight">Assigned Agent:</span>
+                          <span className="font-semibold text-indigo-700 truncate max-w-[130px]">
                             {lead.assignedAgent || 'Jake Moyer'}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-400">Budget:</span>
-                          <strong className="text-slate-900 font-mono">${lead.maxBudget}/mo</strong>
+                          <span className="text-zinc-400">Budget:</span>
+                          <strong className="text-zinc-900 font-mono">${lead.maxBudget}/mo</strong>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-400">Target Move-in:</span>
-                          <strong className="text-slate-800 font-mono">{lead.targetMoveInDate}</strong>
+                          <span className="text-zinc-400">Target Move-in:</span>
+                          <strong className="text-zinc-800 font-mono">{lead.targetMoveInDate}</strong>
                         </div>
                       </div>
 
                       {/* Roommate Profile Tags & Communication History Count */}
                       <div className="flex items-center justify-between text-[10px] pt-1">
                         <div className="flex flex-wrap gap-1">
-                          <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">
+                          <span className="bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded font-medium">
                             {lead.lifestyleProfile?.cleanliness?.split('/')[0] || 'Standard'}
                           </span>
-                          <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">
+                          <span className="bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded font-medium">
                             {lead.lifestyleProfile?.schedule?.split('/')[0] || 'Day'}
                           </span>
                         </div>
-                        <span className="text-slate-400 font-medium">
+                        <span className="text-zinc-400 font-medium">
                           💬 {lead.activityHistory?.length || 0} msgs
                         </span>
                       </div>
 
                       {/* 1-Click Convert or Advance Action */}
-                      <div className="pt-2 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
+                      <div className="pt-2 border-t border-zinc-100" onClick={(e) => e.stopPropagation()}>
                         {stage.id === 'Lease Signed' || lead.stage === 'Lease Signed' ? (
                           <button
                             onClick={() => onOpenConvertLeadModal(lead)}
@@ -342,7 +342,7 @@ export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
                             <select
                               value={lead.stage}
                               onChange={(e) => handleStageChange(lead, e.target.value as LeadStage)}
-                              className="flex-1 text-[10px] bg-slate-50 border border-slate-300 rounded px-1.5 py-1 text-slate-700 font-semibold uppercase tracking-tight"
+                              className="flex-1 text-[10px] bg-zinc-50 border border-zinc-300 rounded px-1.5 py-1 text-zinc-700 font-semibold uppercase tracking-tight"
                             >
                               <option value="New Lead">&rarr; 1. New Lead</option>
                               <option value="Contacted">&rarr; 2. Contacted</option>
