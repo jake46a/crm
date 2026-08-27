@@ -1,0 +1,161 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Common Hardened Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // ==========================================
+    // Entity Schema Validators
+    // ==========================================
+
+    function isValidProperty(data) {
+      return data.id is string && isValidId(data.id)
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 128
+        && data.address is string && data.address.size() <= 256
+        && data.city is string && data.city.size() <= 128
+        && data.state is string && data.state.size() <= 64
+        && data.zip is string && data.zip.size() <= 32
+        && (data.totalRooms is number && data.totalRooms >= 0)
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2048));
+    }
+
+    function isValidRoom(data) {
+      return data.id is string && isValidId(data.id)
+        && data.propertyId is string && isValidId(data.propertyId)
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 128
+        && data.monthlyRent is number && data.monthlyRent >= 0
+        && data.status is string && (data.status == 'Occupied' || data.status == 'Available' || data.status == 'Under Turnover' || data.status == 'Reserved')
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2048));
+    }
+
+    function isValidLeaseRenewal(data) {
+      return data.id is string && isValidId(data.id)
+        && data.tenantName is string && data.tenantName.size() > 0 && data.tenantName.size() <= 128
+        && data.propertyId is string && isValidId(data.propertyId)
+        && data.roomId is string && isValidId(data.roomId)
+        && data.renewalStatus is string && data.renewalStatus.size() <= 64
+        && (!('internalNotes' in data) || (data.internalNotes is string && data.internalNotes.size() <= 2048));
+    }
+
+    function isValidWorkOrder(data) {
+      return data.id is string && isValidId(data.id)
+        && data.ticketNumber is string && data.ticketNumber.size() <= 64
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 256
+        && data.propertyId is string && isValidId(data.propertyId)
+        && data.priority is string && (data.priority == 'Emergency' || data.priority == 'High' || data.priority == 'Medium' || data.priority == 'Low')
+        && data.status is string && data.status.size() <= 64
+        && (!('description' in data) || (data.description is string && data.description.size() <= 4096));
+    }
+
+    function isValidTenantLead(data) {
+      return data.id is string && isValidId(data.id)
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 128
+        && data.email is string && data.email.size() <= 128
+        && data.phone is string && data.phone.size() <= 64
+        && data.stage is string && data.stage.size() <= 64
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2048));
+    }
+
+    function isValidContact(data) {
+      return data.id is string && isValidId(data.id)
+        && data.type is string && data.type.size() <= 64
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 128
+        && data.email is string && data.email.size() <= 128
+        && data.phone is string && data.phone.size() <= 64
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2048));
+    }
+
+    function isValidActivityLog(data) {
+      return data.id is string && isValidId(data.id)
+        && data.timestamp is string && data.timestamp.size() <= 64
+        && data.category is string && data.category.size() <= 64
+        && data.message is string && data.message.size() <= 1024
+        && data.user is string && data.user.size() <= 128;
+    }
+
+    // ==========================================
+    // Collections
+    // ==========================================
+
+    // Properties
+    match /properties/{propertyId} {
+      allow get, list: if true;
+      allow create: if isValidId(propertyId) && isValidProperty(incoming());
+      allow update: if isValidId(propertyId) && isValidProperty(incoming()) && incoming().id == existing().id;
+      allow delete: if isValidId(propertyId);
+    }
+
+    // Rooms
+    match /rooms/{roomId} {
+      allow get, list: if true;
+      allow create: if isValidId(roomId) && isValidRoom(incoming());
+      allow update: if isValidId(roomId) && isValidRoom(incoming()) && incoming().id == existing().id;
+      allow delete: if isValidId(roomId);
+    }
+
+    // Lease Renewals
+    match /renewals/{renewalId} {
+      allow get, list: if true;
+      allow create: if isValidId(renewalId) && isValidLeaseRenewal(incoming());
+      allow update: if isValidId(renewalId) && isValidLeaseRenewal(incoming()) && incoming().id == existing().id;
+      allow delete: if isValidId(renewalId);
+    }
+
+    // Work Orders
+    match /workorders/{workOrderId} {
+      allow get, list: if true;
+      allow create: if isValidId(workOrderId) && isValidWorkOrder(incoming());
+      allow update: if isValidId(workOrderId) && isValidWorkOrder(incoming()) && incoming().id == existing().id;
+      allow delete: if isValidId(workOrderId);
+    }
+
+    // Tenant Leads
+    match /leads/{leadId} {
+      allow get, list: if true;
+      allow create: if isValidId(leadId) && isValidTenantLead(incoming());
+      allow update: if isValidId(leadId) && isValidTenantLead(incoming()) && incoming().id == existing().id;
+      allow delete: if isValidId(leadId);
+    }
+
+    // Contacts
+    match /contacts/{contactId} {
+      allow get, list: if true;
+      allow create: if isValidId(contactId) && isValidContact(incoming());
+      allow update: if isValidId(contactId) && isValidContact(incoming()) && incoming().id == existing().id;
+      allow delete: if isValidId(contactId);
+    }
+
+    // Activity Logs (Append-Only)
+    match /activityLogs/{logId} {
+      allow get, list: if true;
+      allow create: if isValidId(logId) && isValidActivityLog(incoming());
+      allow update: if false; // Append-only audit log
+      allow delete: if isValidId(logId);
+    }
+
+    // Connection Health Test Doc
+    match /test/{testId} {
+      allow read, write: if true;
+    }
+  }
+}

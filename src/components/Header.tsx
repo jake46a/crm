@@ -14,9 +14,16 @@ import {
   Clock,
   ChevronDown,
   Menu,
-  X
+  X,
+  Cloud,
+  CloudCheck,
+  CloudOff,
+  LogIn,
+  LogOut,
+  UserCheck
 } from 'lucide-react';
 import { NavigationTab, LeaseRenewal, WorkOrder, TenantLead, Room, Property, Contact } from '../types';
+import { useFirebase } from '../context/FirebaseContext';
 
 interface HeaderProps {
   currentTab: NavigationTab;
@@ -57,7 +64,9 @@ export const Header: React.FC<HeaderProps> = ({
   onResetData,
   onQuickNavigate
 }) => {
+  const { user, syncStatus, isFirebaseConnected, signIn, signOut } = useFirebase();
   const [isNewMenuOpen, setIsNewMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -217,10 +226,22 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Sidebar Footer Metadata */}
-        <div className="p-5 border-t border-slate-800 text-xs text-slate-500">
-          <p className="font-semibold text-slate-400">Moyer Management v2.4</p>
-          <p className="text-[11px] text-slate-500 mt-0.5">Admin: Jake Moyer (Denver/Boulder)</p>
-          <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+        <div className="p-5 border-t border-slate-800 text-xs text-slate-500 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="font-semibold text-slate-400">Moyer Management</p>
+            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-sm ${
+              syncStatus === 'connected'
+                ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
+                : syncStatus === 'error'
+                ? 'bg-red-950 text-red-400 border border-red-800/60'
+                : 'bg-slate-800 text-slate-400 border border-slate-700'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'connected' ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
+              {syncStatus === 'connected' ? 'Firestore Live' : 'Offline Mode'}
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500">Admin: {user?.displayName || user?.email || 'Jake Moyer'}</p>
+          <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] text-slate-400 font-mono">
             <span>Occupancy: {occupancyRate}%</span>
             <span className="text-emerald-400 font-bold">{occupiedRoomsCount}/{totalRoomsCount} Rm</span>
           </div>
@@ -443,13 +464,78 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {/* User profile avatar bubble matching theme */}
+          {/* Cloud Sync Status Indicator */}
           <div 
-            onClick={onOpenAssistant} 
-            className="w-8 h-8 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center font-bold text-xs text-slate-700 cursor-pointer hover:bg-slate-300 transition"
-            title="Jake Moyer (Property Manager)"
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-medium border ${
+              syncStatus === 'connected'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : syncStatus === 'error'
+                ? 'bg-red-50 text-red-700 border-red-200'
+                : 'bg-slate-100 text-slate-600 border-slate-200'
+            }`}
+            title={syncStatus === 'connected' ? 'Connected to Firebase Firestore in real-time' : 'Running with local fallback cache'}
           >
-            JM
+            <Cloud className={`w-3.5 h-3.5 ${syncStatus === 'connected' ? 'text-emerald-600' : 'text-slate-400'}`} />
+            <span className="text-[11px] hidden md:inline">{syncStatus === 'connected' ? 'Cloud Synced' : 'Syncing...'}</span>
+          </div>
+
+          {/* User Profile & Firebase Auth Dropdown */}
+          <div className="relative">
+            {user ? (
+              <button
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                className="flex items-center gap-2 pl-2 pr-1.5 py-1 rounded-sm border border-slate-200 hover:bg-slate-50 transition"
+              >
+                {user.photoURL ? (
+                  <img 
+                    src={user.photoURL} 
+                    alt={user.displayName || 'User'} 
+                    className="w-6 h-6 rounded-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">
+                    {(user.displayName || user.email || 'U').charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <span className="text-xs font-semibold text-slate-700 hidden sm:inline max-w-[100px] truncate">
+                  {user.displayName || user.email?.split('@')[0]}
+                </span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </button>
+            ) : (
+              <button
+                onClick={signIn}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition shadow-xs"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Sign In with Google</span>
+                <span className="sm:hidden">Sign In</span>
+              </button>
+            )}
+
+            {isUserMenuOpen && user && (
+              <div 
+                className="absolute right-0 top-full mt-1.5 w-60 bg-white border border-slate-200 rounded-sm shadow-xl py-2 z-50 text-xs"
+                onClick={() => setIsUserMenuOpen(false)}
+              >
+                <div className="px-3 py-2 border-b border-slate-100">
+                  <p className="font-semibold text-slate-900 truncate">{user.displayName || 'Property Manager'}</p>
+                  <p className="text-[11px] text-slate-500 truncate">{user.email}</p>
+                  <div className="mt-1.5 inline-flex items-center gap-1 text-[10px] bg-emerald-50 text-emerald-700 font-semibold px-1.5 py-0.5 rounded-sm border border-emerald-200">
+                    <UserCheck className="w-3 h-3" />
+                    <span>Firebase Authenticated</span>
+                  </div>
+                </div>
+                <button
+                  onClick={signOut}
+                  className="w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-2 transition font-medium mt-1"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>

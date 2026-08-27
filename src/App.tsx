@@ -22,6 +22,17 @@ import {
 } from './types';
 
 import { StorageService } from './services/storage';
+import { 
+  FirebaseService,
+  subscribeToProperties,
+  subscribeToRooms,
+  subscribeToRenewals,
+  subscribeToWorkOrders,
+  subscribeToLeads,
+  subscribeToContacts,
+  subscribeToActivityLogs
+} from './services/firebase';
+import { useFirebase } from './context/FirebaseContext';
 
 // Views
 import { Header } from './components/Header';
@@ -101,7 +112,7 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Initial Load from localStorage
+  // Initial Load from localStorage & Firebase Listeners
   const loadAllData = () => {
     setProperties(StorageService.getProperties());
     setRooms(StorageService.getRooms());
@@ -113,7 +124,68 @@ export default function App() {
   };
 
   useEffect(() => {
+    // 1. Instant local cache load
     loadAllData();
+
+    // 2. Real-time Firebase Sync Listeners
+    const unsubProperties = subscribeToProperties((liveProps) => {
+      if (liveProps && liveProps.length > 0) {
+        setProperties(liveProps);
+        StorageService.saveProperties(liveProps);
+      }
+    });
+
+    const unsubRooms = subscribeToRooms((liveRooms) => {
+      if (liveRooms && liveRooms.length > 0) {
+        setRooms(liveRooms);
+        StorageService.saveRooms(liveRooms);
+      }
+    });
+
+    const unsubRenewals = subscribeToRenewals((liveRenewals) => {
+      if (liveRenewals && liveRenewals.length > 0) {
+        setRenewals(liveRenewals);
+        StorageService.saveLeaseRenewals(liveRenewals);
+      }
+    });
+
+    const unsubWorkOrders = subscribeToWorkOrders((liveWOs) => {
+      if (liveWOs && liveWOs.length > 0) {
+        setWorkOrders(liveWOs);
+        StorageService.saveWorkOrders(liveWOs);
+      }
+    });
+
+    const unsubLeads = subscribeToLeads((liveLeads) => {
+      if (liveLeads && liveLeads.length > 0) {
+        setLeads(liveLeads);
+        StorageService.saveTenantLeads(liveLeads);
+      }
+    });
+
+    const unsubContacts = subscribeToContacts((liveContacts) => {
+      if (liveContacts && liveContacts.length > 0) {
+        setContacts(liveContacts);
+        StorageService.saveContacts(liveContacts);
+      }
+    });
+
+    const unsubLogs = subscribeToActivityLogs((liveLogs) => {
+      if (liveLogs && liveLogs.length > 0) {
+        setActivityLogs(liveLogs);
+        StorageService.saveActivityLogs(liveLogs);
+      }
+    });
+
+    return () => {
+      unsubProperties();
+      unsubRooms();
+      unsubRenewals();
+      unsubWorkOrders();
+      unsubLeads();
+      unsubContacts();
+      unsubLogs();
+    };
   }, []);
 
   // Helper to log actions
@@ -127,6 +199,7 @@ export default function App() {
       entityId
     };
     StorageService.addActivityLog(newLog);
+    FirebaseService.addActivityLog(newLog).catch(err => console.warn("Firestore log sync err:", err));
     setActivityLogs(prev => [newLog, ...prev]);
   };
 
@@ -143,18 +216,23 @@ export default function App() {
     }
     setRooms(nextRooms);
     StorageService.saveRooms(nextRooms);
+    FirebaseService.saveRoom(updatedRoom).catch(err => console.warn("Firestore save room err:", err));
 
     // Recalculate property totals
     const nextProperties = properties.map(p => {
       const propRooms = nextRooms.filter(r => r.propertyId === p.id);
       const occupied = propRooms.filter(r => r.status === 'Occupied').length;
       const totalRev = propRooms.reduce((sum, r) => sum + r.monthlyRent, 0);
-      return {
+      const updatedP = {
         ...p,
         totalRooms: propRooms.length,
         occupiedRooms: occupied,
         monthlyRevenueEstimate: totalRev
       };
+      if (p.id === updatedRoom.propertyId) {
+        FirebaseService.saveProperty(updatedP).catch(err => console.warn("Firestore save prop err:", err));
+      }
+      return updatedP;
     });
     setProperties(nextProperties);
     StorageService.saveProperties(nextProperties);
@@ -174,6 +252,7 @@ export default function App() {
     }
     setProperties(nextProps);
     StorageService.saveProperties(nextProps);
+    FirebaseService.saveProperty(prop).catch(err => console.warn("Firestore save prop err:", err));
     logActivity('System', `Property Saved: ${prop.name} (${prop.address}, ${prop.city})`, prop.id);
     showToast(`Saved property: ${prop.name}`);
   };
@@ -188,21 +267,33 @@ export default function App() {
     const nextProperties = properties.filter(p => p.id !== propertyId);
     setProperties(nextProperties);
     StorageService.saveProperties(nextProperties);
+    FirebaseService.deleteProperty(propertyId).catch(err => console.warn("Firestore delete prop err:", err));
 
     // 2. Cascade remove all rooms belonging to this property
     const nextRooms = rooms.filter(r => r.propertyId !== propertyId);
     setRooms(nextRooms);
     StorageService.saveRooms(nextRooms);
+    associatedRooms.forEach(r => {
+      FirebaseService.deleteRoom(r.id).catch(err => console.warn("Firestore delete room err:", err));
+    });
 
     // 3. Remove associated work orders
+    const associatedWOs = workOrders.filter(w => w.propertyId === propertyId);
     const nextWorkOrders = workOrders.filter(w => w.propertyId !== propertyId);
     setWorkOrders(nextWorkOrders);
     StorageService.saveWorkOrders(nextWorkOrders);
+    associatedWOs.forEach(w => {
+      FirebaseService.deleteWorkOrder(w.id).catch(err => console.warn("Firestore delete wo err:", err));
+    });
 
     // 4. Remove associated lease renewals
+    const associatedRenewals = renewals.filter(ren => ren.propertyId === propertyId);
     const nextRenewals = renewals.filter(ren => ren.propertyId !== propertyId);
     setRenewals(nextRenewals);
     StorageService.saveLeaseRenewals(nextRenewals);
+    associatedRenewals.forEach(ren => {
+      FirebaseService.deleteRenewal(ren.id).catch(err => console.warn("Firestore delete renewal err:", err));
+    });
 
     logActivity('System', `Property Deleted: ${propName} and ${associatedRooms.length} room(s) removed`, propertyId);
     showToast(`Deleted ${propName} & ${associatedRooms.length} associated room(s)`);
@@ -216,18 +307,23 @@ export default function App() {
     const nextRooms = rooms.filter(r => r.id !== roomId);
     setRooms(nextRooms);
     StorageService.saveRooms(nextRooms);
+    FirebaseService.deleteRoom(roomId).catch(err => console.warn("Firestore delete room err:", err));
 
     // Recalculate property totals
     const nextProperties = properties.map(p => {
       const propRooms = nextRooms.filter(r => r.propertyId === p.id);
       const occupied = propRooms.filter(r => r.status === 'Occupied').length;
       const totalRev = propRooms.reduce((sum, r) => sum + r.monthlyRent, 0);
-      return {
+      const updatedP = {
         ...p,
         totalRooms: propRooms.length,
         occupiedRooms: occupied,
         monthlyRevenueEstimate: totalRev
       };
+      if (p.id === targetRoom.propertyId) {
+        FirebaseService.saveProperty(updatedP).catch(err => console.warn("Firestore save prop stats err:", err));
+      }
+      return updatedP;
     });
     setProperties(nextProperties);
     StorageService.saveProperties(nextProperties);
@@ -247,6 +343,7 @@ export default function App() {
     }
     setRenewals(nextRenewals);
     StorageService.saveLeaseRenewals(nextRenewals);
+    FirebaseService.saveRenewal(ren).catch(err => console.warn("Firestore save renewal err:", err));
 
     // If accepted / signed, also update room rent & lease end date
     if (ren.renewalStatus === 'Tenant Accepted' || ren.renewalStatus === 'Renewed Signed') {
@@ -278,6 +375,7 @@ export default function App() {
     }
     setWorkOrders(nextWorkOrders);
     StorageService.saveWorkOrders(nextWorkOrders);
+    FirebaseService.saveWorkOrder(wo).catch(err => console.warn("Firestore save work order err:", err));
     logActivity('Maintenance', `Work Order ${wo.ticketNumber}: ${wo.title} (${wo.status})`, wo.id);
     showToast(`Work order ${wo.ticketNumber} saved`);
   };
@@ -296,6 +394,7 @@ export default function App() {
     }
     setLeads(nextLeads);
     StorageService.saveTenantLeads(nextLeads);
+    FirebaseService.saveLead(lead).catch(err => console.warn("Firestore save lead err:", err));
     logActivity('Lead', `Tenant Lead ${lead.name}: Stage is ${lead.stage} (Score: ★${lead.score})`, lead.id);
     showToast(`Lead saved: ${lead.name}`);
   };
@@ -311,6 +410,7 @@ export default function App() {
     }
     setContacts(nextContacts);
     StorageService.saveContacts(nextContacts);
+    FirebaseService.saveContact(contact).catch(err => console.warn("Firestore save contact err:", err));
     logActivity('System', `Contact Saved: ${contact.name} (${contact.type})`, contact.id);
     showToast(`Contact saved: ${contact.name}`);
   };
@@ -404,8 +504,13 @@ export default function App() {
     showToast(`🎉 Converted ${lead.name} to active tenant in ${selectedRoom.name}!`);
   };
 
-  const handleResetDemoData = () => {
+  const handleResetDemoData = async () => {
     StorageService.resetAll();
+    try {
+      await FirebaseService.resetToSeedData();
+    } catch (err) {
+      console.warn("Could not reset Firebase directly, resetting local storage:", err);
+    }
     loadAllData();
     showToast('Reset CRM to default demo data.');
   };

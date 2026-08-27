@@ -1,0 +1,236 @@
+{
+  "entities": {
+    "Property": {
+      "title": "Property",
+      "description": "A managed rental property with multiple rooms or units.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "maxLength": 128 },
+        "address": { "type": "string", "maxLength": 256 },
+        "city": { "type": "string", "maxLength": 128 },
+        "state": { "type": "string", "maxLength": 64 },
+        "zip": { "type": "string", "maxLength": 32 },
+        "propertyType": { "type": "string", "maxLength": 64 },
+        "yearBuilt": { "type": "number" },
+        "ownerName": { "type": "string", "maxLength": 128 },
+        "ownerPhone": { "type": "string", "maxLength": 64 },
+        "ownerEmail": { "type": "string", "maxLength": 128 },
+        "totalRooms": { "type": "number" },
+        "occupiedRooms": { "type": "number" },
+        "monthlyRevenueEstimate": { "type": "number" },
+        "sharedAmenities": { "type": "array" },
+        "houseRules": { "type": "array" },
+        "wifiNetwork": { "type": "string", "maxLength": 128 },
+        "wifiPassword": { "type": "string", "maxLength": 128 },
+        "keypadMasterCode": { "type": "string", "maxLength": 64 },
+        "notes": { "type": "string", "maxLength": 2048 },
+        "imageUrl": { "type": "string", "maxLength": 1024 }
+      },
+      "required": ["id", "name", "address", "city", "state", "zip", "totalRooms"]
+    },
+    "Room": {
+      "title": "Room",
+      "description": "An individual rentable room or suite within a property.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "propertyId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "propertyName": { "type": "string", "maxLength": 128 },
+        "roomNumber": { "type": "string", "maxLength": 64 },
+        "name": { "type": "string", "maxLength": 128 },
+        "floor": { "type": "number" },
+        "sqft": { "type": "number" },
+        "bathroomType": { "type": "string", "maxLength": 64 },
+        "isFurnished": { "type": "boolean" },
+        "monthlyRent": { "type": "number" },
+        "securityDeposit": { "type": "number" },
+        "utilitiesIncluded": { "type": "array" },
+        "status": { "type": "string", "enum": ["Occupied", "Available", "Under Turnover", "Reserved"] },
+        "leaseType": { "type": "string", "maxLength": 64 },
+        "currentTenantId": { "type": "string", "maxLength": 128 },
+        "currentTenantName": { "type": "string", "maxLength": 128 },
+        "currentTenantPhone": { "type": "string", "maxLength": 64 },
+        "currentTenantEmail": { "type": "string", "maxLength": 128 },
+        "currentLeaseId": { "type": "string", "maxLength": 128 },
+        "leaseStartDate": { "type": "string", "maxLength": 64 },
+        "leaseEndDate": { "type": "string", "maxLength": 64 },
+        "turnoverChecklist": { "type": "array" },
+        "amenities": { "type": "array" },
+        "roomFeatures": { "type": "array" },
+        "notes": { "type": "string", "maxLength": 2048 }
+      },
+      "required": ["id", "propertyId", "name", "monthlyRent", "status"]
+    },
+    "LeaseRenewal": {
+      "title": "LeaseRenewal",
+      "description": "Tracking record for a tenant lease renewal proposal and negotiation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "tenantId": { "type": "string", "maxLength": 128 },
+        "tenantName": { "type": "string", "maxLength": 128 },
+        "tenantEmail": { "type": "string", "maxLength": 128 },
+        "tenantPhone": { "type": "string", "maxLength": 64 },
+        "propertyId": { "type": "string", "maxLength": 128 },
+        "propertyName": { "type": "string", "maxLength": 128 },
+        "roomId": { "type": "string", "maxLength": 128 },
+        "roomName": { "type": "string", "maxLength": 128 },
+        "currentMonthlyRent": { "type": "number" },
+        "proposedMonthlyRent": { "type": "number" },
+        "leaseStartDate": { "type": "string", "maxLength": 64 },
+        "currentLeaseEndDate": { "type": "string", "maxLength": 64 },
+        "daysUntilExpiration": { "type": "number" },
+        "renewalStatus": { "type": "string", "maxLength": 64 },
+        "renewalTermMonths": { "type": "number" },
+        "proposedTermMonths": { "type": "number" },
+        "decisionDeadline": { "type": "string", "maxLength": 64 },
+        "tenantResponseNotes": { "type": "string", "maxLength": 2048 },
+        "internalNotes": { "type": "string", "maxLength": 2048 },
+        "generatedNoticeLetter": { "type": "string", "maxLength": 8192 }
+      },
+      "required": ["id", "tenantName", "propertyId", "roomId", "renewalStatus"]
+    },
+    "WorkOrder": {
+      "title": "WorkOrder",
+      "description": "A property repair or maintenance work order request.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ticketNumber": { "type": "string", "maxLength": 64 },
+        "title": { "type": "string", "maxLength": 256 },
+        "description": { "type": "string", "maxLength": 4096 },
+        "propertyId": { "type": "string", "maxLength": 128 },
+        "propertyName": { "type": "string", "maxLength": 128 },
+        "roomId": { "type": "string", "maxLength": 128 },
+        "roomName": { "type": "string", "maxLength": 128 },
+        "isCommonArea": { "type": "boolean" },
+        "tenantId": { "type": "string", "maxLength": 128 },
+        "reportedByName": { "type": "string", "maxLength": 128 },
+        "reportedByPhone": { "type": "string", "maxLength": 64 },
+        "reportedByEmail": { "type": "string", "maxLength": 128 },
+        "category": { "type": "string", "maxLength": 64 },
+        "priority": { "type": "string", "enum": ["Emergency", "High", "Medium", "Low"] },
+        "status": { "type": "string", "maxLength": 64 },
+        "assignedVendorId": { "type": "string", "maxLength": 128 },
+        "assignedVendorName": { "type": "string", "maxLength": 128 },
+        "assignedVendorPhone": { "type": "string", "maxLength": 64 },
+        "estimatedCost": { "type": "number" },
+        "actualCost": { "type": "number" },
+        "dateReported": { "type": "string", "maxLength": 64 },
+        "dateScheduled": { "type": "string", "maxLength": 64 },
+        "dateCompleted": { "type": "string", "maxLength": 64 },
+        "accessInstructions": { "type": "string", "maxLength": 1024 },
+        "entryPermission": { "type": "boolean" },
+        "photos": { "type": "array" },
+        "comments": { "type": "array" },
+        "timeline": { "type": "array" },
+        "internalNotes": { "type": "string", "maxLength": 2048 },
+        "resolutionSummary": { "type": "string", "maxLength": 2048 }
+      },
+      "required": ["id", "ticketNumber", "title", "propertyId", "category", "priority", "status"]
+    },
+    "TenantLead": {
+      "title": "TenantLead",
+      "description": "Prospective tenant lead in the pipeline.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 128 },
+        "phone": { "type": "string", "maxLength": 64 },
+        "stage": { "type": "string", "maxLength": 64 },
+        "assignedAgent": { "type": "string", "maxLength": 128 },
+        "targetMoveInDate": { "type": "string", "maxLength": 64 },
+        "maxBudget": { "type": "number" },
+        "preferredBathroom": { "type": "string", "maxLength": 64 },
+        "furnishingPreference": { "type": "string", "maxLength": 64 },
+        "preferredPropertyIds": { "type": "array" },
+        "assignedRoomId": { "type": "string", "maxLength": 128 },
+        "source": { "type": "string", "maxLength": 64 },
+        "score": { "type": "number" },
+        "occupation": { "type": "string", "maxLength": 128 },
+        "monthlyIncome": { "type": "number" },
+        "creditScoreRange": { "type": "string", "maxLength": 64 },
+        "lifestyleProfile": { "type": "object" },
+        "notes": { "type": "string", "maxLength": 2048 },
+        "activityHistory": { "type": "array" },
+        "createdDate": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "name", "email", "phone", "stage"]
+    },
+    "Contact": {
+      "title": "Contact",
+      "description": "A contact directory entry for tenants, contractors, owners, and emergency contacts.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "type": { "type": "string", "maxLength": 64 },
+        "name": { "type": "string", "maxLength": 128 },
+        "company": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 128 },
+        "phone": { "type": "string", "maxLength": 64 },
+        "secondaryPhone": { "type": "string", "maxLength": 64 },
+        "propertyId": { "type": "string", "maxLength": 128 },
+        "propertyName": { "type": "string", "maxLength": 128 },
+        "roomId": { "type": "string", "maxLength": 128 },
+        "roomName": { "type": "string", "maxLength": 128 },
+        "roleOrSpecialty": { "type": "string", "maxLength": 128 },
+        "address": { "type": "string", "maxLength": 256 },
+        "status": { "type": "string", "maxLength": 64 },
+        "hourlyRate": { "type": "number" },
+        "rating": { "type": "number" },
+        "emergencyContactName": { "type": "string", "maxLength": 128 },
+        "emergencyContactPhone": { "type": "string", "maxLength": 64 },
+        "notes": { "type": "string", "maxLength": 2048 },
+        "paymentStatus": { "type": "string", "maxLength": 64 },
+        "avatarBg": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "type", "name", "email", "phone"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Audit event log entry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "category": { "type": "string", "maxLength": 64 },
+        "message": { "type": "string", "maxLength": 1024 },
+        "user": { "type": "string", "maxLength": 128 },
+        "entityId": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "timestamp", "category", "message", "user"]
+    }
+  },
+  "firestore": {
+    "/properties/{propertyId}": {
+      "schema": "Property",
+      "description": "Collection of all rental properties"
+    },
+    "/rooms/{roomId}": {
+      "schema": "Room",
+      "description": "Collection of all individual rooms across properties"
+    },
+    "/renewals/{renewalId}": {
+      "schema": "LeaseRenewal",
+      "description": "Collection of active lease renewal and notice workflows"
+    },
+    "/workorders/{workOrderId}": {
+      "schema": "WorkOrder",
+      "description": "Collection of all maintenance and repair tickets"
+    },
+    "/leads/{leadId}": {
+      "schema": "TenantLead",
+      "description": "Collection of tenant inquiries and applicant pipeline"
+    },
+    "/contacts/{contactId}": {
+      "schema": "Contact",
+      "description": "Collection of directory contacts (tenants, owners, vendors)"
+    },
+    "/activityLogs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "Audit history and operational logs"
+    }
+  }
+}
