@@ -454,6 +454,18 @@ export default function App() {
     showToast(`Contact saved: ${contact.name}`);
   };
 
+  // Contact Delete
+  const handleDeleteContact = (contactId: string) => {
+    const targetContact = contacts.find(c => c.id === contactId);
+    const contactName = targetContact?.name || 'Contact';
+    const nextContacts = contacts.filter(c => c.id !== contactId);
+    setContacts(nextContacts);
+    StorageService.deleteContact(contactId);
+    FirebaseService.deleteContact(contactId).catch(err => console.warn("Firestore delete contact err:", err));
+    logActivity('System', `Deleted Contact: ${contactName}`, contactId);
+    showToast(`Deleted contact: ${contactName}`);
+  };
+
   // Convert Lead to Resident
   const handleConvertLead = (
     lead: TenantLead,
@@ -568,8 +580,8 @@ export default function App() {
   const openWorkOrdersCount = workOrders.filter(w => w.status !== 'Completed' && w.status !== 'Cancelled').length;
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900 font-sans flex flex-col lg:flex-row selection:bg-indigo-500 selection:text-white">
-      {/* Sidebar & Top Navigation Header */}
+    <>
+      {/* Sidebar & Top Navigation Layout Shell with Full Screen Content */}
       <Header
         currentTab={activeTab}
         onSelectTab={setActiveTab}
@@ -605,18 +617,14 @@ export default function App() {
         onOpenExportImport={() => setIsExportImportOpen(true)}
         onResetData={handleResetDemoData}
         onQuickNavigate={(tab) => setActiveTab(tab)}
-      />
-
-      {/* Main View Container */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-y-auto">
-        <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-          {/* Toast Notification */}
-          {toastMessage && (
-            <div className="fixed bottom-6 right-6 z-50 bg-zinc-900 text-white px-4 py-2.5 rounded-sm shadow-xl border border-zinc-750 text-xs font-semibold flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-indigo-400" />
-              <span>{toastMessage}</span>
-            </div>
-          )}
+      >
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div className="fixed bottom-6 right-6 z-50 bg-zinc-900 text-white px-4 py-2.5 rounded-sm shadow-xl border border-zinc-750 text-xs font-semibold flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-indigo-400" />
+            <span>{toastMessage}</span>
+          </div>
+        )}
 
         {/* Tab 1: Dashboard */}
         {activeTab === 'dashboard' && (
@@ -734,6 +742,7 @@ export default function App() {
             leads={leads}
             rooms={rooms}
             properties={properties}
+            contacts={contacts}
             onUpdateLead={handleSaveLead}
             onOpenNewLeadModal={() => {
               setEditingLead(null);
@@ -754,6 +763,7 @@ export default function App() {
             properties={properties}
             rooms={rooms}
             onUpdateContact={handleSaveContact}
+            onDeleteContact={handleDeleteContact}
             onOpenNewContactModal={() => {
               setEditingContact(null);
               setIsNewContactModalOpen(true);
@@ -764,8 +774,7 @@ export default function App() {
             }}
           />
         )}
-        </main>
-      </div>
+      </Header>
 
       {/* ===================== ALL APPLICATION MODALS ===================== */}
 
@@ -805,8 +814,10 @@ export default function App() {
           setEditingLead(null);
         }}
         properties={properties}
+        contacts={contacts}
         onSave={handleSaveLead}
         editingLead={editingLead}
+        onDeleteLead={handleDeleteLead}
       />
 
       {/* Lead Detail & Communication History Modal */}
@@ -815,6 +826,7 @@ export default function App() {
         onClose={() => setSelectedLeadDetail(null)}
         lead={selectedLeadDetail}
         properties={properties}
+        contacts={contacts}
         onUpdateLead={handleSaveLead}
         onConvertLead={(lead) => setSelectedLeadToConvert(lead)}
         onDeleteLead={handleDeleteLead}
@@ -916,6 +928,7 @@ export default function App() {
         properties={properties}
         onSave={handleSaveContact}
         editingContact={editingContact}
+        onDeleteContact={handleDeleteContact}
       />
 
       {/* Backup, Export & Import Data Modal */}
@@ -924,6 +937,6 @@ export default function App() {
         onClose={() => setIsExportImportOpen(false)}
         onDataReload={loadAllData}
       />
-    </div>
+    </>
   );
 }

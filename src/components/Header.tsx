@@ -38,6 +38,7 @@ interface HeaderProps {
   rooms: Room[];
   properties: Property[];
   contacts: Contact[];
+  children?: React.ReactNode;
   onOpenNewWorkOrder: () => void;
   onOpenNewLead: () => void;
   onOpenNewRenewal: () => void;
@@ -58,6 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
   rooms,
   properties,
   contacts,
+  children,
   onOpenNewWorkOrder,
   onOpenNewLead,
   onOpenNewRenewal,
@@ -162,7 +164,7 @@ export const Header: React.FC<HeaderProps> = ({
   ];
 
   return (
-    <>
+    <div className="min-h-screen bg-zinc-50 text-zinc-900 font-sans flex flex-col lg:flex-row selection:bg-indigo-500 selection:text-white w-full">
       {/* Desktop Sidebar (Geometric Balance Navigation Aside) */}
       <aside className="w-60 bg-zinc-950 text-white flex flex-col shrink-0 min-h-screen border-r border-zinc-800 hidden lg:flex select-none">
         {/* Brand Header */}
@@ -261,8 +263,10 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </aside>
 
-      {/* Top Header Bar inside the Main Column */}
-      <header className="h-16 bg-white border-b border-zinc-200 px-4 sm:px-8 flex items-center justify-between shrink-0 sticky top-0 z-20 shadow-xs relative">
+      {/* Main View Container (Full screen width, no offset) */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-y-auto w-full">
+        {/* Top Header Bar inside the Main Column */}
+        <header className="h-16 bg-white border-b border-zinc-200 px-4 sm:px-8 flex items-center justify-between shrink-0 sticky top-0 z-20 shadow-xs relative w-full">
         {/* Left: Mobile Drawer Trigger */}
         <div className="flex items-center gap-3 shrink-0">
           <button
@@ -553,7 +557,13 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
         </div>
-      </header>
+        </header>
+
+        {/* Main Content Area (Full screen width, perfectly centered and responsive) */}
+        <main className="flex-1 w-full p-4 sm:p-6 lg:p-8">
+          {children}
+        </main>
+      </div>
 
       {/* Mobile Drawer Navigation (when opened on small screens) */}
       {isMobileNavOpen && (
@@ -697,7 +707,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };
 

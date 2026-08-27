@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Users2, 
   Phone, 
@@ -14,9 +14,11 @@ import {
   Clock, 
   User, 
   Building,
-  Trash2
+  Trash2,
+  AlertTriangle,
+  BadgeCheck
 } from 'lucide-react';
-import { TenantLead, LeadStage, LeadActivity, Property } from '../../types';
+import { TenantLead, LeadStage, LeadActivity, Property, Contact } from '../../types';
 import { LeadStageBadge, MonthToMonthBadge } from '../common/Badges';
 
 interface LeadDetailModalProps {
@@ -24,6 +26,7 @@ interface LeadDetailModalProps {
   onClose: () => void;
   lead: TenantLead | null;
   properties: Property[];
+  contacts?: Contact[];
   onUpdateLead: (lead: TenantLead) => void;
   onConvertLead: (lead: TenantLead) => void;
   onDeleteLead?: (leadId: string) => void;
@@ -34,22 +37,33 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   onClose,
   lead,
   properties,
+  contacts = [],
   onUpdateLead,
   onConvertLead,
   onDeleteLead
 }) => {
   const [newNote, setNewNote] = useState<string>('');
   const [newNoteType, setNewNoteType] = useState<'note' | 'call' | 'email' | 'showing' | 'sms' | 'tour'>('note');
-  const [activeAgent, setActiveAgent] = useState<string>(lead?.assignedAgent || 'Jake Moyer (Lead Broker)');
+  const [activeAgent, setActiveAgent] = useState<string>('');
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (lead) {
+      setActiveAgent(lead.assignedAgent || '');
+      setIsConfirmingDelete(false);
+    }
+  }, [lead, isOpen]);
 
   if (!isOpen || !lead) return null;
 
-  const AGENTS_LIST = [
-    'Jake Moyer (Lead Broker)',
-    'Sarah Jenkins (Leasing Agent)',
-    'Alex Rivera (Property Manager)',
-    'Elena Rostova (Coliving Specialist)'
-  ];
+  // Extract all registered Leasing Agents from contacts directory
+  const leasingAgentContacts = contacts.filter(c => c.type === 'Leasing Agent');
+
+  // Find the selected agent object in contacts if matched
+  const matchedAgentContact = leasingAgentContacts.find(
+    c => c.name.toLowerCase() === (lead.assignedAgent || activeAgent).toLowerCase() ||
+         (lead.assignedAgent || '').startsWith(c.name)
+  );
 
   const handleAddActivity = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,18 +112,18 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
     });
   };
 
-  const handleAgentChange = (newAgent: string) => {
-    setActiveAgent(newAgent);
+  const handleAgentChange = (newAgentName: string) => {
+    setActiveAgent(newAgentName);
     onUpdateLead({
       ...lead,
-      assignedAgent: newAgent,
+      assignedAgent: newAgentName,
       activityHistory: [
         {
           id: `act-${Date.now()}`,
           date: new Date().toISOString().replace('T', ' ').slice(0, 16),
           type: 'note',
-          title: `Assigned to ${newAgent}`,
-          content: `Lead ownership assigned to ${newAgent}`,
+          title: `Assigned to ${newAgentName}`,
+          content: `Lead ownership assigned to ${newAgentName}`,
           agent: 'Operations'
         },
         ...lead.activityHistory
@@ -117,13 +131,11 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
     });
   };
 
-  const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete lead ${lead.name}?`)) {
-      if (onDeleteLead) {
-        onDeleteLead(lead.id);
-      }
-      onClose();
+  const handleConfirmDeleteLead = () => {
+    if (onDeleteLead) {
+      onDeleteLead(lead.id);
     }
+    onClose();
   };
 
   return (
@@ -169,9 +181,12 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 <option value="Showing Scheduled">3. Showing Scheduled</option>
                 <option value="Application Received">4. Application Received</option>
                 <option value="Lease Signed">5. Lease Signed</option>
+                {lead.stage === 'Signed / Converted' && (
+                  <option value="Signed / Converted">Signed / Converted (Active Tenant)</option>
+                )}
               </select>
 
-              {(lead.stage === 'Lease Signed' || lead.stage === 'Application Received' || lead.stage === 'Approved' || lead.stage === 'Lease Sent') && (
+              {lead.stage !== 'Signed / Converted' && (lead.stage === 'Lease Signed' || lead.stage === 'Application Received' || lead.stage === 'Approved' || lead.stage === 'Lease Sent') && (
                 <button
                   onClick={() => { onClose(); onConvertLead(lead); }}
                   className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-md transition shadow-xs"
@@ -183,20 +198,57 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
           </div>
 
           {/* Assigned Agent Control */}
-          <div className="bg-indigo-50/50 p-3 rounded-md border border-indigo-200 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-indigo-600" />
-              <span className="font-bold text-zinc-800">Assigned Leasing Agent:</span>
+          <div className="bg-indigo-50/70 p-3.5 rounded-md border border-indigo-200 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-indigo-600" />
+                <span className="font-bold text-zinc-900">Assigned Leasing Agent:</span>
+              </div>
+              <select
+                value={lead.assignedAgent || activeAgent || ''}
+                onChange={(e) => handleAgentChange(e.target.value)}
+                className="bg-white border border-indigo-300 rounded-md px-3 py-1.5 text-indigo-900 font-bold text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              >
+                <option value="">-- Unassigned / Select Agent --</option>
+                {leasingAgentContacts.map((ag) => (
+                  <option key={ag.id} value={ag.name}>
+                    {ag.name}
+                  </option>
+                ))}
+                {lead.assignedAgent && !leasingAgentContacts.some(c => c.name === lead.assignedAgent) && (
+                  <option key="current-assigned" value={lead.assignedAgent}>{lead.assignedAgent}</option>
+                )}
+              </select>
             </div>
-            <select
-              value={lead.assignedAgent || activeAgent}
-              onChange={(e) => handleAgentChange(e.target.value)}
-              className="bg-white border border-indigo-300 rounded-md px-2.5 py-1 text-indigo-900 font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            >
-              {AGENTS_LIST.map((ag) => (
-                <option key={ag} value={ag}>{ag}</option>
-              ))}
-            </select>
+
+            {matchedAgentContact && (
+              <div className="bg-white/80 p-2 rounded border border-indigo-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-600">
+                <div className="flex items-center gap-1.5">
+                  <BadgeCheck className="w-3.5 h-3.5 text-indigo-600" />
+                  <span className="font-semibold text-zinc-900">{matchedAgentContact.name}</span>
+                  {matchedAgentContact.roleOrSpecialty && (
+                    <span className="text-zinc-500">• {matchedAgentContact.roleOrSpecialty}</span>
+                  )}
+                  {matchedAgentContact.licenseNumber && (
+                    <span className="font-mono text-indigo-700 bg-indigo-50 px-1 py-0.2 rounded text-[10px]">
+                      {matchedAgentContact.licenseNumber}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 font-mono text-[11px]">
+                  {matchedAgentContact.phone && (
+                    <a href={`tel:${matchedAgentContact.phone}`} className="text-indigo-600 hover:underline">
+                      📞 {matchedAgentContact.phone}
+                    </a>
+                  )}
+                  {matchedAgentContact.email && (
+                    <a href={`mailto:${matchedAgentContact.email}`} className="text-zinc-600 hover:underline truncate max-w-[150px]">
+                      ✉️ {matchedAgentContact.email}
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Contact and Preferences Grid */}
@@ -282,20 +334,51 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="bg-zinc-50 p-4 border-t border-zinc-200 flex items-center justify-between">
-          <button
-            onClick={handleDelete}
-            className="flex items-center gap-1.5 px-3 py-2 text-rose-600 hover:bg-rose-50 hover:border-rose-200 border border-transparent rounded-md font-bold transition text-xs"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Delete Lead</span>
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-zinc-900 text-white rounded-md font-bold hover:bg-zinc-800 transition shadow-xs"
-          >
-            Close
-          </button>
+        <div className="bg-zinc-50 p-4 border-t border-zinc-200 flex flex-wrap items-center justify-between gap-3">
+          {onDeleteLead && (
+            <div>
+              {isConfirmingDelete ? (
+                <div className="flex items-center gap-2 bg-rose-50 border border-rose-200 p-1.5 rounded-md">
+                  <div className="flex items-center gap-1 text-rose-800 font-bold text-xs">
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Confirm delete {lead.name}?</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleConfirmDeleteLead}
+                    className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-bold transition shadow-xs"
+                  >
+                    Delete Now
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsConfirmingDelete(false)}
+                    className="px-2 py-1 bg-white border border-zinc-300 text-zinc-700 rounded text-xs hover:bg-zinc-50 transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmingDelete(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 text-rose-600 hover:bg-rose-50 hover:border-rose-200 border border-transparent rounded-md font-bold transition text-xs"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Lead</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-zinc-900 text-white rounded-md font-bold hover:bg-zinc-800 transition shadow-xs text-xs"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>

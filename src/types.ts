@@ -224,25 +224,28 @@ export interface TenantLead {
   createdDate: string;
 }
 
-export type ContactType = 'Tenant' | 'Lead' | 'Vendor / Contractor' | 'Property Owner' | 'Emergency Contact';
+export type ContactType = 'Tenant' | 'Lead' | 'Vendor / Contractor' | 'Property Owner' | 'Emergency Contact' | 'Leasing Agent';
 
 export interface Contact {
   id: string;
   type: ContactType;
   name: string;
   company?: string;
-  email: string;
+  email?: string;
   phone: string;
   secondaryPhone?: string;
   propertyId?: string;
   propertyName?: string;
   roomId?: string;
   roomName?: string;
-  roleOrSpecialty?: string; // e.g. "Master Tenant", "HVAC Tech & Plumber", "Property Investor", "Lead (Inquiry)"
+  roleOrSpecialty?: string; // e.g. "Master Tenant", "HVAC Tech & Plumber", "Senior Leasing Agent", "Property Investor", "Lead (Inquiry)"
   address?: string;
-  status: 'Active' | 'Past' | 'Prospect' | 'Available 24/7';
+  status: 'Active' | 'Past' | 'Prospect' | 'Available 24/7' | 'On Leave' | 'Inactive';
   hourlyRate?: number;
   rating?: number;
+  commissionRate?: string;
+  licenseNumber?: string;
+  assignedPropertyIds?: string[];
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   notes: string;

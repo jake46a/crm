@@ -316,8 +316,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-zinc-800 text-xs">
+                        <span className="font-bold text-zinc-800 text-xs flex items-center gap-1">
                           {room.roomNumber} <span className="font-normal text-zinc-500 text-[10px]">({room.bathroomType.includes('Private') ? 'Ensuite' : 'Shared'})</span>
+                          {room.notes && (
+                            <span 
+                              title={`Note: ${room.notes}`} 
+                              className="inline-flex text-zinc-400 hover:text-indigo-600"
+                            >
+                              <FileText className="w-2.5 h-2.5" />
+                            </span>
+                          )}
                         </span>
                         <span className="font-semibold text-zinc-900 font-mono text-xs">${room.monthlyRent}</span>
                       </div>

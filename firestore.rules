@@ -80,8 +80,11 @@ service cloud.firestore {
       return data.id is string && isValidId(data.id)
         && data.type is string && data.type.size() <= 64
         && data.name is string && data.name.size() > 0 && data.name.size() <= 128
-        && data.email is string && data.email.size() <= 128
+        && (!('email' in data) || (data.email is string && data.email.size() <= 128))
         && data.phone is string && data.phone.size() <= 64
+        && (!('licenseNumber' in data) || (data.licenseNumber is string && data.licenseNumber.size() <= 128))
+        && (!('roleOrSpecialty' in data) || (data.roleOrSpecialty is string && data.roleOrSpecialty.size() <= 128))
+        && (!('company' in data) || (data.company is string && data.company.size() <= 128))
         && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2048));
     }
 

@@ -16,7 +16,10 @@ import {
   CheckCircle2, 
   ExternalLink,
   Edit2,
-  Trash2
+  Trash2,
+  FileText,
+  Check,
+  X
 } from 'lucide-react';
 import { Property, Room, RoomStatus, RoomBathroomType, TenantLead } from '../types';
 import { RoomStatusBadge, BathroomTypeBadge } from './common/Badges';
@@ -55,6 +58,28 @@ export const PropertiesRoomsView: React.FC<PropertiesRoomsViewProps> = ({
   const [bathFilter, setBathFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
+  // Quick inline note editing state
+  const [editingNoteRoomId, setEditingNoteRoomId] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState<string>('');
+
+  const handleStartEditNote = (room: Room) => {
+    setEditingNoteRoomId(room.id);
+    setNoteDraft(room.notes || '');
+  };
+
+  const handleSaveNote = (room: Room) => {
+    onUpdateRoom({
+      ...room,
+      notes: noteDraft.trim() || undefined
+    });
+    setEditingNoteRoomId(null);
+  };
+
+  const handleCancelEditNote = () => {
+    setEditingNoteRoomId(null);
+    setNoteDraft('');
+  };
+
   // If the selected property was deleted, reset to 'all'
   const selectedProperty = selectedPropertyId !== 'all' 
     ? properties.find(p => p.id === selectedPropertyId) || null
@@ -72,6 +97,7 @@ export const PropertiesRoomsView: React.FC<PropertiesRoomsViewProps> = ({
         room.name.toLowerCase().includes(q) ||
         room.roomNumber.toLowerCase().includes(q) ||
         room.propertyName.toLowerCase().includes(q) ||
+        (room.notes && room.notes.toLowerCase().includes(q)) ||
         (room.currentTenantName && room.currentTenantName.toLowerCase().includes(q))
       );
     }
@@ -517,6 +543,79 @@ export const PropertiesRoomsView: React.FC<PropertiesRoomsViewProps> = ({
                     <span className="text-[10px] text-zinc-400 self-center">+{room.amenities.length - 3} more</span>
                   )}
                 </div>
+              </div>
+
+              {/* Room Notes Section */}
+              <div className="pt-1">
+                {editingNoteRoomId === room.id ? (
+                  <div className="bg-white p-2.5 rounded-sm border border-indigo-300 shadow-xs space-y-2 animate-in fade-in duration-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 flex items-center gap-1">
+                        <FileText className="w-3 h-3 text-indigo-600" />
+                        Edit Room Notes
+                      </span>
+                      <button
+                        onClick={handleCancelEditNote}
+                        className="text-zinc-400 hover:text-zinc-600 p-0.5 rounded-xs"
+                        title="Cancel"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <textarea
+                      rows={2}
+                      value={noteDraft}
+                      onChange={(e) => setNoteDraft(e.target.value)}
+                      placeholder="Add room notes, keycodes, resident requests, or condition..."
+                      className="w-full p-2 bg-zinc-50 border border-zinc-200 rounded-sm text-zinc-900 text-[11px] focus:bg-white focus:ring-1 focus:ring-indigo-500 focus:outline-none resize-none"
+                      autoFocus
+                    />
+                    <div className="flex items-center justify-end gap-1.5 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={handleCancelEditNote}
+                        className="px-2 py-1 text-[11px] text-zinc-600 hover:bg-zinc-100 rounded-sm transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveNote(room)}
+                        className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-sm text-[11px] font-semibold flex items-center gap-1 transition-colors shadow-2xs"
+                      >
+                        <Check className="w-3 h-3" />
+                        <span>Save Note</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : room.notes ? (
+                  <div className="bg-white/90 border border-zinc-200/90 rounded-sm p-2.5 text-xs group/note relative hover:border-zinc-300 transition-colors">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                        <FileText className="w-3 h-3 text-indigo-600" />
+                        Room Notes
+                      </span>
+                      <button
+                        onClick={() => handleStartEditNote(room)}
+                        className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 opacity-80 hover:opacity-100 transition-opacity flex items-center gap-0.5"
+                        title="Edit note"
+                      >
+                        <Edit2 className="w-2.5 h-2.5" /> Edit
+                      </button>
+                    </div>
+                    <p className="text-zinc-700 text-[11px] leading-relaxed whitespace-pre-wrap line-clamp-3">
+                      {room.notes}
+                    </p>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleStartEditNote(room)}
+                    className="w-full py-1.5 px-2.5 border border-dashed border-zinc-200 hover:border-indigo-300 hover:bg-indigo-50/40 rounded-sm text-[11px] text-zinc-400 hover:text-indigo-600 flex items-center justify-center gap-1.5 transition-all text-left"
+                  >
+                    <FileText className="w-3 h-3 text-zinc-400" />
+                    <span>+ Add room notes</span>
+                  </button>
+                )}
               </div>
             </div>
 

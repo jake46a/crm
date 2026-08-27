@@ -52,6 +52,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
   const [amenities, setAmenities] = useState<string>(
     'Queen Bed, Desk & Ergonomic Chair, Walk-in Closet, Blackout Blinds'
   );
+  const [notes, setNotes] = useState<string>('');
 
   // Form error state
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -96,6 +97,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
           editingRoom.amenities?.join(', ') ||
           'Queen Bed, Desk & Ergonomic Chair, Walk-in Closet, Blackout Blinds'
         );
+        setNotes(editingRoom.notes || '');
       } else {
         const initialPropId = defaultPropertyId && properties.some(p => p.id === defaultPropertyId)
           ? defaultPropertyId 
@@ -115,6 +117,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
         setCurrentTenantPhone('');
         setLeaseEndDate('');
         setAmenities('Queen Bed, Desk & Ergonomic Chair, Walk-in Closet, Blackout Blinds');
+        setNotes('');
       }
     }
   }, [isOpen, editingRoom, defaultPropertyId, properties]);
@@ -184,6 +187,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
           'Walk-in Closet'
         ],
         amenities: parsedAmenities,
+        notes: notes.trim() || undefined,
         turnoverChecklist: editingRoom?.turnoverChecklist || [
           { id: 't-1', task: 'Digital keycode reset & test door deadbolt', isDone: false },
           { id: 't-2', task: 'Professional room & ensuite deep clean and sanitize', isDone: false },
@@ -474,6 +478,23 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
               value={amenities}
               onChange={(e) => setAmenities(e.target.value)}
               className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="roomNotes" className="block font-bold text-zinc-700">
+                Room Notes & Management Remarks
+              </label>
+              <span className="text-[10px] text-zinc-500 font-normal">Optional / Internal notes</span>
+            </div>
+            <textarea
+              id="roomNotes"
+              rows={3}
+              placeholder="e.g. Master keycode updated, window overlooks courtyard, tenant requested extra desk lamp, maintenance history notes..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-xs resize-y"
             />
           </div>
 
