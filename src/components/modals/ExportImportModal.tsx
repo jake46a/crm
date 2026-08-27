@@ -6,12 +6,14 @@ interface ExportImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onDataReload: () => void;
+  onOpenCloudflareD1?: () => void;
 }
 
 export const ExportImportModal: React.FC<ExportImportModalProps> = ({
   isOpen,
   onClose,
-  onDataReload
+  onDataReload,
+  onOpenCloudflareD1
 }) => {
   const [importJson, setImportJson] = useState<string>('');
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -89,6 +91,33 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
             }`}>
               {statusMsg.type === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
               <span>{statusMsg.text}</span>
+            </div>
+          )}
+
+          {/* Cloudflare D1 Integration Banner */}
+          {onOpenCloudflareD1 && (
+            <div className="bg-gradient-to-r from-orange-50 to-amber-50 p-4 rounded-xl border border-orange-200 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-orange-500 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                  D1
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                    <span>Cloudflare D1 SQL Database</span>
+                    <span className="text-[10px] bg-orange-200 text-orange-800 px-1.5 py-0.2 rounded font-semibold uppercase">Edge SQL</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-600">Sync, push, and query live SQLite tables hosted on Cloudflare</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenCloudflareD1();
+                }}
+                className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-bold text-xs shadow-xs transition shrink-0"
+              >
+                Open D1 Manager
+              </button>
             </div>
           )}
 

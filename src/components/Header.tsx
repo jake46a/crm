@@ -35,6 +35,7 @@ interface HeaderProps {
   onOpenNewContact: () => void;
   onOpenAssistant: () => void;
   onOpenExportImport: () => void;
+  onOpenCloudflareD1?: () => void;
   onResetData: () => void;
   onQuickNavigate: (tab: NavigationTab, filterQuery?: string) => void;
 }
@@ -55,6 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewContact,
   onOpenAssistant,
   onOpenExportImport,
+  onOpenCloudflareD1,
   onResetData,
   onQuickNavigate
 }) => {
@@ -95,6 +97,8 @@ export const Header: React.FC<HeaderProps> = ({
       case 'leads': return 'Tenant Leads & Roommate Screening CRM';
       case 'vendors-agents': return 'Vendors, Contractors & Leasing Agents';
       case 'contacts': return 'Unified Contacts & Resident Directory';
+      case 'tenant-portal': return 'Resident Portal & Maintenance Submissions';
+      case 'database-status': return 'Cloudflare D1 Database Status & Telemetry';
     }
   };
 
@@ -145,6 +149,12 @@ export const Header: React.FC<HeaderProps> = ({
       label: 'Resident Directory', 
       icon: ContactIcon,
       badge: <span className="text-[10px] bg-slate-800 text-slate-400 font-mono px-1.5 py-0.5 rounded-sm">{contacts.length}</span>
+    },
+    { 
+      id: 'database-status', 
+      label: 'Database Status', 
+      icon: Database,
+      badge: <span className="text-[10px] bg-orange-950 text-orange-300 border border-orange-800 font-mono px-1.5 py-0.5 rounded-sm font-semibold">D1</span>
     }
   ];
 
@@ -201,6 +211,20 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <span className="text-[9px] bg-blue-700 px-1 py-0.5 rounded-sm uppercase tracking-wider font-mono">GPT</span>
           </button>
+
+          {/* Cloudflare D1 Database Trigger Button */}
+          {onOpenCloudflareD1 && (
+            <button
+              onClick={onOpenCloudflareD1}
+              className="w-full flex items-center justify-between px-3 py-1.5 rounded-sm bg-orange-950/40 hover:bg-orange-900/50 border border-orange-500/30 text-orange-300 font-medium text-xs shadow-xs transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Database className="w-3.5 h-3.5 text-orange-400" />
+                <span>Cloudflare D1 Database</span>
+              </div>
+              <span className="text-[9px] bg-orange-500/30 text-orange-200 px-1 py-0.5 rounded-sm uppercase tracking-wider font-mono">SQL</span>
+            </button>
+          )}
 
           <div className="grid grid-cols-2 gap-1.5 pt-1">
             <button
@@ -451,6 +475,18 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
           </div>
+
+          {/* Cloudflare D1 Top Quick Launcher */}
+          {onOpenCloudflareD1 && (
+            <button
+              onClick={onOpenCloudflareD1}
+              className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-800 text-xs font-semibold shadow-2xs transition"
+              title="Cloudflare D1 SQL Database & Sync"
+            >
+              <Database className="w-3.5 h-3.5 text-orange-600" />
+              <span>D1 SQL</span>
+            </button>
+          )}
 
           {/* User profile avatar bubble matching theme */}
           <div 

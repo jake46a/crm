@@ -7,6 +7,7 @@ export type NavigationTab =
   | 'vendors-agents'
   | 'contacts'
   | 'tenant-portal'
+  | 'database-status'
   | 'assistant';
 
 export interface Property {
@@ -268,5 +269,36 @@ export interface ActivityLog {
   message: string;
   user: string;
   entityId?: string;
+}
+
+export interface D1StatusResponse {
+  configured: boolean;
+  connected: boolean;
+  latencyMs?: number;
+  databaseId?: string;
+  accountId?: string;
+  serverTime?: string;
+  tables?: string[];
+  tableCounts?: Record<string, number>;
+  schemaReady?: boolean;
+  message?: string;
+  error?: string;
+  details?: {
+    hasAccountId: boolean;
+    hasDatabaseId: boolean;
+    hasApiToken: boolean;
+    accountIdPreview?: string | null;
+    databaseIdPreview?: string | null;
+  };
+}
+
+export interface D1SyncDataset {
+  properties: Property[];
+  rooms: Room[];
+  renewals: LeaseRenewal[];
+  workOrders: WorkOrder[];
+  leads: TenantLead[];
+  contacts: Contact[];
+  activityLogs: ActivityLog[];
 }
 

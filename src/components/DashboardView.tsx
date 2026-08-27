@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Building2, 
   Users2, 
@@ -12,10 +12,16 @@ import {
   DollarSign, 
   Sparkles,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Database,
+  RefreshCw,
+  Zap,
+  Activity,
+  ArrowRight
 } from 'lucide-react';
-import { Property, Room, LeaseRenewal, WorkOrder, TenantLead, ActivityLog, NavigationTab } from '../types';
+import { Property, Room, LeaseRenewal, WorkOrder, TenantLead, ActivityLog, NavigationTab, D1StatusResponse } from '../types';
 import { PriorityBadge, WorkOrderStatusBadge, RenewalStatusBadge, RoomStatusBadge } from './common/Badges';
+import { D1ClientService } from '../services/d1Client';
 
 interface DashboardViewProps {
   properties: Property[];
@@ -74,6 +80,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // Leads
   const activeLeads = leads.filter(l => l.stage !== 'Signed / Converted' && l.stage !== 'Lost / Archived');
   const highQualityLeads = activeLeads.filter(l => l.score >= 90);
+
+  // Cloudflare D1 Status
+  const [d1Status, setD1Status] = useState<D1StatusResponse | null>(null);
+  const [d1Loading, setD1Loading] = useState<boolean>(false);
+
+  const fetchD1Status = async () => {
+    setD1Loading(true);
+    const res = await D1ClientService.checkStatus();
+    setD1Status(res);
+    setD1Loading(false);
+  };
+
+  useEffect(() => {
+    fetchD1Status();
+  }, []);
+
+  const totalD1Records = d1Status?.tableCounts
+    ? (Object.values(d1Status.tableCounts) as number[]).reduce((a, b) => (a || 0) + (b || 0), 0)
+    : 0;
 
   return (
     <div className="space-y-6 pb-12">
@@ -235,6 +260,72 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <span>Open Tenant Portal</span>
           <ChevronRight className="w-3.5 h-3.5" />
         </button>
+      </div>
+
+      {/* Cloudflare D1 Database Status & Telemetry Widget */}
+      <div className="bg-white rounded-sm border border-slate-200 shadow-xs p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-start gap-3.5">
+          <div
+            className={`w-10 h-10 rounded-sm flex items-center justify-center shrink-0 ${
+              d1Status?.connected
+                ? 'bg-orange-500/20 text-orange-600 border border-orange-500/30'
+                : 'bg-slate-100 text-slate-500 border border-slate-200'
+            }`}
+          >
+            <Database className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-bold text-xs uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                <span>Cloudflare D1 SQL Status</span>
+              </h3>
+              {d1Status?.connected ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.2 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Connected • {d1Status.latencyMs}ms Latency
+                </span>
+              ) : d1Status?.configured ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.2 rounded-full">
+                  Configured
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-300 px-2 py-0.2 rounded-full">
+                  Ready to Connect
+                </span>
+              )}
+              {d1Status?.schemaReady && (
+                <span className="text-[10px] font-mono font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded-xs border border-slate-200">
+                  {d1Status.tables?.length || 7}/7 Tables Synced ({totalD1Records} Rows)
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              {d1Status?.connected
+                ? `Edge SQLite replica running. Query performance & schema synchronization active.`
+                : `Connect Cloudflare D1 serverless database for edge-replicated persistence and SQL reporting.`}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+          <button
+            onClick={fetchD1Status}
+            disabled={d1Loading}
+            className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-sm transition flex items-center gap-1 disabled:opacity-50"
+            title="Probe connection latency"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${d1Loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Ping Health</span>
+          </button>
+
+          <button
+            onClick={() => onSelectTab('database-status')}
+            className="px-3.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-sm transition flex items-center gap-1.5 shadow-2xs"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span>Database Status & Telemetry &rarr;</span>
+          </button>
+        </div>
       </div>
 
       {/* Property & Room Occupancy Matrix */}
