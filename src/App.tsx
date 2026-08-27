@@ -129,49 +129,49 @@ export default function App() {
 
     // 2. Real-time Firebase Sync Listeners
     const unsubProperties = subscribeToProperties((liveProps) => {
-      if (liveProps && liveProps.length > 0) {
+      if (liveProps) {
         setProperties(liveProps);
         StorageService.saveProperties(liveProps);
       }
     });
 
     const unsubRooms = subscribeToRooms((liveRooms) => {
-      if (liveRooms && liveRooms.length > 0) {
+      if (liveRooms) {
         setRooms(liveRooms);
         StorageService.saveRooms(liveRooms);
       }
     });
 
     const unsubRenewals = subscribeToRenewals((liveRenewals) => {
-      if (liveRenewals && liveRenewals.length > 0) {
+      if (liveRenewals) {
         setRenewals(liveRenewals);
         StorageService.saveLeaseRenewals(liveRenewals);
       }
     });
 
     const unsubWorkOrders = subscribeToWorkOrders((liveWOs) => {
-      if (liveWOs && liveWOs.length > 0) {
+      if (liveWOs) {
         setWorkOrders(liveWOs);
         StorageService.saveWorkOrders(liveWOs);
       }
     });
 
     const unsubLeads = subscribeToLeads((liveLeads) => {
-      if (liveLeads && liveLeads.length > 0) {
+      if (liveLeads) {
         setLeads(liveLeads);
         StorageService.saveTenantLeads(liveLeads);
       }
     });
 
     const unsubContacts = subscribeToContacts((liveContacts) => {
-      if (liveContacts && liveContacts.length > 0) {
+      if (liveContacts) {
         setContacts(liveContacts);
         StorageService.saveContacts(liveContacts);
       }
     });
 
     const unsubLogs = subscribeToActivityLogs((liveLogs) => {
-      if (liveLogs && liveLogs.length > 0) {
+      if (liveLogs) {
         setActivityLogs(liveLogs);
         StorageService.saveActivityLogs(liveLogs);
       }
@@ -505,14 +505,20 @@ export default function App() {
   };
 
   const handleResetDemoData = async () => {
-    StorageService.resetAll();
+    StorageService.clearAll();
     try {
-      await FirebaseService.resetToSeedData();
+      await FirebaseService.clearAllData();
     } catch (err) {
-      console.warn("Could not reset Firebase directly, resetting local storage:", err);
+      console.warn("Could not clear Firebase directly, clearing local storage:", err);
     }
-    loadAllData();
-    showToast('Reset CRM to default demo data.');
+    setProperties([]);
+    setRooms([]);
+    setRenewals([]);
+    setWorkOrders([]);
+    setLeads([]);
+    setContacts([]);
+    setActivityLogs([]);
+    showToast('All sample data deleted successfully.');
   };
 
   // Urgent counts for header badges

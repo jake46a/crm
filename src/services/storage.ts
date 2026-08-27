@@ -1,4 +1,4 @@
-import { Property, Room, LeaseRenewal, WorkOrder, TenantLead, Contact, ActivityLog, LeadStage, RoomStatus } from '../types';
+import { Property, Room, LeaseRenewal, WorkOrder, TenantLead, Contact, ActivityLog } from '../types';
 import {
   INITIAL_PROPERTIES,
   INITIAL_ROOMS,
@@ -110,18 +110,32 @@ export const StorageService = {
     this.saveActivityLogs([log, ...current]);
   },
 
-  // Reset to sample data
+  // Clear all data
+  clearAll(): void {
+    setItem(STORAGE_KEYS.PROPERTIES, []);
+    setItem(STORAGE_KEYS.ROOMS, []);
+    setItem(STORAGE_KEYS.RENEWALS, []);
+    setItem(STORAGE_KEYS.WORK_ORDERS, []);
+    setItem(STORAGE_KEYS.LEADS, []);
+    setItem(STORAGE_KEYS.CONTACTS, []);
+    setItem(STORAGE_KEYS.ACTIVITY_LOGS, []);
+    try {
+      localStorage.removeItem(STORAGE_KEYS.PROPERTIES);
+      localStorage.removeItem(STORAGE_KEYS.ROOMS);
+      localStorage.removeItem(STORAGE_KEYS.RENEWALS);
+      localStorage.removeItem(STORAGE_KEYS.WORK_ORDERS);
+      localStorage.removeItem(STORAGE_KEYS.LEADS);
+      localStorage.removeItem(STORAGE_KEYS.CONTACTS);
+      localStorage.removeItem(STORAGE_KEYS.ACTIVITY_LOGS);
+    } catch (e) {
+      console.error('Error clearing localStorage keys:', e);
+    }
+  },
   resetAll(): void {
-    localStorage.removeItem(STORAGE_KEYS.PROPERTIES);
-    localStorage.removeItem(STORAGE_KEYS.ROOMS);
-    localStorage.removeItem(STORAGE_KEYS.RENEWALS);
-    localStorage.removeItem(STORAGE_KEYS.WORK_ORDERS);
-    localStorage.removeItem(STORAGE_KEYS.LEADS);
-    localStorage.removeItem(STORAGE_KEYS.CONTACTS);
-    localStorage.removeItem(STORAGE_KEYS.ACTIVITY_LOGS);
+    this.clearAll();
   },
   resetToSeedData(): void {
-    this.resetAll();
+    this.clearAll();
   },
 
   // Export full CRM database state
@@ -146,14 +160,14 @@ export const StorageService = {
   importDatabaseJSON(jsonStr: string): boolean {
     try {
       const data = JSON.parse(jsonStr);
-      if (data.properties && data.rooms) {
-        if (data.properties) this.saveProperties(data.properties);
-        if (data.rooms) this.saveRooms(data.rooms);
-        if (data.renewals) this.saveRenewals(data.renewals);
-        if (data.workOrders) this.saveWorkOrders(data.workOrders);
-        if (data.leads) this.saveLeads(data.leads);
-        if (data.contacts) this.saveContacts(data.contacts);
-        if (data.activityLogs) this.saveActivityLogs(data.activityLogs);
+      if (data && typeof data === 'object') {
+        this.saveProperties(data.properties || []);
+        this.saveRooms(data.rooms || []);
+        this.saveRenewals(data.renewals || []);
+        this.saveWorkOrders(data.workOrders || []);
+        this.saveLeads(data.leads || []);
+        this.saveContacts(data.contacts || []);
+        this.saveActivityLogs(data.activityLogs || []);
         return true;
       }
       return false;

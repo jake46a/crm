@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Database, Download, Upload, RotateCcw, Check, AlertCircle, X } from 'lucide-react';
+import { Database, Download, Upload, Trash2, Check, AlertCircle, X } from 'lucide-react';
 import { StorageService } from '../../services/storage';
+import { FirebaseService } from '../../services/firebase';
 
 interface ExportImportModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
 }) => {
   const [importJson, setImportJson] = useState<string>('');
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [isClearing, setIsClearing] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
@@ -46,14 +48,24 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
     }
   };
 
-  const handleResetToDefault = () => {
-    if (window.confirm('Reset all CRM data back to the default Moyer Property Management coliving portfolio?')) {
-      StorageService.resetToSeedData();
-      setStatusMsg({ text: 'Reset to seed data complete!', type: 'success' });
-      setTimeout(() => {
+  const handleDeleteAllData = async () => {
+    if (window.confirm('Are you sure you want to delete ALL data? This will permanently wipe all properties, rooms, lease renewals, work orders, leads, and contacts from both local storage and the database.')) {
+      setIsClearing(true);
+      try {
+        StorageService.clearAll();
+        await FirebaseService.clearAllData();
+        setStatusMsg({ text: 'All sample data deleted successfully!', type: 'success' });
+        setTimeout(() => {
+          onDataReload();
+          onClose();
+        }, 800);
+      } catch (err) {
+        console.error('Error clearing data:', err);
+        setStatusMsg({ text: 'Cleared local data, but encounter an error with cloud sync.', type: 'error' });
         onDataReload();
-        onClose();
-      }, 1000);
+      } finally {
+        setIsClearing(false);
+      }
     }
   };
 
@@ -69,7 +81,7 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
               <h2 className="font-bold text-sm text-white">
                 Portfolio Data & Backup Manager
               </h2>
-              <p className="text-[11px] text-slate-400">Export, import, or reset room rentals and lease database</p>
+              <p className="text-[11px] text-slate-400">Export, import, or delete room rentals and lease database</p>
             </div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
@@ -124,18 +136,19 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
             </div>
           </div>
 
-          {/* Reset section */}
-          <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+          {/* Delete all data section */}
+          <div className="pt-3 border-t border-slate-200 flex items-center justify-between bg-rose-50/50 p-3 rounded-xl border border-rose-100">
             <div>
-              <span className="font-bold text-slate-800">Restore Seed Sample Dataset</span>
-              <p className="text-[11px] text-slate-400">Reverts to the 5 Denver coliving properties sample</p>
+              <span className="font-bold text-rose-900 text-xs">Delete All Sample / CRM Data</span>
+              <p className="text-[11px] text-rose-600">Permanently wipes all properties, rooms, leads, and work orders</p>
             </div>
             <button
-              onClick={handleResetToDefault}
-              className="flex items-center gap-1 px-3 py-1.5 border border-rose-200 text-rose-700 hover:bg-rose-50 rounded-lg font-semibold transition"
+              onClick={handleDeleteAllData}
+              disabled={isClearing}
+              className="flex items-center gap-1 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-lg font-bold text-xs shadow-xs transition whitespace-nowrap"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset to Seed</span>
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{isClearing ? 'Deleting...' : 'Delete All Data'}</span>
             </button>
           </div>
         </div>

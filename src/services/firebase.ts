@@ -29,15 +29,6 @@ import {
   Contact, 
   ActivityLog 
 } from '../types';
-import {
-  INITIAL_PROPERTIES,
-  INITIAL_ROOMS,
-  INITIAL_RENEWALS,
-  INITIAL_WORK_ORDERS,
-  INITIAL_LEADS,
-  INITIAL_CONTACTS,
-  INITIAL_ACTIVITY_LOGS
-} from '../data/initialData';
 
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
@@ -387,85 +378,38 @@ export const FirebaseService = {
     }
   },
 
-  // Seed initial data into Firestore if empty
-  async seedInitialDataIfEmpty(): Promise<boolean> {
-    try {
-      const snap = await getDocs(collection(db, COLLECTIONS.PROPERTIES));
-      if (snap.empty) {
-        console.log("Seeding Firestore with initial Moyer CRM data...");
-        const batch = writeBatch(db);
-
-        INITIAL_PROPERTIES.forEach(p => {
-          batch.set(doc(db, COLLECTIONS.PROPERTIES, p.id), p);
-        });
-
-        INITIAL_ROOMS.forEach(r => {
-          batch.set(doc(db, COLLECTIONS.ROOMS, r.id), r);
-        });
-
-        INITIAL_RENEWALS.forEach(ren => {
-          batch.set(doc(db, COLLECTIONS.RENEWALS, ren.id), ren);
-        });
-
-        INITIAL_WORK_ORDERS.forEach(wo => {
-          batch.set(doc(db, COLLECTIONS.WORK_ORDERS, wo.id), wo);
-        });
-
-        INITIAL_LEADS.forEach(l => {
-          batch.set(doc(db, COLLECTIONS.LEADS, l.id), l);
-        });
-
-        INITIAL_CONTACTS.forEach(c => {
-          batch.set(doc(db, COLLECTIONS.CONTACTS, c.id), c);
-        });
-
-        INITIAL_ACTIVITY_LOGS.forEach(log => {
-          batch.set(doc(db, COLLECTIONS.ACTIVITY_LOGS, log.id), log);
-        });
-
-        await batch.commit();
-        console.log("Firestore seeding complete!");
-        return true;
+  // Delete all data from Firestore across all collections
+  async clearAllData(): Promise<void> {
+    const allCollections = Object.values(COLLECTIONS);
+    for (const colName of allCollections) {
+      try {
+        const snap = await getDocs(collection(db, colName));
+        if (!snap.empty) {
+          const docs = snap.docs;
+          for (let i = 0; i < docs.length; i += 400) {
+            const batch = writeBatch(db);
+            const chunk = docs.slice(i, i + 400);
+            chunk.forEach(d => {
+              batch.delete(d.ref);
+            });
+            await batch.commit();
+          }
+        }
+      } catch (err) {
+        console.warn(`Error deleting documents from collection ${colName}:`, err);
       }
-      return false;
-    } catch (error) {
-      console.warn("Could not check/seed Firestore (offline or rules check):", error);
-      return false;
     }
   },
 
-  // Reset Firestore to initial dataset
+  async deleteAllData(): Promise<void> {
+    await this.clearAllData();
+  },
+
   async resetToSeedData(): Promise<void> {
-    const batch = writeBatch(db);
+    await this.clearAllData();
+  },
 
-    INITIAL_PROPERTIES.forEach(p => {
-      batch.set(doc(db, COLLECTIONS.PROPERTIES, p.id), p);
-    });
-
-    INITIAL_ROOMS.forEach(r => {
-      batch.set(doc(db, COLLECTIONS.ROOMS, r.id), r);
-    });
-
-    INITIAL_RENEWALS.forEach(ren => {
-      batch.set(doc(db, COLLECTIONS.RENEWALS, ren.id), ren);
-    });
-
-    INITIAL_WORK_ORDERS.forEach(wo => {
-      batch.set(doc(db, COLLECTIONS.WORK_ORDERS, wo.id), wo);
-    });
-
-    INITIAL_LEADS.forEach(l => {
-      batch.set(doc(db, COLLECTIONS.LEADS, l.id), l);
-    });
-
-    INITIAL_CONTACTS.forEach(c => {
-      batch.set(doc(db, COLLECTIONS.CONTACTS, c.id), c);
-    });
-
-    INITIAL_ACTIVITY_LOGS.forEach(log => {
-      batch.set(doc(db, COLLECTIONS.ACTIVITY_LOGS, log.id), log);
-    });
-
-    await batch.commit();
+  async seedInitialDataIfEmpty(): Promise<boolean> {
+    return false;
   }
 };

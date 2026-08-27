@@ -213,14 +213,14 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
             <button
               onClick={() => {
-                if (window.confirm('Reset CRM to initial Moyer Property Management sample dataset? Any unsaved local edits will be refreshed.')) {
+                if (window.confirm('Delete all sample CRM data? This will clear all properties, rooms, renewals, work orders, and contacts.')) {
                   onResetData();
                 }
               }}
               className="flex items-center justify-center text-slate-400 hover:text-red-300 text-xs px-2 py-1.5 rounded-sm hover:bg-slate-800 border border-slate-800 transition"
-              title="Reset Sample Data"
+              title="Delete All Sample Data"
             >
-              <span>Reset</span>
+              <span>Clear Data</span>
             </button>
           </div>
         </div>
