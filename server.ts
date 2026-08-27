@@ -32,19 +32,35 @@ async function executeD1Query(sql: string, params: any[] = []) {
 
   const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`;
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiToken}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      sql,
-      params
-    })
-  });
+  let response: globalThis.Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        sql,
+        params
+      })
+    });
+  } catch (netErr: any) {
+    throw new Error(`Failed to reach Cloudflare API network endpoint: ${netErr.message}`);
+  }
 
-  const data: any = await response.json();
+  const rawText = await response.text();
+  let data: any;
+  try {
+    data = JSON.parse(rawText);
+  } catch (_parseErr) {
+    if (rawText.toLowerCase().includes("<!doctype") || rawText.toLowerCase().includes("<html")) {
+      throw new Error(
+        `Cloudflare API returned HTML (HTTP ${response.status} ${response.statusText}). Check that your Account ID (${accountId}) and Database ID (${databaseId}) are valid and not containing typos.`
+      );
+    }
+    throw new Error(`Cloudflare API returned invalid response (HTTP ${response.status}): ${rawText.slice(0, 150)}`);
+  }
 
   if (!response.ok || !data.success) {
     const errorMsg = data?.errors?.map((e: any) => `${e.message} (code ${e.code})`).join("; ") || `HTTP ${response.status}: ${response.statusText}`;
