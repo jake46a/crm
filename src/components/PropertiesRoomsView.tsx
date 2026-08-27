@@ -414,8 +414,13 @@ export const PropertiesRoomsView: React.FC<PropertiesRoomsViewProps> = ({
                   <span className="text-xl font-light text-slate-900 font-mono">${room.monthlyRent}</span>
                   <span className="text-slate-500 text-[11px]">/month</span>
                 </div>
-                <div className="text-right text-slate-500 text-[11px] font-mono">
-                  <span>{room.sqft} sqft</span>
+                <div className="text-right text-slate-500 text-[11px]">
+                  {room.floor && (
+                    <span className="font-semibold text-slate-700">
+                      {typeof room.floor === 'number' ? `Floor ${room.floor}` : room.floor} •{' '}
+                    </span>
+                  )}
+                  <span className="font-mono">{room.sqft} sqft</span>
                 </div>
               </div>
 

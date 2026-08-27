@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Home, Plus, X, Building, DollarSign, Trash2, AlertCircle, PlusCircle } from 'lucide-react';
-import { Room, RoomStatus, RoomBathroomType, Property } from '../../types';
+import { Room, RoomStatus, RoomBathroomType, FloorLevel, Property } from '../../types';
 
 interface NewRoomModalProps {
   isOpen: boolean;
@@ -12,6 +12,17 @@ interface NewRoomModalProps {
   onDeleteRoom?: (roomId: string) => void;
   onOpenNewPropertyModal?: () => void;
 }
+
+export const FLOOR_LEVEL_OPTIONS: FloorLevel[] = [
+  'Main Level',
+  'Lower Level',
+  'Upper Level',
+  '1st Floor',
+  '2nd Floor',
+  '3rd Floor',
+  'Basement',
+  'Attic'
+];
 
 export const NewRoomModal: React.FC<NewRoomModalProps> = ({
   isOpen,
@@ -26,7 +37,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
   const [propertyId, setPropertyId] = useState<string>('');
   const [roomNumber, setRoomNumber] = useState<string>('101');
   const [name, setName] = useState<string>('Room 101 - Primary Suite');
-  const [floor, setFloor] = useState<number>(1);
+  const [floor, setFloor] = useState<FloorLevel>('Main Level');
   const [sqft, setSqft] = useState<number>(200);
   const [monthlyRent, setMonthlyRent] = useState<number>(895);
   const [securityDeposit, setSecurityDeposit] = useState<number>(895);
@@ -55,7 +66,23 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
         setPropertyId(editingRoom.propertyId);
         setRoomNumber(editingRoom.roomNumber || '101');
         setName(editingRoom.name || 'Room 101');
-        setFloor(editingRoom.floor ?? 1);
+        
+        let initialFloor: FloorLevel = 'Main Level';
+        if (typeof editingRoom.floor === 'string' && editingRoom.floor.trim()) {
+          initialFloor = editingRoom.floor;
+        } else if (editingRoom.floor === 0) {
+          initialFloor = 'Lower Level';
+        } else if (editingRoom.floor === 1) {
+          initialFloor = 'Main Level';
+        } else if (editingRoom.floor === 2) {
+          initialFloor = 'Upper Level';
+        } else if (editingRoom.floor === 3) {
+          initialFloor = '3rd Floor';
+        } else if (editingRoom.floor !== undefined && editingRoom.floor !== null) {
+          initialFloor = String(editingRoom.floor);
+        }
+        setFloor(initialFloor);
+
         setSqft(editingRoom.sqft ?? 200);
         setMonthlyRent(editingRoom.monthlyRent ?? 895);
         setSecurityDeposit(editingRoom.securityDeposit ?? 895);
@@ -77,7 +104,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
         setPropertyId(initialPropId);
         setRoomNumber('101');
         setName('Room 101 - Primary Suite');
-        setFloor(1);
+        setFloor('Main Level');
         setSqft(200);
         setMonthlyRent(895);
         setSecurityDeposit(895);
@@ -125,7 +152,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
       const sanitizedMonthlyRent = Math.max(0, Number(monthlyRent) || 0);
       const sanitizedDeposit = Math.max(0, Number(securityDeposit) || 0);
       const sanitizedSqft = Math.max(1, Number(sqft) || 180);
-      const sanitizedFloor = Math.max(0, Number(floor) || 1);
+      const chosenFloor = floor || 'Main Level';
 
       const parsedAmenities = amenities
         ? amenities.split(',').map(a => a.trim()).filter(Boolean)
@@ -137,7 +164,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
         propertyName: selectedProp.name,
         roomNumber: roomNumber.trim(),
         name: name.trim(),
-        floor: sanitizedFloor,
+        floor: chosenFloor,
         sqft: sanitizedSqft,
         monthlyRent: sanitizedMonthlyRent,
         securityDeposit: sanitizedDeposit,
@@ -340,13 +367,20 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <div>
               <label className="block font-bold text-slate-700 mb-1">Floor Level</label>
-              <input
-                type="number"
-                min="0"
+              <select
                 value={floor}
-                onChange={(e) => setFloor(Number(e.target.value))}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none"
-              />
+                onChange={(e) => setFloor(e.target.value)}
+                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none"
+              >
+                <option value="Main Level">Main Level</option>
+                <option value="Lower Level">Lower Level</option>
+                <option value="Upper Level">Upper Level</option>
+                <option value="1st Floor">1st Floor</option>
+                <option value="2nd Floor">2nd Floor</option>
+                <option value="3rd Floor">3rd Floor</option>
+                <option value="Basement">Basement</option>
+                <option value="Attic">Attic</option>
+              </select>
             </div>
             <div>
               <label className="block font-bold text-slate-700 mb-1">Bathroom Setup</label>
@@ -391,7 +425,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
               className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
             />
             <label htmlFor="isFurnished" className="font-semibold text-slate-800 select-none cursor-pointer">
-              Furnished Room (Includes Bed Frame, Mattress & Desk)
+              Furnished Room (Includes Bed Frame, Mattress & Dresser)
             </label>
           </div>
 

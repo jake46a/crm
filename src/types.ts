@@ -34,6 +34,7 @@ export interface Property {
 
 export type RoomBathroomType = 'Private Ensuite' | '1 Shared Bathroom' | '2 Shared Bathrooms' | 'Shared Bath' | 'Jack & Jill Shared' | string;
 export type RoomStatus = 'Occupied' | 'Available' | 'Under Turnover' | 'Reserved';
+export type FloorLevel = 'Main Level' | 'Lower Level' | 'Upper Level' | '1st Floor' | '2nd Floor' | '3rd Floor' | 'Basement' | 'Attic' | string;
 
 export interface TurnoverTask {
   id: string;
@@ -47,7 +48,7 @@ export interface Room {
   propertyName: string;
   roomNumber: string;
   name: string;
-  floor: number;
+  floor: FloorLevel | number;
   sqft: number;
   bathroomType: RoomBathroomType;
   isFurnished: boolean;
