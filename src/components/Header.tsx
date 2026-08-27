@@ -20,7 +20,11 @@ import {
   CloudOff,
   LogIn,
   LogOut,
-  UserCheck
+  UserCheck,
+  ShieldAlert,
+  Copy,
+  Check,
+  ExternalLink
 } from 'lucide-react';
 import { NavigationTab, LeaseRenewal, WorkOrder, TenantLead, Room, Property, Contact } from '../types';
 import { useFirebase } from '../context/FirebaseContext';
@@ -64,12 +68,21 @@ export const Header: React.FC<HeaderProps> = ({
   onResetData,
   onQuickNavigate
 }) => {
-  const { user, syncStatus, isFirebaseConnected, signIn, signOut } = useFirebase();
+  const { user, syncStatus, isFirebaseConnected, signIn, signOut, authError, clearAuthError } = useFirebase();
   const [isNewMenuOpen, setIsNewMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [hasCopiedDomain, setHasCopiedDomain] = useState(false);
+
+  const handleCopyDomain = () => {
+    if (authError?.domain) {
+      navigator.clipboard.writeText(authError.domain);
+      setHasCopiedDomain(true);
+      setTimeout(() => setHasCopiedDomain(false), 3000);
+    }
+  };
 
   // Computed urgent counts
   const urgentRenewalsCount = renewals.filter(r => r.daysUntilExpiration <= 30 && r.renewalStatus !== 'Renewed Signed' && r.renewalStatus !== 'Tenant Declined (Vacating)').length;
@@ -594,6 +607,92 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
           <div className="flex-1" onClick={() => setIsMobileNavOpen(false)} />
+        </div>
+      )}
+
+      {/* Google Auth Domain Authorization Diagnostic Modal */}
+      {authError && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-8">
+            <div className="bg-amber-500 text-slate-950 p-5 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <ShieldAlert className="w-6 h-6 text-slate-950 stroke-[2.5]" />
+                <h3 className="font-bold text-base">Google Sign In: Domain Authorization</h3>
+              </div>
+              <button 
+                onClick={clearAuthError}
+                className="text-slate-900/70 hover:text-slate-950 font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs text-slate-700">
+              {authError.isDomainError ? (
+                <>
+                  <p className="leading-relaxed font-medium text-slate-900">
+                    Google OAuth blocked this sign-in attempt because your Cloudflare host domain is not yet listed in your Firebase project's <strong>Authorized domains</strong> list.
+                  </p>
+
+                  {/* Domain Copy Box */}
+                  <div className="bg-slate-100 p-3 rounded-xl border border-slate-300 space-y-1.5">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Domain to Authorize:</span>
+                    <div className="flex items-center justify-between gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 font-mono text-xs text-blue-700 font-bold">
+                      <span className="truncate">{authError.domain || window.location.hostname}</span>
+                      <button
+                        onClick={handleCopyDomain}
+                        className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded font-sans text-[11px] font-bold transition shrink-0"
+                      >
+                        {hasCopiedDomain ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            <span className="text-emerald-700">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 3 Step Quick Instructions */}
+                  <div className="space-y-2 bg-blue-50/60 p-3.5 rounded-xl border border-blue-200 text-slate-800">
+                    <span className="font-bold text-blue-900 block text-xs">How to fix in 1 minute:</span>
+                    <ol className="list-decimal list-inside space-y-1.5 text-[11px] text-slate-700 leading-normal">
+                      <li>
+                        Go to <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-blue-700 font-bold underline inline-flex items-center gap-0.5">Firebase Console <ExternalLink className="w-2.5 h-2.5" /></a> and select project <strong>data-terminus-489202-p9</strong>.
+                      </li>
+                      <li>
+                        Navigate to <strong>Authentication</strong> &rarr; <strong>Settings</strong> tab &rarr; <strong>Authorized domains</strong>.
+                      </li>
+                      <li>
+                        Click <strong>Add domain</strong>, paste <code className="bg-white px-1 py-0.5 rounded border border-slate-300 font-mono font-bold text-blue-900">{authError.domain || window.location.hostname}</code>, and click <strong>Save</strong>.
+                      </li>
+                    </ol>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <p className="font-semibold text-rose-700">{authError.message}</p>
+                  <p className="text-slate-500 text-[11px]">
+                    If your browser or Cloudflare deployment is blocking popups, please ensure popups are allowed or try again.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+              <button
+                onClick={clearAuthError}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-bold text-xs transition"
+              >
+                Got It
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>

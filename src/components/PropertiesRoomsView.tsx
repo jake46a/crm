@@ -335,6 +335,55 @@ export const PropertiesRoomsView: React.FC<PropertiesRoomsViewProps> = ({
       </div>
 
       {/* Room Grid Cards */}
+      {filteredRooms.length === 0 ? (
+        <div className="bg-white rounded-sm border border-slate-200 p-8 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
+            <Home className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-800 text-sm">No Rooms Found</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+              {properties.length === 0 
+                ? "You don't have any properties yet. Start by creating a coliving property, then add individual rooms."
+                : rooms.length === 0
+                ? "No rooms have been added to your inventory yet. Click below to add your first room."
+                : "No rooms match the selected filters or search keyword."}
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-2 pt-2">
+            {properties.length === 0 ? (
+              <button
+                onClick={() => onOpenNewPropertyModal()}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-sm text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 transition-colors shadow-xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add First Property</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => onOpenNewRoomModal(selectedPropertyId !== 'all' ? selectedPropertyId : undefined)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-sm text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 transition-colors shadow-xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Rental Room</span>
+              </button>
+            )}
+            {(statusFilter !== 'all' || bathFilter !== 'all' || searchTerm) && (
+              <button
+                onClick={() => {
+                  setStatusFilter('all');
+                  setBathFilter('all');
+                  setSearchTerm('');
+                  setSelectedPropertyId('all');
+                }}
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-sm text-xs font-semibold transition-colors"
+              >
+                Reset Filters
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredRooms.map(room => (
           <div 
@@ -511,6 +560,7 @@ export const PropertiesRoomsView: React.FC<PropertiesRoomsViewProps> = ({
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 };

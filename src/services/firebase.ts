@@ -2,6 +2,8 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   getAuth, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider, 
   signOut as fbSignOut, 
   onAuthStateChanged, 
@@ -104,9 +106,37 @@ export async function loginWithGoogle(): Promise<User | null> {
     provider.setCustomParameters({ prompt: 'select_account' });
     const result = await signInWithPopup(auth, provider);
     return result.user;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Google Sign In Error:', error);
+    // If popup was blocked by browser or COOP headers, fall back to redirect if appropriate
+    if (error?.code === 'auth/popup-blocked' || error?.code === 'auth/cancelled-popup-request') {
+      try {
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        await signInWithRedirect(auth, provider);
+        return null;
+      } catch (redirectErr) {
+        console.error('Redirect sign in error:', redirectErr);
+        throw redirectErr;
+      }
+    }
     throw error;
+  }
+}
+
+export async function loginWithGoogleRedirect(): Promise<void> {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  await signInWithRedirect(auth, provider);
+}
+
+export async function checkRedirectAuthResult(): Promise<User | null> {
+  try {
+    const result = await getRedirectResult(auth);
+    return result ? result.user : null;
+  } catch (error) {
+    console.error('Error checking redirect auth result:', error);
+    return null;
   }
 }
 
@@ -259,12 +289,35 @@ export function subscribeToActivityLogs(
   );
 }
 
+/**
+ * Recursively removes all keys with `undefined` values so Firestore setDoc / updateDoc does not reject payloads.
+ */
+export function sanitizeForFirestore<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeForFirestore(item)) as unknown as T;
+  }
+  if (typeof obj === 'object') {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = sanitizeForFirestore(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return obj;
+}
+
 // Firestore Database Mutation Service
 export const FirebaseService = {
   async saveProperty(property: Property): Promise<void> {
     const docPath = `${COLLECTIONS.PROPERTIES}/${property.id}`;
     try {
-      await setDoc(doc(db, COLLECTIONS.PROPERTIES, property.id), property, { merge: true });
+      const sanitized = sanitizeForFirestore(property);
+      await setDoc(doc(db, COLLECTIONS.PROPERTIES, property.id), sanitized, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, docPath);
     }
@@ -282,7 +335,8 @@ export const FirebaseService = {
   async saveRoom(room: Room): Promise<void> {
     const docPath = `${COLLECTIONS.ROOMS}/${room.id}`;
     try {
-      await setDoc(doc(db, COLLECTIONS.ROOMS, room.id), room, { merge: true });
+      const sanitized = sanitizeForFirestore(room);
+      await setDoc(doc(db, COLLECTIONS.ROOMS, room.id), sanitized, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, docPath);
     }
@@ -300,7 +354,8 @@ export const FirebaseService = {
   async saveRenewal(renewal: LeaseRenewal): Promise<void> {
     const docPath = `${COLLECTIONS.RENEWALS}/${renewal.id}`;
     try {
-      await setDoc(doc(db, COLLECTIONS.RENEWALS, renewal.id), renewal, { merge: true });
+      const sanitized = sanitizeForFirestore(renewal);
+      await setDoc(doc(db, COLLECTIONS.RENEWALS, renewal.id), sanitized, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, docPath);
     }
@@ -318,7 +373,8 @@ export const FirebaseService = {
   async saveWorkOrder(workOrder: WorkOrder): Promise<void> {
     const docPath = `${COLLECTIONS.WORK_ORDERS}/${workOrder.id}`;
     try {
-      await setDoc(doc(db, COLLECTIONS.WORK_ORDERS, workOrder.id), workOrder, { merge: true });
+      const sanitized = sanitizeForFirestore(workOrder);
+      await setDoc(doc(db, COLLECTIONS.WORK_ORDERS, workOrder.id), sanitized, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, docPath);
     }
@@ -336,7 +392,8 @@ export const FirebaseService = {
   async saveLead(lead: TenantLead): Promise<void> {
     const docPath = `${COLLECTIONS.LEADS}/${lead.id}`;
     try {
-      await setDoc(doc(db, COLLECTIONS.LEADS, lead.id), lead, { merge: true });
+      const sanitized = sanitizeForFirestore(lead);
+      await setDoc(doc(db, COLLECTIONS.LEADS, lead.id), sanitized, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, docPath);
     }
@@ -354,7 +411,8 @@ export const FirebaseService = {
   async saveContact(contact: Contact): Promise<void> {
     const docPath = `${COLLECTIONS.CONTACTS}/${contact.id}`;
     try {
-      await setDoc(doc(db, COLLECTIONS.CONTACTS, contact.id), contact, { merge: true });
+      const sanitized = sanitizeForFirestore(contact);
+      await setDoc(doc(db, COLLECTIONS.CONTACTS, contact.id), sanitized, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, docPath);
     }
@@ -372,7 +430,8 @@ export const FirebaseService = {
   async addActivityLog(log: ActivityLog): Promise<void> {
     const docPath = `${COLLECTIONS.ACTIVITY_LOGS}/${log.id}`;
     try {
-      await setDoc(doc(db, COLLECTIONS.ACTIVITY_LOGS, log.id), log);
+      const sanitized = sanitizeForFirestore(log);
+      await setDoc(doc(db, COLLECTIONS.ACTIVITY_LOGS, log.id), sanitized);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, docPath);
     }

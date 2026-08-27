@@ -903,6 +903,7 @@ export default function App() {
         editingRoom={editingRoom}
         defaultPropertyId={defaultPropertyIdForRoom}
         onDeleteRoom={handleDeleteRoom}
+        onOpenNewPropertyModal={() => setIsNewPropertyModalOpen(true)}
       />
 
       {/* New / Edit Contact Modal */}
