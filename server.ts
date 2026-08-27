@@ -10,11 +10,25 @@ const PORT = 3000;
 
 app.use(express.json({ limit: "50mb" }));
 
-// Helper to get Cloudflare D1 credentials
+// Helper to clean quotes and whitespace from env strings
+function cleanEnvVal(val: string | undefined): string {
+  if (!val) return "";
+  let clean = val.trim();
+  // Strip enclosing quotes if user wrapped the value in quotes
+  if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.slice(1, -1).trim();
+  }
+  return clean;
+}
+
+// Helper to get Cloudflare D1 credentials with dynamic reload
 function getD1Config() {
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim() || "";
-  const databaseId = process.env.CLOUDFLARE_DATABASE_ID?.trim() || "";
-  const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim() || "";
+  // Reload dotenv to pick up any changes made to .env without needing manual process restarts
+  dotenv.config({ override: true });
+
+  const accountId = cleanEnvVal(process.env.CLOUDFLARE_ACCOUNT_ID);
+  const databaseId = cleanEnvVal(process.env.CLOUDFLARE_DATABASE_ID);
+  const apiToken = cleanEnvVal(process.env.CLOUDFLARE_API_TOKEN);
 
   const isConfigured = Boolean(accountId && databaseId && apiToken);
   return { accountId, databaseId, apiToken, isConfigured };
