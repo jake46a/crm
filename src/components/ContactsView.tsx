@@ -13,8 +13,7 @@ import {
   Edit2, 
   MessageSquare,
   DollarSign,
-  Briefcase,
-  Trash2
+  Briefcase
 } from 'lucide-react';
 import { Contact, ContactType, Property, Room } from '../types';
 
@@ -25,8 +24,6 @@ interface ContactsViewProps {
   onUpdateContact: (contact: Contact) => void;
   onOpenNewContactModal: () => void;
   onOpenEditContactModal: (contact: Contact) => void;
-  onOpenDeleteContactModal?: (contact: Contact) => void;
-  onNavigateToVendorsAgents?: () => void;
 }
 
 export const ContactsView: React.FC<ContactsViewProps> = ({
@@ -35,9 +32,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
   rooms,
   onUpdateContact,
   onOpenNewContactModal,
-  onOpenEditContactModal,
-  onOpenDeleteContactModal,
-  onNavigateToVendorsAgents
+  onOpenEditContactModal
 }) => {
   const [activeTab, setActiveTab] = useState<string>('all');
   const [propertyFilter, setPropertyFilter] = useState<string>('all');
@@ -292,15 +287,6 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                 >
                   <Edit2 className="w-3.5 h-3.5" />
                 </button>
-                {onOpenDeleteContactModal && (
-                  <button
-                    onClick={() => onOpenDeleteContactModal(contact)}
-                    className="p-1.5 bg-slate-100 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-sm transition-colors"
-                    title={`Delete ${contact.type}`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
               </div>
             </div>
           </div>

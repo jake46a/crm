@@ -17,7 +17,6 @@ import {
   WorkOrder, 
   TenantLead, 
   Contact, 
-  ContactType,
   ActivityLog,
   NavigationTab
 } from './types';
@@ -31,9 +30,7 @@ import { PropertiesRoomsView } from './components/PropertiesRoomsView';
 import { LeaseRenewalsView } from './components/LeaseRenewalsView';
 import { WorkOrdersView } from './components/WorkOrdersView';
 import { LeadsPipelineView } from './components/LeadsPipelineView';
-import { VendorsAgentsView } from './components/VendorsAgentsView';
 import { ContactsView } from './components/ContactsView';
-import { DatabaseStatusView } from './components/DatabaseStatusView';
 
 // Modals
 import { AiAssistantModal } from './components/AiAssistantModal';
@@ -44,12 +41,10 @@ import { NewPropertyModal } from './components/modals/NewPropertyModal';
 import { DeletePropertyModal } from './components/modals/DeletePropertyModal';
 import { NewRoomModal } from './components/modals/NewRoomModal';
 import { NewContactModal } from './components/modals/NewContactModal';
-import { DeleteContactModal } from './components/modals/DeleteContactModal';
 import { ConvertLeadModal } from './components/modals/ConvertLeadModal';
 import { RenewalNoticeLetterModal } from './components/modals/RenewalNoticeLetterModal';
 import { LeadDetailModal } from './components/modals/LeadDetailModal';
 import { ExportImportModal } from './components/modals/ExportImportModal';
-import { CloudflareD1Modal } from './components/modals/CloudflareD1Modal';
 
 export default function App() {
   // Navigation State
@@ -68,7 +63,6 @@ export default function App() {
   // Modal State
   const [isAssistantOpen, setIsAssistantOpen] = useState<boolean>(false);
   const [isExportImportOpen, setIsExportImportOpen] = useState<boolean>(false);
-  const [isCloudflareD1Open, setIsCloudflareD1Open] = useState<boolean>(false);
 
   // Work Order Modal
   const [isNewWorkOrderModalOpen, setIsNewWorkOrderModalOpen] = useState<boolean>(false);
@@ -95,12 +89,9 @@ export default function App() {
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [defaultPropertyIdForRoom, setDefaultPropertyIdForRoom] = useState<string | undefined>(undefined);
 
-  // Contact Modal & Deletion
+  // Contact Modal
   const [isNewContactModalOpen, setIsNewContactModalOpen] = useState<boolean>(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
-  const [defaultContactType, setDefaultContactType] = useState<ContactType>('Vendor / Contractor');
-  const [isDeleteContactModalOpen, setIsDeleteContactModalOpen] = useState<boolean>(false);
-  const [contactToDelete, setContactToDelete] = useState<Contact | null>(null);
 
   // Notification Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -137,34 +128,6 @@ export default function App() {
     };
     StorageService.addActivityLog(newLog);
     setActivityLogs(prev => [newLog, ...prev]);
-  };
-
-  // Sync data loaded from Cloudflare D1
-  const handleDataLoadedFromD1 = (data: {
-    properties: Property[];
-    rooms: Room[];
-    renewals: LeaseRenewal[];
-    workOrders: WorkOrder[];
-    leads: TenantLead[];
-    contacts: Contact[];
-    activityLogs: ActivityLog[];
-  }) => {
-    StorageService.saveProperties(data.properties);
-    StorageService.saveRooms(data.rooms);
-    StorageService.saveLeaseRenewals(data.renewals);
-    StorageService.saveWorkOrders(data.workOrders);
-    StorageService.saveTenantLeads(data.leads);
-    StorageService.saveContacts(data.contacts);
-    StorageService.saveActivityLogs(data.activityLogs);
-    setProperties(data.properties);
-    setRooms(data.rooms);
-    setRenewals(data.renewals);
-    setWorkOrders(data.workOrders);
-    setLeads(data.leads);
-    setContacts(data.contacts);
-    setActivityLogs(data.activityLogs);
-    logActivity('System', 'Imported & synchronized data snapshot from Cloudflare D1 SQLite replica');
-    showToast('Database successfully synchronized with Cloudflare D1!');
   };
 
   // ===================== CRUD HANDLERS =====================
@@ -352,51 +315,6 @@ export default function App() {
     showToast(`Contact saved: ${contact.name}`);
   };
 
-  // Contact Deletion (Vendors, Leasing Agents, Owners, Tenants)
-  const handleDeleteContact = (contactId: string) => {
-    const targetContact = contacts.find(c => c.id === contactId);
-    if (!targetContact) return;
-
-    // 1. Remove contact from state & localStorage
-    const nextContacts = contacts.filter(c => c.id !== contactId);
-    setContacts(nextContacts);
-    StorageService.saveContacts(nextContacts);
-
-    // 2. Unassign from active work orders if vendor
-    if (targetContact.type === 'Vendor / Contractor') {
-      const updatedWorkOrders = workOrders.map(wo => {
-        if (wo.assignedVendorId === contactId || wo.assignedVendorName === targetContact.name) {
-          return {
-            ...wo,
-            assignedVendorId: undefined,
-            assignedVendorName: undefined
-          };
-        }
-        return wo;
-      });
-      setWorkOrders(updatedWorkOrders);
-      StorageService.saveWorkOrders(updatedWorkOrders);
-    }
-
-    // 3. Unassign from pipeline leads if leasing agent
-    if (targetContact.type === 'Leasing Agent') {
-      const updatedLeads = leads.map(l => {
-        if (l.assignedAgent === targetContact.name) {
-          return {
-            ...l,
-            assignedAgent: undefined
-          };
-        }
-        return l;
-      });
-      setLeads(updatedLeads);
-      StorageService.saveTenantLeads(updatedLeads);
-    }
-
-    logActivity('System', `Deleted ${targetContact.type}: ${targetContact.name}`, contactId);
-    showToast(`Deleted ${targetContact.name} from directory`);
-  };
-
   // Convert Lead to Resident
   const handleConvertLead = (
     lead: TenantLead,
@@ -535,7 +453,6 @@ export default function App() {
         }}
         onOpenAssistant={() => setIsAssistantOpen(true)}
         onOpenExportImport={() => setIsExportImportOpen(true)}
-        onOpenCloudflareD1={() => setIsCloudflareD1Open(true)}
         onResetData={handleResetDemoData}
         onQuickNavigate={(tab) => setActiveTab(tab)}
       />
@@ -678,33 +595,7 @@ export default function App() {
           />
         )}
 
-        {/* Tab 6: Vendors, Contractors & Leasing Agents */}
-        {activeTab === 'vendors-agents' && (
-          <VendorsAgentsView
-            contacts={contacts}
-            properties={properties}
-            workOrders={workOrders}
-            leads={leads}
-            onOpenNewContactModal={(defaultType) => {
-              setEditingContact(null);
-              setDefaultContactType(defaultType || 'Vendor / Contractor');
-              setIsNewContactModalOpen(true);
-            }}
-            onOpenEditContactModal={(contact) => {
-              setEditingContact(contact);
-              setDefaultContactType(contact.type);
-              setIsNewContactModalOpen(true);
-            }}
-            onOpenDeleteContactModal={(contact) => {
-              setContactToDelete(contact);
-              setIsDeleteContactModalOpen(true);
-            }}
-            onNavigateToWorkOrders={() => setActiveTab('workorders')}
-            onNavigateToLeads={() => setActiveTab('leads')}
-          />
-        )}
-
-        {/* Tab 7: Contacts Directory */}
+        {/* Tab 6: Contacts Directory */}
         {activeTab === 'contacts' && (
           <ContactsView
             contacts={contacts}
@@ -713,35 +604,12 @@ export default function App() {
             onUpdateContact={handleSaveContact}
             onOpenNewContactModal={() => {
               setEditingContact(null);
-              setDefaultContactType('Tenant');
               setIsNewContactModalOpen(true);
             }}
             onOpenEditContactModal={(contact) => {
               setEditingContact(contact);
-              setDefaultContactType(contact.type);
               setIsNewContactModalOpen(true);
             }}
-            onOpenDeleteContactModal={(contact) => {
-              setContactToDelete(contact);
-              setIsDeleteContactModalOpen(true);
-            }}
-            onNavigateToVendorsAgents={() => setActiveTab('vendors-agents')}
-          />
-        )}
-
-        {/* Tab 8: Cloudflare D1 Database Status & Telemetry */}
-        {activeTab === 'database-status' && (
-          <DatabaseStatusView
-            properties={properties}
-            rooms={rooms}
-            renewals={renewals}
-            workOrders={workOrders}
-            leads={leads}
-            contacts={contacts}
-            activityLogs={activityLogs}
-            onDataLoadedFromD1={handleDataLoadedFromD1}
-            onShowToast={showToast}
-            onSelectTab={setActiveTab}
           />
         )}
         </main>
@@ -894,26 +762,6 @@ export default function App() {
         properties={properties}
         onSave={handleSaveContact}
         editingContact={editingContact}
-        defaultType={defaultContactType}
-        onDeleteRequest={(contact) => {
-          setIsNewContactModalOpen(false);
-          setEditingContact(null);
-          setContactToDelete(contact);
-          setIsDeleteContactModalOpen(true);
-        }}
-      />
-
-      {/* Delete Contact Modal */}
-      <DeleteContactModal
-        isOpen={isDeleteContactModalOpen}
-        onClose={() => {
-          setIsDeleteContactModalOpen(false);
-          setContactToDelete(null);
-        }}
-        contact={contactToDelete}
-        workOrders={workOrders}
-        leads={leads}
-        onConfirmDelete={handleDeleteContact}
       />
 
       {/* Backup, Export & Import Data Modal */}
@@ -921,21 +769,6 @@ export default function App() {
         isOpen={isExportImportOpen}
         onClose={() => setIsExportImportOpen(false)}
         onDataReload={loadAllData}
-      />
-
-      {/* Cloudflare D1 Sync & Settings Modal */}
-      <CloudflareD1Modal
-        isOpen={isCloudflareD1Open}
-        onClose={() => setIsCloudflareD1Open(false)}
-        properties={properties}
-        rooms={rooms}
-        renewals={renewals}
-        workOrders={workOrders}
-        leads={leads}
-        contacts={contacts}
-        activityLogs={activityLogs}
-        onDataLoadedFromD1={handleDataLoadedFromD1}
-        onShowToast={showToast}
       />
     </div>
   );

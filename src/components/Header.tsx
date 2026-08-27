@@ -14,8 +14,7 @@ import {
   Clock,
   ChevronDown,
   Menu,
-  X,
-  Briefcase
+  X
 } from 'lucide-react';
 import { NavigationTab, LeaseRenewal, WorkOrder, TenantLead, Room, Property, Contact } from '../types';
 
@@ -35,7 +34,6 @@ interface HeaderProps {
   onOpenNewContact: () => void;
   onOpenAssistant: () => void;
   onOpenExportImport: () => void;
-  onOpenCloudflareD1?: () => void;
   onResetData: () => void;
   onQuickNavigate: (tab: NavigationTab, filterQuery?: string) => void;
 }
@@ -56,7 +54,6 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewContact,
   onOpenAssistant,
   onOpenExportImport,
-  onOpenCloudflareD1,
   onResetData,
   onQuickNavigate
 }) => {
@@ -73,7 +70,6 @@ export const Header: React.FC<HeaderProps> = ({
   const totalRoomsCount = rooms.length;
   const occupiedRoomsCount = rooms.filter(r => r.status === 'Occupied').length;
   const occupancyRate = totalRoomsCount > 0 ? ((occupiedRoomsCount / totalRoomsCount) * 100).toFixed(1) : '0';
-  const vendorsAndAgentsCount = contacts.filter(c => c.type === 'Vendor / Contractor' || c.type === 'Leasing Agent').length;
 
   // Search matches
   const searchResults = searchQuery.trim() ? {
@@ -95,10 +91,7 @@ export const Header: React.FC<HeaderProps> = ({
       case 'renewals': return 'Lease Renewals & Expiration Engine';
       case 'workorders': return 'Maintenance Hub & Vendor Dispatch';
       case 'leads': return 'Tenant Leads & Roommate Screening CRM';
-      case 'vendors-agents': return 'Vendors, Contractors & Leasing Agents';
-      case 'contacts': return 'Unified Contacts & Resident Directory';
-      case 'tenant-portal': return 'Resident Portal & Maintenance Submissions';
-      case 'database-status': return 'Cloudflare D1 Database Status & Telemetry';
+      case 'contacts': return 'Unified Contacts & Contractor Directory';
     }
   };
 
@@ -139,22 +132,10 @@ export const Header: React.FC<HeaderProps> = ({
       badge: <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-1.5 py-0.5 rounded-sm font-semibold">{activeLeadsCount}</span>
     },
     { 
-      id: 'vendors-agents', 
-      label: 'Vendors & Agents', 
-      icon: Briefcase,
-      badge: <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono px-1.5 py-0.5 rounded-sm">{vendorsAndAgentsCount}</span>
-    },
-    { 
       id: 'contacts', 
-      label: 'Resident Directory', 
+      label: 'Contacts', 
       icon: ContactIcon,
       badge: <span className="text-[10px] bg-slate-800 text-slate-400 font-mono px-1.5 py-0.5 rounded-sm">{contacts.length}</span>
-    },
-    { 
-      id: 'database-status', 
-      label: 'Database Status', 
-      icon: Database,
-      badge: <span className="text-[10px] bg-orange-950 text-orange-300 border border-orange-800 font-mono px-1.5 py-0.5 rounded-sm font-semibold">D1</span>
     }
   ];
 
@@ -211,20 +192,6 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <span className="text-[9px] bg-blue-700 px-1 py-0.5 rounded-sm uppercase tracking-wider font-mono">GPT</span>
           </button>
-
-          {/* Cloudflare D1 Database Trigger Button */}
-          {onOpenCloudflareD1 && (
-            <button
-              onClick={onOpenCloudflareD1}
-              className="w-full flex items-center justify-between px-3 py-1.5 rounded-sm bg-orange-950/40 hover:bg-orange-900/50 border border-orange-500/30 text-orange-300 font-medium text-xs shadow-xs transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <Database className="w-3.5 h-3.5 text-orange-400" />
-                <span>Cloudflare D1 Database</span>
-              </div>
-              <span className="text-[9px] bg-orange-500/30 text-orange-200 px-1 py-0.5 rounded-sm uppercase tracking-wider font-mono">SQL</span>
-            </button>
-          )}
 
           <div className="grid grid-cols-2 gap-1.5 pt-1">
             <button
@@ -475,18 +442,6 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
           </div>
-
-          {/* Cloudflare D1 Top Quick Launcher */}
-          {onOpenCloudflareD1 && (
-            <button
-              onClick={onOpenCloudflareD1}
-              className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-800 text-xs font-semibold shadow-2xs transition"
-              title="Cloudflare D1 SQL Database & Sync"
-            >
-              <Database className="w-3.5 h-3.5 text-orange-600" />
-              <span>D1 SQL</span>
-            </button>
-          )}
 
           {/* User profile avatar bubble matching theme */}
           <div 

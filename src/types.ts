@@ -4,10 +4,8 @@ export type NavigationTab =
   | 'renewals' 
   | 'workorders' 
   | 'leads' 
-  | 'vendors-agents'
   | 'contacts'
   | 'tenant-portal'
-  | 'database-status'
   | 'assistant';
 
 export interface Property {
@@ -225,7 +223,7 @@ export interface TenantLead {
   createdDate: string;
 }
 
-export type ContactType = 'Tenant' | 'Lead' | 'Vendor / Contractor' | 'Leasing Agent' | 'Property Owner' | 'Emergency Contact';
+export type ContactType = 'Tenant' | 'Lead' | 'Vendor / Contractor' | 'Property Owner' | 'Emergency Contact';
 
 export interface Contact {
   id: string;
@@ -239,7 +237,7 @@ export interface Contact {
   propertyName?: string;
   roomId?: string;
   roomName?: string;
-  roleOrSpecialty?: string; // e.g. "Master Tenant", "HVAC Tech & Plumber", "Licensed Leasing Agent", "Property Investor", "Lead (Inquiry)"
+  roleOrSpecialty?: string; // e.g. "Master Tenant", "HVAC Tech & Plumber", "Property Investor", "Lead (Inquiry)"
   address?: string;
   status: 'Active' | 'Past' | 'Prospect' | 'Available 24/7';
   hourlyRate?: number;
@@ -249,17 +247,6 @@ export interface Contact {
   notes: string;
   paymentStatus?: 'Current / Paid' | 'Payment Pending' | 'Past Due';
   avatarBg: string;
-  // Leasing Agent specific fields
-  licenseNumber?: string;
-  commissionRate?: string | number; // e.g. "$250 / lease" or "10%"
-  assignedProperties?: string[]; // Array of property IDs
-  assignedPropertyNames?: string[]; // Array of property names
-  activeListingsCount?: number;
-  // Vendor / Contractor specific fields
-  tradeCategory?: 'Plumbing' | 'Electrical' | 'HVAC / Heating' | 'Appliance' | 'Locks & Access' | 'Cleaning' | 'General Handyman' | 'Painting & Drywall' | 'Pest Control' | string;
-  emergencyAvailable?: boolean;
-  insurancePolicyExpiry?: string;
-  w9OnRecord?: boolean;
 }
 
 export interface ActivityLog {
@@ -269,36 +256,5 @@ export interface ActivityLog {
   message: string;
   user: string;
   entityId?: string;
-}
-
-export interface D1StatusResponse {
-  configured: boolean;
-  connected: boolean;
-  latencyMs?: number;
-  databaseId?: string;
-  accountId?: string;
-  serverTime?: string;
-  tables?: string[];
-  tableCounts?: Record<string, number>;
-  schemaReady?: boolean;
-  message?: string;
-  error?: string;
-  details?: {
-    hasAccountId: boolean;
-    hasDatabaseId: boolean;
-    hasApiToken: boolean;
-    accountIdPreview?: string | null;
-    databaseIdPreview?: string | null;
-  };
-}
-
-export interface D1SyncDataset {
-  properties: Property[];
-  rooms: Room[];
-  renewals: LeaseRenewal[];
-  workOrders: WorkOrder[];
-  leads: TenantLead[];
-  contacts: Contact[];
-  activityLogs: ActivityLog[];
 }
 

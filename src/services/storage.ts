@@ -10,36 +10,14 @@ import {
 } from '../data/initialData';
 
 const STORAGE_KEYS = {
-  PROPERTIES: 'moyer_crm_clean_properties_v1',
-  ROOMS: 'moyer_crm_clean_rooms_v1',
-  RENEWALS: 'moyer_crm_clean_renewals_v1',
-  WORK_ORDERS: 'moyer_crm_clean_workorders_v1',
-  LEADS: 'moyer_crm_clean_leads_v1',
-  CONTACTS: 'moyer_crm_clean_contacts_v1',
-  ACTIVITY_LOGS: 'moyer_crm_clean_activity_logs_v1'
+  PROPERTIES: 'moyer_crm_properties_v2',
+  ROOMS: 'moyer_crm_rooms_v2',
+  RENEWALS: 'moyer_crm_renewals_v2',
+  WORK_ORDERS: 'moyer_crm_workorders_v2',
+  LEADS: 'moyer_crm_leads_v2',
+  CONTACTS: 'moyer_crm_contacts_v2',
+  ACTIVITY_LOGS: 'moyer_crm_activity_logs_v2'
 };
-
-// Clear legacy sample keys once so old mock cache is flushed
-try {
-  const legacyKeys = [
-    'moyer_crm_properties_v2',
-    'moyer_crm_rooms_v2',
-    'moyer_crm_renewals_v2',
-    'moyer_crm_workorders_v2',
-    'moyer_crm_leads_v2',
-    'moyer_crm_contacts_v2',
-    'moyer_crm_activity_logs_v2',
-    'moyer_crm_properties',
-    'moyer_crm_rooms',
-    'moyer_crm_renewals',
-    'moyer_crm_workorders',
-    'moyer_crm_leads',
-    'moyer_crm_contacts'
-  ];
-  legacyKeys.forEach(k => localStorage.removeItem(k));
-} catch {
-  // Ignore storage exceptions
-}
 
 function getItem<T>(key: string, defaultValue: T): T {
   try {
