@@ -107,7 +107,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div>
           <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-sm bg-blue-500/20 border border-blue-500/30 text-blue-300 text-[10px] font-bold uppercase tracking-wider mb-2">
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Denver & Boulder Room Rental Operations</span>
+            <span>Room Rental Operations</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
             Operations & Tenancy Matrix
