@@ -9,11 +9,12 @@ import {
   ShieldCheck, 
   MessageSquare, 
   Plus, 
-  UserCheck,
-  CheckCircle2,
-  Clock,
-  User,
-  Building
+  UserCheck, 
+  CheckCircle2, 
+  Clock, 
+  User, 
+  Building,
+  Trash2
 } from 'lucide-react';
 import { TenantLead, LeadStage, LeadActivity, Property } from '../../types';
 import { LeadStageBadge, MonthToMonthBadge } from '../common/Badges';
@@ -25,6 +26,7 @@ interface LeadDetailModalProps {
   properties: Property[];
   onUpdateLead: (lead: TenantLead) => void;
   onConvertLead: (lead: TenantLead) => void;
+  onDeleteLead?: (leadId: string) => void;
 }
 
 export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
@@ -33,7 +35,8 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   lead,
   properties,
   onUpdateLead,
-  onConvertLead
+  onConvertLead,
+  onDeleteLead
 }) => {
   const [newNote, setNewNote] = useState<string>('');
   const [newNoteType, setNewNoteType] = useState<'note' | 'call' | 'email' | 'showing' | 'sms' | 'tour'>('note');
@@ -112,6 +115,15 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
         ...lead.activityHistory
       ]
     });
+  };
+
+  const handleDelete = () => {
+    if (window.confirm(`Are you sure you want to delete lead ${lead.name}?`)) {
+      if (onDeleteLead) {
+        onDeleteLead(lead.id);
+      }
+      onClose();
+    }
   };
 
   return (
@@ -270,7 +282,14 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-end">
+        <div className="bg-slate-50 p-4 border-t border-slate-200 flex items-center justify-between">
+          <button
+            onClick={handleDelete}
+            className="flex items-center gap-1.5 px-3 py-2 text-rose-600 hover:bg-rose-50 hover:border-rose-200 border border-transparent rounded-lg font-bold transition text-xs"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Delete Lead</span>
+          </button>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800"
@@ -282,4 +301,3 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
     </div>
   );
 };
-

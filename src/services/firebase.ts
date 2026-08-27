@@ -378,6 +378,22 @@ export const FirebaseService = {
     }
   },
 
+  // Clear only leads collection
+  async clearLeads(): Promise<void> {
+    try {
+      const snap = await getDocs(collection(db, COLLECTIONS.LEADS));
+      if (!snap.empty) {
+        const batch = writeBatch(db);
+        snap.docs.forEach(d => {
+          batch.delete(d.ref);
+        });
+        await batch.commit();
+      }
+    } catch (err) {
+      console.warn('Error deleting leads collection docs:', err);
+    }
+  },
+
   // Delete all data from Firestore across all collections
   async clearAllData(): Promise<void> {
     const allCollections = Object.values(COLLECTIONS);

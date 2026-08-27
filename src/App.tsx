@@ -158,8 +158,16 @@ export default function App() {
 
     const unsubLeads = subscribeToLeads((liveLeads) => {
       if (liveLeads) {
-        setLeads(liveLeads);
-        StorageService.saveTenantLeads(liveLeads);
+        const legacyMockIds = new Set(['lead-1', 'lead-2', 'lead-3', 'lead-4', 'lead-5', 'lead-6', 'lead-7', 'lead-8']);
+        const cleaned = liveLeads.filter(l => !legacyMockIds.has(l.id));
+        // Delete any legacy demo leads from Firestore if they were previously seeded
+        liveLeads.forEach(l => {
+          if (legacyMockIds.has(l.id)) {
+            FirebaseService.deleteLead(l.id).catch(() => {});
+          }
+        });
+        setLeads(cleaned);
+        StorageService.saveTenantLeads(cleaned);
       }
     });
 
@@ -397,6 +405,37 @@ export default function App() {
     FirebaseService.saveLead(lead).catch(err => console.warn("Firestore save lead err:", err));
     logActivity('Lead', `Tenant Lead ${lead.name}: Stage is ${lead.stage} (Score: ★${lead.score})`, lead.id);
     showToast(`Lead saved: ${lead.name}`);
+  };
+
+  // Tenant Lead Deletion
+  const handleDeleteLead = (leadId: string) => {
+    const targetLead = leads.find(l => l.id === leadId);
+    const leadName = targetLead?.name || 'Lead';
+    const nextLeads = leads.filter(l => l.id !== leadId);
+    setLeads(nextLeads);
+    StorageService.saveTenantLeads(nextLeads);
+    FirebaseService.deleteLead(leadId).catch(err => console.warn("Firestore delete lead err:", err));
+    if (selectedLeadDetail?.id === leadId) {
+      setSelectedLeadDetail(null);
+    }
+    logActivity('Lead', `Deleted Tenant Lead: ${leadName}`, leadId);
+    showToast(`Deleted lead: ${leadName}`);
+  };
+
+  // Clear All Leads
+  const handleClearAllLeads = async () => {
+    StorageService.clearLeads();
+    setLeads([]);
+    try {
+      await FirebaseService.clearLeads();
+    } catch (err) {
+      console.warn("Firestore clear leads err:", err);
+    }
+    if (selectedLeadDetail) {
+      setSelectedLeadDetail(null);
+    }
+    logActivity('Lead', `Cleared all tenant leads`, 'system');
+    showToast('All tenant leads cleared.');
   };
 
   // Contact Save / Update
@@ -703,6 +742,8 @@ export default function App() {
             onOpenLeadDetailModal={(lead) => setSelectedLeadDetail(lead)}
             onOpenConvertLeadModal={(lead) => setSelectedLeadToConvert(lead)}
             onOpenAssistant={() => setIsAssistantOpen(true)}
+            onDeleteLead={handleDeleteLead}
+            onClearAllLeads={handleClearAllLeads}
           />
         )}
 
@@ -776,6 +817,7 @@ export default function App() {
         properties={properties}
         onUpdateLead={handleSaveLead}
         onConvertLead={(lead) => setSelectedLeadToConvert(lead)}
+        onDeleteLead={handleDeleteLead}
       />
 
       {/* Convert Lead to Tenant Modal */}

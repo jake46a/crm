@@ -16,7 +16,8 @@ import {
   Clock, 
   ChevronRight,
   UserCheck,
-  ShieldCheck
+  ShieldCheck,
+  Trash2
 } from 'lucide-react';
 import { TenantLead, LeadStage, Room, Property, Contact } from '../types';
 import { LeadStageBadge, BathroomTypeBadge } from './common/Badges';
@@ -30,6 +31,8 @@ interface LeadsPipelineViewProps {
   onOpenLeadDetailModal: (lead: TenantLead) => void;
   onOpenConvertLeadModal: (lead: TenantLead) => void;
   onOpenAssistant: () => void;
+  onDeleteLead?: (leadId: string) => void;
+  onClearAllLeads?: () => void;
 }
 
 export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
@@ -40,7 +43,9 @@ export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
   onOpenNewLeadModal,
   onOpenLeadDetailModal,
   onOpenConvertLeadModal,
-  onOpenAssistant
+  onOpenAssistant,
+  onDeleteLead,
+  onClearAllLeads
 }) => {
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [propertyFilter, setPropertyFilter] = useState<string>('all');
@@ -97,22 +102,21 @@ export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
     });
   };
 
-  const handleAssignAgent = (lead: TenantLead, agentName: string) => {
-    onUpdateLead({
-      ...lead,
-      assignedAgent: agentName,
-      activityHistory: [
-        {
-          id: 'act-' + Date.now(),
-          date: new Date().toISOString().replace('T', ' ').slice(0, 16),
-          type: 'note',
-          title: `Assigned to ${agentName}`,
-          content: `Lead ownership assigned to ${agentName}.`,
-          agent: 'Operations'
-        },
-        ...lead.activityHistory
-      ]
-    });
+  const handleDeleteSingleLead = (e: React.MouseEvent, lead: TenantLead) => {
+    e.stopPropagation();
+    if (window.confirm(`Delete lead "${lead.name}"?`)) {
+      if (onDeleteLead) {
+        onDeleteLead(lead.id);
+      }
+    }
+  };
+
+  const handleClearAll = () => {
+    if (window.confirm('Delete all tenant leads from the pipeline and database?')) {
+      if (onClearAllLeads) {
+        onClearAllLeads();
+      }
+    }
   };
 
   return (
@@ -142,6 +146,17 @@ export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
             <Sparkles className="w-3.5 h-3.5 text-blue-600" />
             <span>AI Roommate Matcher</span>
           </button>
+
+          {leads.length > 0 && onClearAllLeads && (
+            <button
+              onClick={handleClearAll}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-sm border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs font-semibold transition-colors"
+              title="Delete all leads in pipeline"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              <span>Clear Leads</span>
+            </button>
+          )}
 
           <button
             onClick={onOpenNewLeadModal}
@@ -255,17 +270,28 @@ export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
                     <div
                       key={lead.id}
                       onClick={() => onOpenLeadDetailModal(lead)}
-                      className="bg-white rounded-lg p-3.5 border border-slate-200 hover:border-blue-400 hover:shadow-sm transition cursor-pointer space-y-2.5 text-xs"
+                      className="bg-white rounded-lg p-3.5 border border-slate-200 hover:border-blue-400 hover:shadow-sm transition cursor-pointer space-y-2.5 text-xs group relative"
                     >
-                      {/* Name, Score, and Assigned Agent */}
+                      {/* Name, Score, and Actions */}
                       <div className="flex items-start justify-between gap-1">
                         <div>
                           <span className="font-bold text-slate-900 text-xs block leading-tight">{lead.name}</span>
                           <span className="text-[10px] text-slate-500 block truncate">{lead.occupation}</span>
                         </div>
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono shrink-0">
-                          ★ {lead.score}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono shrink-0">
+                            ★ {lead.score}
+                          </span>
+                          {onDeleteLead && (
+                            <button
+                              onClick={(e) => handleDeleteSingleLead(e, lead)}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 transition"
+                              title="Delete lead"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Assigned Agent Pill */}
@@ -290,10 +316,10 @@ export const LeadsPipelineView: React.FC<LeadsPipelineViewProps> = ({
                       <div className="flex items-center justify-between text-[10px] pt-1">
                         <div className="flex flex-wrap gap-1">
                           <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">
-                            {lead.lifestyleProfile.cleanliness.split('/')[0]}
+                            {lead.lifestyleProfile?.cleanliness?.split('/')[0] || 'Standard'}
                           </span>
                           <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">
-                            {lead.lifestyleProfile.schedule.split('/')[0]}
+                            {lead.lifestyleProfile?.schedule?.split('/')[0] || 'Day'}
                           </span>
                         </div>
                         <span className="text-slate-400 font-medium">
