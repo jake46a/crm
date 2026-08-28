@@ -15,7 +15,8 @@ import {
   Building, 
   Tag,
   Key,
-  MessageSquare
+  MessageSquare,
+  Printer
 } from 'lucide-react';
 import { WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderCategory, Property, Room, Contact } from '../types';
 import { PriorityBadge, WorkOrderStatusBadge } from './common/Badges';
@@ -28,6 +29,7 @@ interface WorkOrdersViewProps {
   onUpdateWorkOrder: (workOrder: WorkOrder) => void;
   onOpenNewWorkOrderModal: (defaultRoom?: Room) => void;
   onOpenEditWorkOrderModal: (workOrder: WorkOrder) => void;
+  onPrintWorkOrder?: (workOrder: WorkOrder) => void;
 }
 
 export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
@@ -37,7 +39,8 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
   contacts,
   onUpdateWorkOrder,
   onOpenNewWorkOrderModal,
-  onOpenEditWorkOrderModal
+  onOpenEditWorkOrderModal,
+  onPrintWorkOrder
 }) => {
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
@@ -276,7 +279,21 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-mono text-xs font-semibold text-zinc-600">{wo.ticketNumber}</span>
-                          <PriorityBadge priority={wo.priority} />
+                          <div className="flex items-center gap-1.5">
+                            {onPrintWorkOrder && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onPrintWorkOrder(wo);
+                                }}
+                                title="Print Work Order Slip"
+                                className="p-1 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded transition"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <PriorityBadge priority={wo.priority} />
+                          </div>
                         </div>
 
                         <h4 className="font-bold text-zinc-900 text-xs leading-snug">{wo.title}</h4>
@@ -367,12 +384,24 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                     <td className="px-4 py-3 font-mono font-semibold">${wo.actualCost || wo.estimatedCost}</td>
                     <td className="px-4 py-3 text-zinc-500 font-mono">{wo.dateReported}</td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onOpenEditWorkOrderModal(wo); }}
-                        className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-sm font-medium text-[11px] uppercase tracking-tight"
-                      >
-                        Manage
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        {onPrintWorkOrder && (
+                          <button
+                            onClick={() => onPrintWorkOrder(wo)}
+                            className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-sm font-semibold text-[11px] flex items-center gap-1 transition"
+                            title="Print maintenance slip"
+                          >
+                            <Printer className="w-3 h-3 text-amber-700" />
+                            <span>Print</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onOpenEditWorkOrderModal(wo)}
+                          className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-sm font-medium text-[11px] uppercase tracking-tight"
+                        >
+                          Manage
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

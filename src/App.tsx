@@ -54,6 +54,7 @@ import { NewRoomModal } from './components/modals/NewRoomModal';
 import { NewContactModal } from './components/modals/NewContactModal';
 import { ConvertLeadModal } from './components/modals/ConvertLeadModal';
 import { RenewalNoticeLetterModal } from './components/modals/RenewalNoticeLetterModal';
+import { PrintWorkOrderModal } from './components/modals/PrintWorkOrderModal';
 import { LeadDetailModal } from './components/modals/LeadDetailModal';
 import { ExportImportModal } from './components/modals/ExportImportModal';
 
@@ -75,10 +76,11 @@ export default function App() {
   const [isAssistantOpen, setIsAssistantOpen] = useState<boolean>(false);
   const [isExportImportOpen, setIsExportImportOpen] = useState<boolean>(false);
 
-  // Work Order Modal
+  // Work Order Modal & Print
   const [isNewWorkOrderModalOpen, setIsNewWorkOrderModalOpen] = useState<boolean>(false);
   const [editingWorkOrder, setEditingWorkOrder] = useState<WorkOrder | null>(null);
   const [defaultRoomForWO, setDefaultRoomForWO] = useState<Room | null>(null);
+  const [selectedWorkOrderForPrint, setSelectedWorkOrderForPrint] = useState<WorkOrder | null>(null);
 
   // Lead Modal & Detail
   const [isNewLeadModalOpen, setIsNewLeadModalOpen] = useState<boolean>(false);
@@ -388,6 +390,18 @@ export default function App() {
     showToast(`Work order ${wo.ticketNumber} saved`);
   };
 
+  // Work Order Deletion
+  const handleDeleteWorkOrder = (workOrderId: string) => {
+    const target = workOrders.find(w => w.id === workOrderId);
+    const title = target?.title || 'Work Order';
+    const nextWorkOrders = workOrders.filter(w => w.id !== workOrderId);
+    setWorkOrders(nextWorkOrders);
+    StorageService.saveWorkOrders(nextWorkOrders);
+    FirebaseService.deleteWorkOrder(workOrderId).catch(err => console.warn("Firestore delete work order err:", err));
+    logActivity('Maintenance', `Deleted Work Order: ${title}`, workOrderId);
+    showToast(`Deleted work order: ${title}`);
+  };
+
   // Tenant Lead Save / Update
   const handleSaveLead = (lead: TenantLead) => {
     const isExisting = leads.some(l => l.id === lead.id);
@@ -650,6 +664,7 @@ export default function App() {
               setIsNewWorkOrderModalOpen(true);
             }}
             onOpenAssistant={() => setIsAssistantOpen(true)}
+            onPrintWorkOrder={(wo) => setSelectedWorkOrderForPrint(wo)}
           />
         )}
 
@@ -733,6 +748,7 @@ export default function App() {
               setEditingWorkOrder(wo);
               setIsNewWorkOrderModalOpen(true);
             }}
+            onPrintWorkOrder={(wo) => setSelectedWorkOrderForPrint(wo)}
           />
         )}
 
@@ -804,6 +820,18 @@ export default function App() {
         onSave={handleSaveWorkOrder}
         editingWorkOrder={editingWorkOrder}
         defaultRoom={defaultRoomForWO}
+        onDelete={handleDeleteWorkOrder}
+        onPrint={(wo) => setSelectedWorkOrderForPrint(wo)}
+      />
+
+      {/* Print Work Order Slip Modal */}
+      <PrintWorkOrderModal
+        isOpen={!!selectedWorkOrderForPrint}
+        onClose={() => setSelectedWorkOrderForPrint(null)}
+        workOrder={selectedWorkOrderForPrint}
+        properties={properties}
+        rooms={rooms}
+        contacts={contacts}
       />
 
       {/* New / Edit Tenant Lead Modal */}

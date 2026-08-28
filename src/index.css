@@ -21,3 +21,24 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #a1a1aa;
 }
+
+@media print {
+  @page {
+    margin: 12mm;
+    size: auto;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  #printable-work-order {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+}

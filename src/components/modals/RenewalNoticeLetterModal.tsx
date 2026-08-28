@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FileText, Printer, Copy, Check, Send, X, Mail } from 'lucide-react';
 import { LeaseRenewal, Property, Room } from '../../types';
+import { printHtmlDocument } from '../../utils/printUtils';
 
 interface RenewalNoticeLetterModalProps {
   isOpen: boolean;
@@ -37,7 +38,86 @@ export const RenewalNoticeLetterModal: React.FC<RenewalNoticeLetterModalProps> =
   });
 
   const handlePrint = () => {
-    window.print();
+    const letterHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px; font-size: 13px; line-height: 1.6; color: #18181b;">
+        <div style="border-bottom: 2px solid #18181b; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <h1 style="font-size: 18px; font-weight: 900; margin: 0; color: #09090b;">MOYER PROPERTY MANAGEMENT</h1>
+            <p style="font-size: 11px; color: #71717a; margin: 2px 0 0 0;">Coliving & Room Rental Operations</p>
+            <p style="font-size: 10px; color: #a1a1aa; margin: 2px 0 0 0;">1000 Speer Blvd, Suite 400, Denver, CO 80204 • (303) 555-0100</p>
+          </div>
+          <div style="text-align: right; font-size: 11px; color: #52525b;">
+            <p style="font-weight: bold; margin: 0;">Date: ${formattedDate}</p>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin: 20px 0;">
+          <h2 style="font-size: 15px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">
+            Notice of Lease Expiration & Renewal Offer
+          </h2>
+        </div>
+
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 12px; margin-bottom: 20px; display: flex; justify-content: space-between;">
+          <div>
+            <span style="font-size: 10px; text-transform: uppercase; font-weight: bold; color: #64748b;">Resident:</span>
+            <div style="font-weight: bold; font-size: 13px;">${renewal.tenantName}</div>
+            <div style="font-size: 11px; color: #64748b;">${renewal.tenantEmail}</div>
+          </div>
+          <div>
+            <span style="font-size: 10px; text-transform: uppercase; font-weight: bold; color: #64748b;">Premises:</span>
+            <div style="font-weight: bold; font-size: 13px;">${renewal.propertyName}</div>
+            <div style="font-size: 11px; color: #64748b;">${renewal.roomName}</div>
+          </div>
+        </div>
+
+        <p style="margin-bottom: 12px;">Dear ${renewal.tenantName},</p>
+        <p style="margin-bottom: 16px;">
+          Thank you for being a valued resident with Moyer Property Management at ${renewal.propertyName}. As your current lease term is scheduled to conclude on <strong>${renewal.currentLeaseEndDate}</strong>, we are pleased to offer you the opportunity to renew your room rental agreement under the following terms:
+        </p>
+
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; border: 1px solid #e4e4e7; font-size: 12px;">
+          <tbody>
+            <tr style="background-color: #f8fafc; border-bottom: 1px solid #e4e4e7;">
+              <td style="padding: 8px 12px; font-weight: 500; color: #52525b;">Current Monthly Rent:</td>
+              <td style="padding: 8px 12px; font-weight: bold; font-family: monospace;">$${renewal.currentMonthlyRent}.00/mo</td>
+            </tr>
+            <tr style="background-color: #ecfdf5; border-bottom: 1px solid #e4e4e7;">
+              <td style="padding: 8px 12px; font-weight: bold; color: #065f46;">Proposed Renewal Rate:</td>
+              <td style="padding: 8px 12px; font-weight: 900; font-family: monospace; color: #065f46; font-size: 14px;">
+                $${renewal.proposedMonthlyRent}.00/mo (+${pct}%)
+              </td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e4e4e7;">
+              <td style="padding: 8px 12px; font-weight: 500; color: #52525b;">Proposed Lease Term:</td>
+              <td style="padding: 8px 12px; font-weight: bold;">${renewal.proposedTermMonths} Months</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e4e4e7;">
+              <td style="padding: 8px 12px; font-weight: 500; color: #52525b;">Decision Deadline:</td>
+              <td style="padding: 8px 12px; font-weight: bold; color: #9f1239;">${renewal.decisionDeadline}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 12px; font-weight: 500; color: #52525b;">Utilities & Amenities Included:</td>
+              <td style="padding: 8px 12px;">High-Speed Wi-Fi, Water/Gas/Electricity, Bi-weekly House Cleaning</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p style="margin-bottom: 24px; font-size: 12px; color: #3f3f46;">
+          To accept this renewal offer and lock in your room rate, please sign and return this document or confirm through the resident portal by <strong>${renewal.decisionDeadline}</strong>.
+        </p>
+
+        <div style="border-top: 1px solid #e4e4e7; padding-top: 20px; display: flex; justify-content: space-between; align-items: flex-end; margin-top: 30px;">
+          <div>
+            <p style="font-weight: bold; margin: 0;">Jake Moyer</p>
+            <p style="font-size: 11px; color: #71717a; margin: 2px 0 0 0;">Moyer Property Management LLC</p>
+          </div>
+          <div style="border-top: 1px solid #71717a; width: 200px; text-align: center; padding-top: 4px;">
+            <span style="font-size: 10px; color: #71717a;">Tenant Signature & Date</span>
+          </div>
+        </div>
+      </div>
+    `;
+    printHtmlDocument(`Renewal Notice - ${renewal.tenantName}`, letterHtml);
   };
 
   const fullLetterText = `MOYER PROPERTY MANAGEMENT

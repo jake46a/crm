@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { FileText, Plus, X, Building, DollarSign, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { FileText, Plus, X, Building, DollarSign, Sparkles, AlertCircle } from 'lucide-react';
 import { LeaseRenewal, LeaseRenewalStatus, Property, Room } from '../../types';
 
 interface NewRenewalModalProps {
@@ -21,28 +21,43 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
 }) => {
   const occupiedRooms = rooms.filter(r => r.status === 'Occupied' || r.id === editingRenewal?.roomId);
 
-  const [roomId, setRoomId] = useState<string>(editingRenewal?.roomId || occupiedRooms[0]?.id || '');
-  const [renewalStatus, setRenewalStatus] = useState<LeaseRenewalStatus>(
-    editingRenewal?.renewalStatus || 'Review Pending'
-  );
-  const [currentLeaseEndDate, setCurrentLeaseEndDate] = useState<string>(
-    editingRenewal?.currentLeaseEndDate || '2026-09-30'
-  );
-  const [currentMonthlyRent, setCurrentMonthlyRent] = useState<number>(
-    editingRenewal?.currentMonthlyRent || 895
-  );
-  const [proposedMonthlyRent, setProposedMonthlyRent] = useState<number>(
-    editingRenewal?.proposedMonthlyRent || 930
-  );
-  const [proposedTermMonths, setProposedTermMonths] = useState<number>(
-    editingRenewal?.proposedTermMonths || 12
-  );
-  const [decisionDeadline, setDecisionDeadline] = useState<string>(
-    editingRenewal?.decisionDeadline || '2026-08-31'
-  );
-  const [tenantResponseNotes, setTenantResponseNotes] = useState<string>(
-    editingRenewal?.tenantResponseNotes || ''
-  );
+  const [roomId, setRoomId] = useState<string>('');
+  const [renewalStatus, setRenewalStatus] = useState<LeaseRenewalStatus>('Review Pending');
+  const [currentLeaseEndDate, setCurrentLeaseEndDate] = useState<string>('2026-09-30');
+  const [currentMonthlyRent, setCurrentMonthlyRent] = useState<number>(895);
+  const [proposedMonthlyRent, setProposedMonthlyRent] = useState<number>(930);
+  const [proposedTermMonths, setProposedTermMonths] = useState<number>(12);
+  const [decisionDeadline, setDecisionDeadline] = useState<string>('2026-08-31');
+  const [tenantResponseNotes, setTenantResponseNotes] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setErrorMessage('');
+      const defaultRoomId = editingRenewal?.roomId || occupiedRooms[0]?.id || (rooms.length > 0 ? rooms[0].id : '');
+      setRoomId(defaultRoomId);
+
+      if (editingRenewal) {
+        setRenewalStatus(editingRenewal.renewalStatus || 'Review Pending');
+        setCurrentLeaseEndDate(editingRenewal.currentLeaseEndDate || '2026-09-30');
+        setCurrentMonthlyRent(editingRenewal.currentMonthlyRent || 895);
+        setProposedMonthlyRent(editingRenewal.proposedMonthlyRent || 930);
+        setProposedTermMonths(editingRenewal.proposedTermMonths || 12);
+        setDecisionDeadline(editingRenewal.decisionDeadline || '2026-08-31');
+        setTenantResponseNotes(editingRenewal.tenantResponseNotes || '');
+      } else {
+        const r = rooms.find(room => room.id === defaultRoomId);
+        const rent = r?.monthlyRent || 895;
+        setRenewalStatus('Review Pending');
+        setCurrentLeaseEndDate(r?.leaseEndDate || '2026-09-30');
+        setCurrentMonthlyRent(rent);
+        setProposedMonthlyRent(Math.round(rent * 1.04));
+        setProposedTermMonths(12);
+        setDecisionDeadline('2026-08-31');
+        setTenantResponseNotes('');
+      }
+    }
+  }, [isOpen, editingRenewal, rooms]);
 
   if (!isOpen) return null;
 
@@ -68,7 +83,12 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!roomId || !selectedRoom || !selectedProperty) return;
+    setErrorMessage('');
+
+    if (!roomId || !selectedRoom || !selectedProperty) {
+      setErrorMessage('Please select a room associated with a valid property.');
+      return;
+    }
 
     // Calculate days until expiration
     const end = new Date(currentLeaseEndDate).getTime();
@@ -79,7 +99,7 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
       id: editingRenewal?.id || `ren-${Date.now()}`,
       tenantId: selectedRoom.currentTenantId || `tenant-${Date.now()}`,
       tenantName: selectedRoom.currentTenantName || 'Tenant Name',
-      tenantEmail: 'resident@moyercoliving.com',
+      tenantEmail: selectedRoom.currentTenantEmail || 'resident@moyercoliving.com',
       tenantPhone: selectedRoom.currentTenantPhone || '(303) 555-0100',
       propertyId: selectedProperty.id,
       propertyName: selectedProperty.name,

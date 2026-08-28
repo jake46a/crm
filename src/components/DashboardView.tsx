@@ -12,7 +12,8 @@ import {
   DollarSign, 
   Sparkles,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Printer
 } from 'lucide-react';
 import { Property, Room, LeaseRenewal, WorkOrder, TenantLead, ActivityLog, NavigationTab } from '../types';
 import { PriorityBadge, WorkOrderStatusBadge, RenewalStatusBadge, RoomStatusBadge } from './common/Badges';
@@ -30,6 +31,7 @@ interface DashboardViewProps {
   onOpenNewLeadModal: () => void;
   onOpenNewWorkOrderModal: () => void;
   onOpenAssistant: () => void;
+  onPrintWorkOrder?: (workOrder: WorkOrder) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -44,7 +46,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenWorkOrderModal,
   onOpenNewLeadModal,
   onOpenNewWorkOrderModal,
-  onOpenAssistant
+  onOpenAssistant,
+  onPrintWorkOrder
 }) => {
   // Key Stats Calculations
   const totalRooms = rooms.length;
@@ -460,12 +463,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                   <div className="shrink-0 flex flex-col items-end gap-1">
                     <span className="text-[10px] text-zinc-400 font-mono">{wo.dateReported}</span>
-                    <button
-                      onClick={() => onOpenWorkOrderModal(wo)}
-                      className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-sm text-[11px] font-medium border border-zinc-200 transition"
-                    >
-                      Manage Ticket
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {onPrintWorkOrder && (
+                        <button
+                          onClick={() => onPrintWorkOrder(wo)}
+                          className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-sm text-[11px] font-semibold flex items-center gap-1 transition"
+                          title="Print work order slip"
+                        >
+                          <Printer className="w-3 h-3 text-amber-700" />
+                          <span>Print</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onOpenWorkOrderModal(wo)}
+                        className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-sm text-[11px] font-medium border border-zinc-200 transition"
+                      >
+                        Manage
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}

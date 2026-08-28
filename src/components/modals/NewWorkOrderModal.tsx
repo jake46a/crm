@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Wrench, Plus, X, Building, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Wrench, Plus, X, Building, AlertTriangle, Trash2, AlertCircle, Printer } from 'lucide-react';
 import { WorkOrder, WorkOrderPriority, WorkOrderCategory, Property, Room, Contact } from '../../types';
 
 interface NewWorkOrderModalProps {
@@ -11,6 +11,8 @@ interface NewWorkOrderModalProps {
   onSave: (workOrder: WorkOrder) => void;
   editingWorkOrder?: WorkOrder | null;
   defaultRoom?: Room | null;
+  onDelete?: (workOrderId: string) => void;
+  onPrint?: (workOrder: WorkOrder) => void;
 }
 
 export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
@@ -21,43 +23,67 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
   contacts,
   onSave,
   editingWorkOrder,
-  defaultRoom
+  defaultRoom,
+  onDelete,
+  onPrint
 }) => {
   const contractors = contacts.filter(c => c.type === 'Vendor / Contractor');
 
-  const [title, setTitle] = useState<string>(editingWorkOrder?.title || '');
-  const [description, setDescription] = useState<string>(editingWorkOrder?.description || '');
-  const [propertyId, setPropertyId] = useState<string>(
-    editingWorkOrder?.propertyId || defaultRoom?.propertyId || properties[0]?.id || ''
-  );
-  const [roomId, setRoomId] = useState<string>(
-    editingWorkOrder?.roomId || defaultRoom?.id || 'common'
-  );
-  const [category, setCategory] = useState<WorkOrderCategory>(
-    editingWorkOrder?.category || 'Plumbing'
-  );
-  const [priority, setPriority] = useState<WorkOrderPriority>(
-    editingWorkOrder?.priority || 'Medium'
-  );
-  const [assignedVendorId, setAssignedVendorId] = useState<string>(
-    editingWorkOrder?.assignedVendorId || ''
-  );
-  const [estimatedCost, setEstimatedCost] = useState<number>(
-    editingWorkOrder?.estimatedCost || 120
-  );
-  const [actualCost, setActualCost] = useState<number | undefined>(
-    editingWorkOrder?.actualCost
-  );
-  const [status, setStatus] = useState<any>(editingWorkOrder?.status || 'New');
-  const [accessInstructions, setAccessInstructions] = useState<string>(
-    editingWorkOrder?.accessInstructions || ''
-  );
-  const [entryPermission, setEntryPermission] = useState<boolean>(
-    editingWorkOrder?.entryPermission ?? true
-  );
-  const [resolutionSummary, setResolutionSummary] = useState<string>(
-    editingWorkOrder?.resolutionSummary || ''
-  );
+  const [title, setTitle] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
+  const [propertyId, setPropertyId] = useState<string>('');
+  const [roomId, setRoomId] = useState<string>('common');
+  const [category, setCategory] = useState<WorkOrderCategory>('Plumbing');
+  const [priority, setPriority] = useState<WorkOrderPriority>('Medium');
+  const [assignedVendorId, setAssignedVendorId] = useState<string>('');
+  const [estimatedCost, setEstimatedCost] = useState<number>(120);
+  const [actualCost, setActualCost] = useState<number | undefined>(undefined);
+  const [status, setStatus] = useState<any>('New');
+  const [accessInstructions, setAccessInstructions] = useState<string>('');
+  const [entryPermission, setEntryPermission] = useState<boolean>(true);
+  const [resolutionSummary, setResolutionSummary] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setErrorMessage('');
+      setIsConfirmingDelete(false);
+      
+      const initialPropId = editingWorkOrder?.propertyId || defaultRoom?.propertyId || (properties.length > 0 ? properties[0].id : '');
+      const initialRoomId = editingWorkOrder?.roomId || defaultRoom?.id || 'common';
+
+      if (editingWorkOrder) {
+        setTitle(editingWorkOrder.title || '');
+        setDescription(editingWorkOrder.description || '');
+        setPropertyId(editingWorkOrder.propertyId || initialPropId);
+        setRoomId(editingWorkOrder.roomId || initialRoomId);
+        setCategory(editingWorkOrder.category || 'Plumbing');
+        setPriority(editingWorkOrder.priority || 'Medium');
+        setAssignedVendorId(editingWorkOrder.assignedVendorId || '');
+        setEstimatedCost(editingWorkOrder.estimatedCost ?? 120);
+        setActualCost(editingWorkOrder.actualCost);
+        setStatus(editingWorkOrder.status || 'New');
+        setAccessInstructions(editingWorkOrder.accessInstructions || '');
+        setEntryPermission(editingWorkOrder.entryPermission ?? true);
+        setResolutionSummary(editingWorkOrder.resolutionSummary || '');
+      } else {
+        setTitle('');
+        setDescription('');
+        setPropertyId(initialPropId);
+        setRoomId(initialRoomId);
+        setCategory('Plumbing');
+        setPriority('Medium');
+        setAssignedVendorId('');
+        setEstimatedCost(120);
+        setActualCost(undefined);
+        setStatus('New');
+        setAccessInstructions('');
+        setEntryPermission(true);
+        setResolutionSummary('');
+      }
+    }
+  }, [isOpen, editingWorkOrder, defaultRoom, properties]);
 
   if (!isOpen) return null;
 
@@ -66,33 +92,43 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !propertyId) return;
+    setErrorMessage('');
 
-    const prop = properties.find(p => p.id === propertyId);
+    if (!title.trim()) {
+      setErrorMessage('Please enter an issue title.');
+      return;
+    }
+
+    if (!propertyId && properties.length > 0) {
+      setPropertyId(properties[0].id);
+    }
+
+    const effectivePropertyId = propertyId || (properties.length > 0 ? properties[0].id : `prop-${Date.now()}`);
+    const prop = properties.find(p => p.id === effectivePropertyId);
     const roomObj = roomId !== 'common' ? rooms.find(r => r.id === roomId) : undefined;
     const vendorObj = contractors.find(c => c.id === assignedVendorId);
 
     const newTicket: WorkOrder = {
       id: editingWorkOrder?.id || `wo-${Date.now()}`,
       ticketNumber: editingWorkOrder?.ticketNumber || `WO-${Math.floor(1000 + Math.random() * 9000)}`,
-      title,
-      description,
-      propertyId,
-      propertyName: prop?.name || 'Property',
-      roomId: roomObj ? roomObj.id : undefined,
-      roomName: roomObj ? roomObj.name : 'Common Area',
+      title: title.trim(),
+      description: description.trim(),
+      propertyId: effectivePropertyId,
+      propertyName: prop?.name || editingWorkOrder?.propertyName || 'Managed Property',
+      roomId: roomObj ? roomObj.id : (roomId !== 'common' ? roomId : undefined),
+      roomName: roomObj ? roomObj.name : (roomId === 'common' ? 'Shared Commons (Kitchen / Living / Yard)' : 'Specific Area'),
       isCommonArea: roomId === 'common',
-      tenantId: roomObj?.currentTenantId,
-      reportedByName: roomObj?.currentTenantName || 'Moyer Operations Dispatch',
-      reportedByPhone: roomObj?.currentTenantPhone || '(303) 555-0100',
+      tenantId: roomObj?.currentTenantId || editingWorkOrder?.tenantId,
+      reportedByName: roomObj?.currentTenantName || editingWorkOrder?.reportedByName || 'Moyer Operations Dispatch',
+      reportedByPhone: roomObj?.currentTenantPhone || editingWorkOrder?.reportedByPhone || '(303) 555-0100',
       category,
       priority,
       status: status || (assignedVendorId ? 'Assigned' : 'New'),
-      assignedVendorId: vendorObj?.id,
-      assignedVendorName: vendorObj ? `${vendorObj.name} (${vendorObj.company || 'Contractor'})` : undefined,
-      assignedVendorPhone: vendorObj?.phone,
+      assignedVendorId: vendorObj?.id || (assignedVendorId || undefined),
+      assignedVendorName: vendorObj ? `${vendorObj.name} (${vendorObj.company || 'Contractor'})` : editingWorkOrder?.assignedVendorName,
+      assignedVendorPhone: vendorObj?.phone || editingWorkOrder?.assignedVendorPhone,
       estimatedCost: Number(estimatedCost) || 0,
-      actualCost: actualCost !== undefined ? Number(actualCost) : undefined,
+      actualCost: actualCost !== undefined && actualCost !== null && !isNaN(Number(actualCost)) ? Number(actualCost) : undefined,
       dateReported: editingWorkOrder?.dateReported || new Date().toISOString().split('T')[0],
       accessInstructions: accessInstructions || (selectedProperty?.keypadMasterCode ? `Keypad Master Code: ${selectedProperty.keypadMasterCode}` : undefined),
       entryPermission,
@@ -102,7 +138,7 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
           id: `tl-${Date.now()}`,
           timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
           status: status || 'New',
-          note: `Work order logged: ${title}`,
+          note: `Work order logged: ${title.trim()}`,
           author: 'Moyer Property Staff'
         }
       ],
@@ -112,14 +148,21 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
           timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
           author: 'Moyer Dispatch',
           isTenant: false,
-          message: description || 'Work order logged.'
+          message: description.trim() || 'Work order logged.'
         }
       ],
-      resolutionSummary
+      resolutionSummary: resolutionSummary.trim() || undefined
     };
 
     onSave(newTicket);
     onClose();
+  };
+
+  const handleDelete = () => {
+    if (editingWorkOrder && onDelete) {
+      onDelete(editingWorkOrder.id);
+      onClose();
+    }
   };
 
   return (
@@ -140,6 +183,13 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
           <button onClick={onClose} className="text-zinc-400 hover:text-white p-1">✕</button>
         </div>
 
+        {errorMessage && (
+          <div className="m-5 mb-0 p-3 bg-rose-50 border border-rose-200 rounded-md text-xs text-rose-700 font-medium flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs max-h-[700px] overflow-y-auto">
           <div>
             <label className="block font-bold text-zinc-700 mb-1">Issue Title *</label>
@@ -156,18 +206,24 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block font-bold text-zinc-700 mb-1">Property *</label>
-              <select
-                value={propertyId}
-                onChange={(e) => {
-                  setPropertyId(e.target.value);
-                  setRoomId('common');
-                }}
-                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                {properties.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+              {properties.length === 0 ? (
+                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-[11px]">
+                  No properties created yet. A default property tag will be assigned.
+                </div>
+              ) : (
+                <select
+                  value={propertyId}
+                  onChange={(e) => {
+                    setPropertyId(e.target.value);
+                    setRoomId('common');
+                  }}
+                  className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                >
+                  {properties.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div>
@@ -241,7 +297,7 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
               >
                 <option value="">-- Leave Unassigned --</option>
                 {contractors.map(c => (
-                  <option key={c.id} value={c.id}>{c.name} - {c.roleOrSpecialty}</option>
+                  <option key={c.id} value={c.id}>{c.name} - {c.roleOrSpecialty || c.company || 'Contractor'}</option>
                 ))}
               </select>
             </div>
@@ -268,9 +324,11 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
                 >
                   <option value="New">New</option>
                   <option value="Assigned">Assigned</option>
+                  <option value="In Progress">In Progress</option>
                   <option value="Scheduled">Scheduled</option>
                   <option value="Awaiting Parts">Awaiting Parts</option>
                   <option value="Completed">Completed</option>
+                  <option value="Cancelled">Cancelled</option>
                 </select>
               </div>
 
@@ -300,23 +358,71 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
             </div>
           )}
 
-          <div className="flex justify-end gap-2.5 pt-3 border-t border-zinc-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-md border border-zinc-300 text-zinc-700 font-medium hover:bg-zinc-50 transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-bold shadow-xs transition"
-            >
-              {editingWorkOrder ? 'Save Changes' : 'Create Work Order'}
-            </button>
+          <div className="flex items-center justify-between gap-2.5 pt-3 border-t border-zinc-200">
+            <div className="flex items-center gap-2">
+              {editingWorkOrder && onPrint && (
+                <button
+                  type="button"
+                  onClick={() => onPrint(editingWorkOrder)}
+                  className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition"
+                >
+                  <Printer className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Print Ticket</span>
+                </button>
+              )}
+
+              {editingWorkOrder && onDelete && (
+                <div>
+                  {isConfirmingDelete ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleDelete}
+                        className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-md font-bold text-[11px] transition"
+                      >
+                        Confirm Delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsConfirmingDelete(false)}
+                        className="px-2 py-1.5 text-zinc-500 hover:text-zinc-700 text-[11px]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsConfirmingDelete(true)}
+                      className="px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-md font-medium text-[11px] flex items-center gap-1 transition"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-md border border-zinc-300 text-zinc-700 font-medium hover:bg-zinc-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-bold shadow-xs transition"
+              >
+                {editingWorkOrder ? 'Save Changes' : 'Create Work Order'}
+              </button>
+            </div>
           </div>
         </form>
       </div>
     </div>
   );
 };
+
