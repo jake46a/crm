@@ -45,12 +45,17 @@ service cloud.firestore {
         && data.name is string && data.name.size() > 0 && data.name.size() <= 128
         && data.monthlyRent is number && data.monthlyRent >= 0
         && data.status is string && (data.status == 'Occupied' || data.status == 'Available' || data.status == 'Under Turnover' || data.status == 'Reserved')
+        && (!('currentTenantFirstName' in data) || (data.currentTenantFirstName is string && data.currentTenantFirstName.size() <= 128))
+        && (!('currentTenantLastName' in data) || (data.currentTenantLastName is string && data.currentTenantLastName.size() <= 128))
+        && (!('currentTenantName' in data) || (data.currentTenantName is string && data.currentTenantName.size() <= 256))
         && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2048));
     }
 
     function isValidLeaseRenewal(data) {
       return data.id is string && isValidId(data.id)
-        && data.tenantName is string && data.tenantName.size() > 0 && data.tenantName.size() <= 128
+        && (!('tenantFirstName' in data) || (data.tenantFirstName is string && data.tenantFirstName.size() <= 128))
+        && (!('tenantLastName' in data) || (data.tenantLastName is string && data.tenantLastName.size() <= 128))
+        && (!('tenantName' in data) || (data.tenantName is string && data.tenantName.size() <= 256))
         && data.propertyId is string && isValidId(data.propertyId)
         && data.roomId is string && isValidId(data.roomId)
         && data.renewalStatus is string && data.renewalStatus.size() <= 64
@@ -62,6 +67,9 @@ service cloud.firestore {
         && data.ticketNumber is string && data.ticketNumber.size() <= 64
         && data.title is string && data.title.size() > 0 && data.title.size() <= 256
         && data.propertyId is string && isValidId(data.propertyId)
+        && (!('reportedByFirstName' in data) || (data.reportedByFirstName is string && data.reportedByFirstName.size() <= 128))
+        && (!('reportedByLastName' in data) || (data.reportedByLastName is string && data.reportedByLastName.size() <= 128))
+        && (!('reportedByName' in data) || (data.reportedByName is string && data.reportedByName.size() <= 256))
         && data.priority is string && (data.priority == 'Emergency' || data.priority == 'High' || data.priority == 'Medium' || data.priority == 'Low')
         && data.status is string && data.status.size() <= 64
         && (!('description' in data) || (data.description is string && data.description.size() <= 4096));
@@ -69,7 +77,9 @@ service cloud.firestore {
 
     function isValidTenantLead(data) {
       return data.id is string && isValidId(data.id)
-        && data.name is string && data.name.size() > 0 && data.name.size() <= 128
+        && (!('firstName' in data) || (data.firstName is string && data.firstName.size() <= 128))
+        && (!('lastName' in data) || (data.lastName is string && data.lastName.size() <= 128))
+        && (!('name' in data) || (data.name is string && data.name.size() <= 256))
         && data.email is string && data.email.size() <= 128
         && data.phone is string && data.phone.size() <= 64
         && data.stage is string && data.stage.size() <= 64
@@ -79,7 +89,9 @@ service cloud.firestore {
     function isValidContact(data) {
       return data.id is string && isValidId(data.id)
         && data.type is string && data.type.size() <= 64
-        && data.name is string && data.name.size() > 0 && data.name.size() <= 128
+        && (!('firstName' in data) || (data.firstName is string && data.firstName.size() <= 128))
+        && (!('lastName' in data) || (data.lastName is string && data.lastName.size() <= 128))
+        && (!('name' in data) || (data.name is string && data.name.size() <= 256))
         && (!('email' in data) || (data.email is string && data.email.size() <= 128))
         && data.phone is string && data.phone.size() <= 64
         && (!('licenseNumber' in data) || (data.licenseNumber is string && data.licenseNumber.size() <= 128))

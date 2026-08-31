@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { WorkOrder, WorkOrderCategory, WorkOrderPriority, WorkOrderStatus, Property, Room, Contact } from '../types';
 import { PriorityBadge, WorkOrderStatusBadge, MonthToMonthBadge } from './common/Badges';
+import { getTenantFullName, splitFullName } from '../utils/nameUtils';
 
 interface TenantPortalViewProps {
   workOrders: WorkOrder[];
@@ -47,7 +48,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
   onUpdateWorkOrder
 }) => {
   // Available occupied rooms for tenant simulation
-  const occupiedRooms = rooms.filter(r => r.currentTenantName);
+  const occupiedRooms = rooms.filter(r => r.currentTenantFirstName || r.currentTenantLastName || r.currentTenantName);
   
   // Selected tenant / room state
   const [selectedRoomId, setSelectedRoomId] = useState<string>(
@@ -121,9 +122,11 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
     setIsSubmitting(true);
 
     const generatedTicketNo = `WO-${Math.floor(1000 + Math.random() * 9000)}`;
-    const tenantName = currentRoom?.currentTenantName || 'Resident Tenant';
+    const tenantFirstName = currentRoom?.currentTenantFirstName || (currentRoom?.currentTenantName ? splitFullName(currentRoom.currentTenantName).firstName : 'Resident');
+    const tenantLastName = currentRoom?.currentTenantLastName || (currentRoom?.currentTenantName ? splitFullName(currentRoom.currentTenantName).lastName : 'Tenant');
+    const tenantName = getTenantFullName(currentRoom) || `${tenantFirstName} ${tenantLastName}`.trim();
     const tenantPhone = currentRoom?.currentTenantPhone || '(303) 555-0100';
-    const tenantEmail = currentRoom?.currentTenantEmail || `${tenantName.toLowerCase().replace(/\s+/g, '.')}@example.com`;
+    const tenantEmail = currentRoom?.currentTenantEmail || `${tenantFirstName.toLowerCase()}.${tenantLastName.toLowerCase()}@example.com`;
 
     const newTicket: WorkOrder = {
       id: `wo-${Date.now()}`,
@@ -136,6 +139,8 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
       roomName: isCommonArea ? 'Shared House Common Area' : currentRoom?.name || 'Private Bedroom',
       isCommonArea,
       tenantId: currentRoom?.currentTenantId,
+      reportedByFirstName: tenantFirstName,
+      reportedByLastName: tenantLastName,
       reportedByName: tenantName,
       reportedByPhone: tenantPhone,
       reportedByEmail: tenantEmail,
@@ -187,7 +192,11 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
     // Match by current property or current tenant room
     const isMatchingProperty = wo.propertyId === currentProperty.id;
     const isMatchingRoom = wo.roomId === currentRoom?.id;
-    const isReportedByTenant = currentRoom?.currentTenantName && wo.reportedByName.toLowerCase().includes(currentRoom.currentTenantName.toLowerCase().split(' ')[0]);
+    const tenantFirstName = currentRoom?.currentTenantFirstName || (currentRoom?.currentTenantName ? currentRoom.currentTenantName.split(' ')[0] : '');
+    const isReportedByTenant = Boolean(tenantFirstName && (
+      wo.reportedByName.toLowerCase().includes(tenantFirstName.toLowerCase()) ||
+      (wo.reportedByFirstName && wo.reportedByFirstName.toLowerCase() === tenantFirstName.toLowerCase())
+    ));
 
     const belongsToContext = isMatchingProperty || isMatchingRoom || isReportedByTenant;
     if (!belongsToContext) return false;
@@ -218,7 +227,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
     e.preventDefault();
     if (!newComment.trim() || !selectedTicket) return;
 
-    const tenantName = currentRoom?.currentTenantName || 'Resident';
+    const tenantName = getTenantFullName(currentRoom) || 'Resident';
     const commentObj = {
       id: `c-${Date.now()}`,
       timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
@@ -279,7 +288,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
             >
               {occupiedRooms.map(r => (
                 <option key={r.id} value={r.id}>
-                  {r.currentTenantName} — {r.propertyName} ({r.name})
+                  {getTenantFullName(r)} — {r.propertyName} ({r.name})
                 </option>
               ))}
             </select>

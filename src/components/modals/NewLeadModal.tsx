@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users2, Plus, X, Building, DollarSign, User, BadgeCheck, Trash2, AlertTriangle } from 'lucide-react';
 import { TenantLead, LeadStage, Property, Contact } from '../../types';
+import { splitFullName, formatFullName } from '../../utils/nameUtils';
 
 interface NewLeadModalProps {
   isOpen: boolean;
@@ -21,7 +22,8 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
   editingLead,
   onDeleteLead
 }) => {
-  const [name, setName] = useState<string>('');
+  const [firstName, setFirstName] = useState<string>('');
+  const [lastName, setLastName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [source, setSource] = useState<string>('Roomies.com');
@@ -50,7 +52,15 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
     if (isOpen) {
       setIsConfirmingDelete(false);
       if (editingLead) {
-        setName(editingLead.name || '');
+        let fName = editingLead.firstName || '';
+        let lName = editingLead.lastName || '';
+        if (!fName && !lName && editingLead.name) {
+          const split = splitFullName(editingLead.name);
+          fName = split.firstName;
+          lName = split.lastName;
+        }
+        setFirstName(fName);
+        setLastName(lName);
         setEmail(editingLead.email || '');
         setPhone(editingLead.phone || '');
         setSource(editingLead.source || 'Roomies.com');
@@ -69,7 +79,8 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
         setSocialLevel(editingLead.lifestyleProfile?.socialLevel || 'Balanced (Polite & Independent)');
         setNotes(editingLead.notes || '');
       } else {
-        setName('');
+        setFirstName('');
+        setLastName('');
         setEmail('');
         setPhone('');
         setSource('Roomies.com');
@@ -98,11 +109,17 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) return;
+    const fName = firstName.trim();
+    const lName = lastName.trim();
+    const fullName = formatFullName(fName, lName);
+
+    if (!fullName || !email.trim()) return;
 
     const newLead: TenantLead = {
       id: editingLead?.id || `lead-${Date.now()}`,
-      name: name.trim(),
+      firstName: fName || undefined,
+      lastName: lName || undefined,
+      name: fullName,
       email: email.trim(),
       phone: phone.trim() || '(303) 555-0199',
       source: source as any,
@@ -159,7 +176,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
             </div>
             <div>
               <h2 className="font-bold text-sm text-white">
-                {editingLead ? `Edit Lead: ${editingLead.name}` : 'Record New Tenant Lead'}
+                {editingLead ? `Edit Lead: ${formatFullName(firstName, lastName, editingLead.name)}` : 'Record New Tenant Lead'}
               </h2>
               <p className="text-[11px] text-zinc-400">Add applicant profile, room preferences, and roommate survey</p>
             </div>
@@ -169,18 +186,32 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs max-h-[700px] overflow-y-auto">
           {/* Contact Details */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-zinc-700 mb-1">Full Name *</label>
+              <label className="block font-bold text-zinc-700 mb-1">First Name *</label>
               <input
                 type="text"
                 required
-                placeholder="e.g. Jordan Miller"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Jordan"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
                 className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
             </div>
+            <div>
+              <label className="block font-bold text-zinc-700 mb-1">Last Name *</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Miller"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block font-bold text-zinc-700 mb-1">Email *</label>
               <input

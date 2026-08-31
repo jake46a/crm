@@ -18,6 +18,8 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { Contact, ContactType, Property, Room } from '../types';
+import { formatFullName } from '../utils/nameUtils';
+import { QuickSmsModal, QuickSmsRecipient } from './modals/QuickSmsModal';
 
 interface ContactsViewProps {
   contacts: Contact[];
@@ -43,8 +45,6 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [quickSmsModalContact, setQuickSmsModalContact] = useState<Contact | null>(null);
   const [contactToDelete, setContactToDelete] = useState<Contact | null>(null);
-  const [smsMessage, setSmsMessage] = useState<string>('');
-  const [smsSentNotice, setSmsSentNotice] = useState<boolean>(false);
 
   // Filter contacts
   const filteredContacts = contacts.filter(c => {
@@ -56,8 +56,11 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
     if (propertyFilter !== 'all' && c.propertyId !== propertyFilter) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
+      const fullName = formatFullName(c.firstName, c.lastName, c.name).toLowerCase();
       return (
-        c.name.toLowerCase().includes(q) ||
+        fullName.includes(q) ||
+        (c.firstName && c.firstName.toLowerCase().includes(q)) ||
+        (c.lastName && c.lastName.toLowerCase().includes(q)) ||
         (c.email && c.email.toLowerCase().includes(q)) ||
         c.phone.toLowerCase().includes(q) ||
         (c.roleOrSpecialty && c.roleOrSpecialty.toLowerCase().includes(q)) ||
@@ -68,16 +71,6 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
     }
     return true;
   });
-
-  const handleSendQuickSMS = () => {
-    if (!smsMessage.trim()) return;
-    setSmsSentNotice(true);
-    setTimeout(() => {
-      setSmsSentNotice(false);
-      setQuickSmsModalContact(null);
-      setSmsMessage('');
-    }, 1500);
-  };
 
   return (
     <div className="space-y-6 pb-12">
@@ -202,10 +195,16 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-3">
                   <div className={`w-9 h-9 rounded-sm flex items-center justify-center text-white font-bold text-xs shadow-xs ${contact.avatarBg}`}>
-                    {contact.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
+                    {(() => {
+                      const f = contact.firstName || contact.name.split(' ')[0] || '';
+                      const l = contact.lastName || (contact.name.split(' ').length > 1 ? contact.name.split(' ')[contact.name.split(' ').length - 1] : '');
+                      return `${f ? f[0] : ''}${l ? l[0] : ''}`.toUpperCase() || 'C';
+                    })()}
                   </div>
                   <div>
-                    <h3 className="font-bold text-zinc-900 text-xs leading-snug">{contact.name}</h3>
+                    <h3 className="font-bold text-zinc-900 text-xs leading-snug">
+                      {formatFullName(contact.firstName, contact.lastName, contact.name)}
+                    </h3>
                     {contact.company && (
                       <p className="text-[11px] text-zinc-500 font-medium">{contact.company}</p>
                     )}
@@ -316,11 +315,9 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
             {/* Action buttons */}
             <div className="mt-3 pt-2.5 border-t border-zinc-100 flex items-center justify-between gap-2">
               <button
-                onClick={() => {
-                  setQuickSmsModalContact(contact);
-                  setSmsMessage(`Hi ${contact.name.split(' ')[0]}, this is Moyer Property Management regarding `);
-                }}
+                onClick={() => setQuickSmsModalContact(contact)}
                 className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-sm text-xs font-semibold flex items-center gap-1 uppercase tracking-tight transition-colors"
+                title="Send SMS via Google Voice or Mobile SMS"
               >
                 <MessageSquare className="w-3.5 h-3.5 text-indigo-600" />
                 <span>Quick SMS</span>
@@ -377,7 +374,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
 
             <div className="p-5 space-y-3 text-xs">
               <p className="text-zinc-700">
-                Are you sure you want to delete <strong className="text-zinc-900 font-semibold">{contactToDelete.name}</strong> ({contactToDelete.type}) from your directory?
+                Are you sure you want to delete <strong className="text-zinc-900 font-semibold">{formatFullName(contactToDelete.firstName, contactToDelete.lastName, contactToDelete.name)}</strong> ({contactToDelete.type}) from your directory?
               </p>
               <div className="bg-zinc-50 border border-zinc-200 rounded-sm p-3 space-y-1 text-zinc-600">
                 <div className="flex justify-between">
@@ -426,57 +423,23 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
         </div>
       )}
 
-      {/* Quick SMS Modal */}
-      {quickSmsModalContact && (
-        <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-sm p-5 max-w-md w-full shadow-lg border border-zinc-200 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
-              <h3 className="font-bold text-zinc-900 text-sm flex items-center gap-2 uppercase tracking-wide">
-                <MessageSquare className="w-4 h-4 text-indigo-600" />
-                <span>SMS to {quickSmsModalContact.name}</span>
-              </h3>
-              <button
-                onClick={() => setQuickSmsModalContact(null)}
-                className="text-zinc-400 hover:text-zinc-600 text-sm font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div>
-              <p className="text-xs text-zinc-500 mb-1.5">Recipient Mobile: <strong className="text-zinc-800 font-mono">{quickSmsModalContact.phone}</strong></p>
-              <textarea
-                rows={4}
-                value={smsMessage}
-                onChange={(e) => setSmsMessage(e.target.value)}
-                placeholder="Type resident message, maintenance update, or notice..."
-                className="w-full text-xs p-3 border border-zinc-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-            </div>
-
-            {smsSentNotice && (
-              <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-sm text-xs font-semibold text-center">
-                ✓ Message sent via Moyer Resident Portal Gateway!
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => setQuickSmsModalContact(null)}
-                className="px-3 py-1.5 rounded-sm border border-zinc-300 text-zinc-600 text-xs font-semibold uppercase tracking-wider hover:bg-zinc-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSendQuickSMS}
-                className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-sm text-xs font-semibold uppercase tracking-wider shadow-xs transition-colors"
-              >
-                Send SMS
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Quick SMS Modal with Google Voice & Mobile SMS integration */}
+      <QuickSmsModal
+        isOpen={Boolean(quickSmsModalContact)}
+        onClose={() => setQuickSmsModalContact(null)}
+        recipient={quickSmsModalContact ? {
+          id: quickSmsModalContact.id,
+          firstName: quickSmsModalContact.firstName,
+          lastName: quickSmsModalContact.lastName,
+          name: quickSmsModalContact.name,
+          phone: quickSmsModalContact.phone,
+          email: quickSmsModalContact.email,
+          roleOrType: quickSmsModalContact.type,
+          propertyName: quickSmsModalContact.propertyName,
+          roomName: quickSmsModalContact.roomName
+        } : null}
+        defaultTemplateId="general"
+      />
     </div>
   );
 };

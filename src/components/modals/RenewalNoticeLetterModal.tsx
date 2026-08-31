@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FileText, Printer, Copy, Check, Send, X, Mail, ShieldCheck, Clock, CheckCircle2 } from 'lucide-react';
 import { LeaseRenewal, Property, Room } from '../../types';
 import { printHtmlDocument } from '../../utils/printUtils';
+import { formatFullName } from '../../utils/nameUtils';
 import { 
   calculateAnnualReviewMilestones, 
   generateAnnualRateAdjustmentNoticeText,
@@ -38,6 +39,7 @@ export const RenewalNoticeLetterModal: React.FC<RenewalNoticeLetterModalProps> =
   const pct = ((delta / renewal.currentMonthlyRent) * 100).toFixed(1);
 
   const milestones = calculateAnnualReviewMilestones(renewal.leaseStartDate || '2025-10-01', renewal.currentMonthlyRent);
+  const tenantFullName = formatFullName(renewal.tenantFirstName, renewal.tenantLastName, renewal.tenantName);
 
   const formattedDate = new Date().toLocaleDateString('en-US', {
     month: 'long',
@@ -47,7 +49,7 @@ export const RenewalNoticeLetterModal: React.FC<RenewalNoticeLetterModalProps> =
 
   const fullLetterText = noticeType === 'anniversary-rate-increase'
     ? generateAnnualRateAdjustmentNoticeText({
-        tenantName: renewal.tenantName,
+        tenantName: tenantFullName,
         propertyName: renewal.propertyName,
         roomName: renewal.roomName,
         currentRent: renewal.currentMonthlyRent,
@@ -57,7 +59,7 @@ export const RenewalNoticeLetterModal: React.FC<RenewalNoticeLetterModalProps> =
         managerName: 'Jake Moyer'
       })
     : generate21DayVacateNoticeText({
-        tenantName: renewal.tenantName,
+        tenantName: tenantFullName,
         propertyName: renewal.propertyName,
         roomName: renewal.roomName,
         noticeDate: renewal.noticeToVacate?.noticeDate || new Date().toISOString().split('T')[0],
@@ -92,7 +94,7 @@ export const RenewalNoticeLetterModal: React.FC<RenewalNoticeLetterModalProps> =
         <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 12px; margin-bottom: 20px; display: flex; justify-content: space-between;">
           <div>
             <span style="font-size: 10px; text-transform: uppercase; font-weight: bold; color: #64748b;">Resident:</span>
-            <div style="font-weight: bold; font-size: 13px;">${renewal.tenantName}</div>
+            <div style="font-weight: bold; font-size: 13px;">${tenantFullName}</div>
             <div style="font-size: 11px; color: #64748b;">${renewal.tenantEmail}</div>
           </div>
           <div>
@@ -102,7 +104,7 @@ export const RenewalNoticeLetterModal: React.FC<RenewalNoticeLetterModalProps> =
           </div>
         </div>
 
-        <p style="margin-bottom: 12px;">Dear ${renewal.tenantName},</p>
+        <p style="margin-bottom: 12px;">Dear ${tenantFullName},</p>
         <p style="margin-bottom: 16px;">
           Thank you for being a valued resident at ${renewal.propertyName}. Under our month-to-month coliving policy, all room rentals auto-renew each month, and rate adjustments occur on your 1-year lease anniversary. In accordance with our 2-month advance review schedule, we are pleased to present your upcoming rate terms:
         </p>
@@ -175,7 +177,7 @@ export const RenewalNoticeLetterModal: React.FC<RenewalNoticeLetterModalProps> =
           <tbody>
             <tr style="background-color: #f8fafc; border-bottom: 1px solid #e4e4e7;">
               <td style="padding: 8px 12px; font-weight: 500;">Resident Name:</td>
-              <td style="padding: 8px 12px; font-weight: bold;">${renewal.tenantName}</td>
+              <td style="padding: 8px 12px; font-weight: bold;">${tenantFullName}</td>
             </tr>
             <tr style="border-bottom: 1px solid #e4e4e7;">
               <td style="padding: 8px 12px; font-weight: 500;">Rental Premises:</td>
@@ -209,7 +211,7 @@ export const RenewalNoticeLetterModal: React.FC<RenewalNoticeLetterModalProps> =
         </div>
       </div>
     `;
-    printHtmlDocument(`Lease Notice - ${renewal.tenantName}`, letterHtml);
+    printHtmlDocument(`Lease Notice - ${tenantFullName}`, letterHtml);
   };
 
   const handleCopy = () => {
@@ -238,7 +240,7 @@ export const RenewalNoticeLetterModal: React.FC<RenewalNoticeLetterModalProps> =
                 Formal Lease Notice Generator
               </h2>
               <p className="text-[11px] text-zinc-400">
-                Resident: {renewal.tenantName} • {renewal.propertyName} ({renewal.roomName})
+                Resident: {tenantFullName} • {renewal.propertyName} ({renewal.roomName})
               </p>
             </div>
           </div>

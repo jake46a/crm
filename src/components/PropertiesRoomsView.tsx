@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { Property, Room, RoomStatus, RoomBathroomType, TenantLead } from '../types';
 import { RoomStatusBadge, BathroomTypeBadge } from './common/Badges';
+import { getTenantFullName } from '../utils/nameUtils';
 
 interface PropertiesRoomsViewProps {
   properties: Property[];
@@ -93,12 +94,15 @@ export const PropertiesRoomsView: React.FC<PropertiesRoomsViewProps> = ({
     if (bathFilter === 'shared' && !room.bathroomType.includes('Shared')) return false;
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
+      const tenantName = getTenantFullName(room).toLowerCase();
       return (
         room.name.toLowerCase().includes(q) ||
         room.roomNumber.toLowerCase().includes(q) ||
         room.propertyName.toLowerCase().includes(q) ||
         (room.notes && room.notes.toLowerCase().includes(q)) ||
-        (room.currentTenantName && room.currentTenantName.toLowerCase().includes(q))
+        (tenantName && tenantName.includes(q)) ||
+        (room.currentTenantFirstName && room.currentTenantFirstName.toLowerCase().includes(q)) ||
+        (room.currentTenantLastName && room.currentTenantLastName.toLowerCase().includes(q))
       );
     }
     return true;
@@ -468,7 +472,7 @@ export const PropertiesRoomsView: React.FC<PropertiesRoomsViewProps> = ({
                 <div className="bg-white p-3 rounded-sm border border-zinc-200 text-xs space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-zinc-900 flex items-center gap-1">
-                      {room.currentTenantName}
+                      {getTenantFullName(room)}
                     </span>
                     <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded-sm border border-emerald-200 uppercase">
                       Active Lease

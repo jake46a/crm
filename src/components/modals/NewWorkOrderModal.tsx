@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Wrench, Plus, X, Building, AlertTriangle, Trash2, AlertCircle, Printer } from 'lucide-react';
+import { Wrench, Plus, X, Building, AlertTriangle, Trash2, AlertCircle, Printer, MessageSquare } from 'lucide-react';
 import { WorkOrder, WorkOrderPriority, WorkOrderCategory, Property, Room, Contact } from '../../types';
+import { getTenantFullName } from '../../utils/nameUtils';
+import { QuickSmsModal, QuickSmsRecipient } from './QuickSmsModal';
 
 interface NewWorkOrderModalProps {
   isOpen: boolean;
@@ -44,6 +46,7 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
   const [resolutionSummary, setResolutionSummary] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isConfirmingDelete, setIsConfirmingDelete] = useState<boolean>(false);
+  const [smsTarget, setSmsTarget] = useState<QuickSmsRecipient | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -119,7 +122,9 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
       roomName: roomObj ? roomObj.name : (roomId === 'common' ? 'Shared Commons (Kitchen / Living / Yard)' : 'Specific Area'),
       isCommonArea: roomId === 'common',
       tenantId: roomObj?.currentTenantId || editingWorkOrder?.tenantId,
-      reportedByName: roomObj?.currentTenantName || editingWorkOrder?.reportedByName || 'Moyer Operations Dispatch',
+      reportedByFirstName: roomObj?.currentTenantFirstName || editingWorkOrder?.reportedByFirstName,
+      reportedByLastName: roomObj?.currentTenantLastName || editingWorkOrder?.reportedByLastName,
+      reportedByName: roomObj ? getTenantFullName(roomObj) : (editingWorkOrder?.reportedByName || 'Moyer Operations Dispatch'),
       reportedByPhone: roomObj?.currentTenantPhone || editingWorkOrder?.reportedByPhone || '(303) 555-0100',
       category,
       priority,
@@ -289,7 +294,37 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-zinc-700 mb-1">Assign Vendor / Contractor</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="font-bold text-zinc-700">Assign Vendor / Contractor</label>
+                {assignedVendorId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const vendor = contractors.find(c => c.id === assignedVendorId);
+                      if (vendor && vendor.phone) {
+                        const targetProp = properties.find(p => p.id === propertyId);
+                        setSmsTarget({
+                          id: vendor.id,
+                          firstName: vendor.firstName,
+                          lastName: vendor.lastName,
+                          name: vendor.name,
+                          phone: vendor.phone,
+                          email: vendor.email,
+                          roleOrType: 'Vendor / Contractor',
+                          propertyName: targetProp?.name || 'Property',
+                          workOrderTitle: title,
+                          ticketNumber: editingWorkOrder?.ticketNumber || 'New Work Order'
+                        });
+                      }
+                    }}
+                    className="text-[10px] text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200"
+                    title="Send Dispatch SMS via Google Voice or Mobile"
+                  >
+                    <MessageSquare className="w-3 h-3" />
+                    <span>SMS Dispatch</span>
+                  </button>
+                )}
+              </div>
               <select
                 value={assignedVendorId}
                 onChange={(e) => setAssignedVendorId(e.target.value)}
@@ -422,6 +457,14 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Quick SMS Modal for Dispatching Vendor via Google Voice or Mobile */}
+      <QuickSmsModal
+        isOpen={Boolean(smsTarget)}
+        onClose={() => setSmsTarget(null)}
+        recipient={smsTarget}
+        defaultTemplateId="maintenance_update"
+      />
     </div>
   );
 };

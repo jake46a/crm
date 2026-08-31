@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Home, Plus, X, Building, DollarSign, Trash2, AlertCircle, PlusCircle } from 'lucide-react';
 import { Room, RoomStatus, RoomBathroomType, FloorLevel, Property } from '../../types';
+import { splitFullName, formatFullName } from '../../utils/nameUtils';
 
 interface NewRoomModalProps {
   isOpen: boolean;
@@ -46,7 +47,8 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
   const [status, setStatus] = useState<RoomStatus>('Available');
   
   // Tenancy if occupied
-  const [currentTenantName, setCurrentTenantName] = useState<string>('');
+  const [currentTenantFirstName, setCurrentTenantFirstName] = useState<string>('');
+  const [currentTenantLastName, setCurrentTenantLastName] = useState<string>('');
   const [currentTenantPhone, setCurrentTenantPhone] = useState<string>('');
   const [leaseEndDate, setLeaseEndDate] = useState<string>('');
   const [amenities, setAmenities] = useState<string>(
@@ -90,7 +92,16 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
         setBathroomType(editingRoom.bathroomType || 'Private Ensuite');
         setIsFurnished(editingRoom.isFurnished ?? true);
         setStatus(editingRoom.status || 'Available');
-        setCurrentTenantName(editingRoom.currentTenantName || '');
+        
+        let fName = editingRoom.currentTenantFirstName || '';
+        let lName = editingRoom.currentTenantLastName || '';
+        if (!fName && !lName && editingRoom.currentTenantName) {
+          const split = splitFullName(editingRoom.currentTenantName);
+          fName = split.firstName;
+          lName = split.lastName;
+        }
+        setCurrentTenantFirstName(fName);
+        setCurrentTenantLastName(lName);
         setCurrentTenantPhone(editingRoom.currentTenantPhone || '');
         setLeaseEndDate(editingRoom.leaseEndDate || '');
         setAmenities(
@@ -113,7 +124,8 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
         setBathroomType('Private Ensuite');
         setIsFurnished(true);
         setStatus('Available');
-        setCurrentTenantName('');
+        setCurrentTenantFirstName('');
+        setCurrentTenantLastName('');
         setCurrentTenantPhone('');
         setLeaseEndDate('');
         setAmenities('Queen Bed, Desk & Ergonomic Chair, Walk-in Closet, Blackout Blinds');
@@ -200,7 +212,12 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
       // Only assign tenancy info if status is Occupied
       if (status === 'Occupied') {
         newRoom.currentTenantId = editingRoom?.currentTenantId || `tenant-${Date.now()}`;
-        if (currentTenantName.trim()) newRoom.currentTenantName = currentTenantName.trim();
+        const fName = currentTenantFirstName.trim();
+        const lName = currentTenantLastName.trim();
+        if (fName) newRoom.currentTenantFirstName = fName;
+        if (lName) newRoom.currentTenantLastName = lName;
+        const fullName = formatFullName(fName, lName);
+        if (fullName) newRoom.currentTenantName = fullName;
         if (currentTenantPhone.trim()) newRoom.currentTenantPhone = currentTenantPhone.trim();
         if (leaseEndDate.trim()) newRoom.leaseEndDate = leaseEndDate.trim();
       }
@@ -438,15 +455,27 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
               <span className="font-bold text-zinc-800 text-xs block">Active Resident Details</span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] text-zinc-500">Tenant Name</label>
+                  <label className="block text-[11px] text-zinc-500">Tenant First Name</label>
                   <input
                     type="text"
-                    placeholder="e.g. Alex Morgan"
-                    value={currentTenantName}
-                    onChange={(e) => setCurrentTenantName(e.target.value)}
+                    placeholder="e.g. Alex"
+                    value={currentTenantFirstName}
+                    onChange={(e) => setCurrentTenantFirstName(e.target.value)}
                     className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
+                <div>
+                  <label className="block text-[11px] text-zinc-500">Tenant Last Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Morgan"
+                    value={currentTenantLastName}
+                    onChange={(e) => setCurrentTenantLastName(e.target.value)}
+                    className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[11px] text-zinc-500">Tenant Phone</label>
                   <input
@@ -457,15 +486,15 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
                     className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
-              </div>
-              <div>
-                <label className="block text-[11px] text-zinc-500">Lease Expiration Date</label>
-                <input
-                  type="date"
-                  value={leaseEndDate}
-                  onChange={(e) => setLeaseEndDate(e.target.value)}
-                  className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
-                />
+                <div>
+                  <label className="block text-[11px] text-zinc-500">Lease Expiration Date</label>
+                  <input
+                    type="date"
+                    value={leaseEndDate}
+                    onChange={(e) => setLeaseEndDate(e.target.value)}
+                    className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
               </div>
             </div>
           )}

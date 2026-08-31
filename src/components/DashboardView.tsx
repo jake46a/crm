@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Property, Room, LeaseRenewal, WorkOrder, TenantLead, ActivityLog, NavigationTab } from '../types';
 import { PriorityBadge, WorkOrderStatusBadge, RenewalStatusBadge, RoomStatusBadge } from './common/Badges';
+import { getTenantFullName, formatFullName } from '../utils/nameUtils';
 
 interface DashboardViewProps {
   properties: Property[];
@@ -340,7 +341,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <div className="mt-1.5 flex items-center justify-between text-[11px]">
                         {room.status === 'Occupied' ? (
                           <span className="text-zinc-600 truncate font-medium max-w-[120px]">
-                            {room.currentTenantName}
+                            {getTenantFullName(room)}
                           </span>
                         ) : (
                           <span className={`font-semibold text-[10px] uppercase tracking-tight ${
@@ -385,7 +386,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div key={ren.id} className="p-4 flex items-start justify-between gap-3 hover:bg-zinc-50/60 transition-colors">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="font-bold text-zinc-900 text-xs truncate">{ren.tenantName}</p>
+                      <p className="font-bold text-zinc-900 text-xs truncate">
+                        {formatFullName(ren.tenantFirstName, ren.tenantLastName, ren.tenantName)}
+                      </p>
                       <RenewalStatusBadge status={ren.renewalStatus} />
                     </div>
                     <p className="text-[11px] text-zinc-500 mt-0.5 truncate">

@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { TenantLead, LeadStage, LeadActivity, Property, Contact } from '../../types';
 import { LeadStageBadge, MonthToMonthBadge } from '../common/Badges';
+import { formatFullName } from '../../utils/nameUtils';
+import { QuickSmsModal } from './QuickSmsModal';
 
 interface LeadDetailModalProps {
   isOpen: boolean;
@@ -46,6 +48,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   const [newNoteType, setNewNoteType] = useState<'note' | 'call' | 'email' | 'showing' | 'sms' | 'tour'>('note');
   const [activeAgent, setActiveAgent] = useState<string>('');
   const [isConfirmingDelete, setIsConfirmingDelete] = useState<boolean>(false);
+  const [showSmsModal, setShowSmsModal] = useState<boolean>(false);
 
   useEffect(() => {
     if (lead) {
@@ -145,11 +148,17 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
         <div className="bg-zinc-900 text-white p-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-xs">
-              {lead.name.split(' ').map(n => n[0]).join('')}
+              {(() => {
+                const f = lead.firstName || lead.name.split(' ')[0] || '';
+                const l = lead.lastName || (lead.name.split(' ').length > 1 ? lead.name.split(' ')[lead.name.split(' ').length - 1] : '');
+                return `${f ? f[0] : ''}${l ? l[0] : ''}`.toUpperCase() || 'L';
+              })()}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="font-bold text-base text-white">{lead.name}</h2>
+                <h2 className="font-bold text-base text-white">
+                  {formatFullName(lead.firstName, lead.lastName, lead.name)}
+                </h2>
                 <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold">
                   ★ Score: {lead.score}
                 </span>
@@ -256,7 +265,18 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
             <div className="border border-zinc-200 rounded-md p-3.5 space-y-2">
               <span className="font-bold text-zinc-800 text-xs block border-b border-zinc-200 pb-1">Contact & Financials</span>
               <div className="space-y-1 text-zinc-600">
-                <p>Phone: <a href={`tel:${lead.phone}`} className="font-mono text-zinc-900 font-semibold hover:text-indigo-600">{lead.phone}</a></p>
+                <div className="flex items-center justify-between">
+                  <p>Phone: <a href={`tel:${lead.phone}`} className="font-mono text-zinc-900 font-semibold hover:text-indigo-600">{lead.phone}</a></p>
+                  <button
+                    type="button"
+                    onClick={() => setShowSmsModal(true)}
+                    className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold flex items-center gap-1 shadow-2xs transition"
+                    title="Send SMS via Google Voice or Mobile"
+                  >
+                    <MessageSquare className="w-3 h-3" />
+                    <span>Send SMS</span>
+                  </button>
+                </div>
                 <p>Email: <a href={`mailto:${lead.email}`} className="text-zinc-900 font-semibold hover:text-indigo-600">{lead.email}</a></p>
                 <p>Monthly Income: <strong className="text-zinc-900 font-mono">${lead.monthlyIncome}/mo</strong></p>
                 <p>Max Budget: <strong className="text-emerald-700 font-mono">${lead.maxBudget}/mo</strong></p>
@@ -381,6 +401,38 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Quick SMS Modal with Google Voice & Mobile SMS Integration */}
+      <QuickSmsModal
+        isOpen={showSmsModal}
+        onClose={() => setShowSmsModal(false)}
+        recipient={lead ? {
+          id: lead.id,
+          firstName: lead.firstName,
+          lastName: lead.lastName,
+          name: lead.name,
+          phone: lead.phone,
+          email: lead.email,
+          roleOrType: 'Prospect / Lead',
+          propertyName: lead.interestedPropertyId ? properties.find(p => p.id === lead.interestedPropertyId)?.name : 'Property',
+          roomName: lead.interestedRoomId ? `Room ${lead.interestedRoomId}` : ''
+        } : null}
+        defaultTemplateId="showing_tour"
+        onLogSent={(rec, msg) => {
+          const activity: LeadActivity = {
+            id: `act-${Date.now()}`,
+            date: new Date().toISOString().replace('T', ' ').slice(0, 16),
+            type: 'sms',
+            title: 'SMS Sent via Google Voice / Mobile',
+            content: msg,
+            agent: lead.assignedAgent || activeAgent || 'Jake Moyer'
+          };
+          onUpdateLead({
+            ...lead,
+            activityHistory: [activity, ...(lead.activityHistory || [])]
+          });
+        }}
+      />
     </div>
   );
 };

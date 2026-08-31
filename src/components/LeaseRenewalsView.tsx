@@ -26,7 +26,8 @@ import {
   RotateCcw,
   Trash2,
   CopyX,
-  AlertTriangle
+  AlertTriangle,
+  MessageSquare
 } from 'lucide-react';
 import { LeaseRenewal, LeaseRenewalStatus, Room, Property, NoticeToVacateRecord } from '../types';
 import { RenewalStatusBadge, MonthToMonthBadge } from './common/Badges';
@@ -35,6 +36,8 @@ import {
   calculateAnnualReviewMilestones, 
   formatDateToISO 
 } from '../utils/leaseEngine';
+import { formatFullName } from '../utils/nameUtils';
+import { QuickSmsModal, QuickSmsRecipient } from './modals/QuickSmsModal';
 
 interface LeaseRenewalsViewProps {
   renewals: LeaseRenewal[];
@@ -80,6 +83,9 @@ export const LeaseRenewalsView: React.FC<LeaseRenewalsViewProps> = ({
   // Single card delete confirmation state
   const [cardToDelete, setCardToDelete] = useState<LeaseRenewal | null>(null);
 
+  // Quick SMS State
+  const [smsTargetRenewal, setSmsTargetRenewal] = useState<LeaseRenewal | null>(null);
+
   // Notice to Vacate Modal / Drawer State
   const [vacatingRenewalTarget, setVacatingRenewalTarget] = useState<LeaseRenewal | null>(null);
   const [noticeGivenBy, setNoticeGivenBy] = useState<'Tenant' | 'Landlord'>('Tenant');
@@ -96,9 +102,10 @@ export const LeaseRenewalsView: React.FC<LeaseRenewalsViewProps> = ({
     
     renewals.forEach(r => {
       // Key on roomId if present, or normalized tenant name + property
+      const fullName = formatFullName(r.tenantFirstName, r.tenantLastName, r.tenantName);
       const groupKey = r.roomId 
         ? `room_${r.roomId}` 
-        : `tenant_${(r.propertyName || '').trim().toLowerCase()}_${(r.tenantName || '').trim().toLowerCase()}`;
+        : `tenant_${(r.propertyName || '').trim().toLowerCase()}_${fullName.trim().toLowerCase()}`;
       
       if (!groups[groupKey]) {
         groups[groupKey] = [];
@@ -139,7 +146,7 @@ export const LeaseRenewalsView: React.FC<LeaseRenewalsViewProps> = ({
           key,
           roomName: primaryCard.roomName || 'Bedroom',
           propertyName: primaryCard.propertyName || 'Property',
-          tenantName: primaryCard.tenantName || 'Resident',
+          tenantName: formatFullName(primaryCard.tenantFirstName, primaryCard.tenantLastName, primaryCard.tenantName || 'Resident'),
           primaryCard,
           duplicates,
           allCards: list
@@ -199,8 +206,11 @@ export const LeaseRenewalsView: React.FC<LeaseRenewalsViewProps> = ({
     if (timeFilter === '60days' && ren.milestones.daysUntilDecisionDeadline > 60) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
+      const tName = formatFullName(ren.tenantFirstName, ren.tenantLastName, ren.tenantName).toLowerCase();
       return (
-        ren.tenantName.toLowerCase().includes(q) ||
+        tName.includes(q) ||
+        (ren.tenantFirstName && ren.tenantFirstName.toLowerCase().includes(q)) ||
+        (ren.tenantLastName && ren.tenantLastName.toLowerCase().includes(q)) ||
         ren.propertyName.toLowerCase().includes(q) ||
         ren.roomName.toLowerCase().includes(q) ||
         ren.tenantEmail.toLowerCase().includes(q)
@@ -633,7 +643,9 @@ export const LeaseRenewalsView: React.FC<LeaseRenewalsViewProps> = ({
                   {/* Left: Tenant & Tenancy Timeline */}
                   <div className="space-y-2 max-w-xl">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-bold text-zinc-900 text-sm uppercase tracking-tight">{renewal.tenantName}</h3>
+                      <h3 className="font-bold text-zinc-900 text-sm uppercase tracking-tight">
+                        {formatFullName(renewal.tenantFirstName, renewal.tenantLastName, renewal.tenantName)}
+                      </h3>
                       <RenewalStatusBadge status={renewal.renewalStatus} />
                       <MonthToMonthBadge />
 
@@ -774,13 +786,25 @@ export const LeaseRenewalsView: React.FC<LeaseRenewalsViewProps> = ({
                       )}
                     </div>
 
-                    <button
-                      onClick={() => onOpenRenewalLetterModal(renewal)}
-                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-sm text-xs font-semibold uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 shadow-xs w-full"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Notice / Letter</span>
-                    </button>
+                    <div className="grid grid-cols-2 gap-1.5 w-full">
+                      <button
+                        onClick={() => onOpenRenewalLetterModal(renewal)}
+                        className="px-2 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-sm text-[11px] font-semibold uppercase tracking-wider transition-colors flex items-center justify-center gap-1 shadow-xs"
+                        title="Generate formal letter or printable notice"
+                      >
+                        <Send className="w-3 h-3" />
+                        <span>Notice</span>
+                      </button>
+
+                      <button
+                        onClick={() => setSmsTargetRenewal(renewal)}
+                        className="px-2 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-sm text-[11px] font-semibold uppercase tracking-wider transition-colors flex items-center justify-center gap-1 shadow-xs"
+                        title="Send 1-Year Rate adjustment SMS via Google Voice or Mobile"
+                      >
+                        <MessageSquare className="w-3 h-3" />
+                        <span>SMS</span>
+                      </button>
+                    </div>
 
                     <button
                       onClick={() => {
@@ -1097,6 +1121,26 @@ export const LeaseRenewalsView: React.FC<LeaseRenewalsViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Quick SMS Modal for 1-Year Rate Adjustment Notice via Google Voice or Mobile */}
+      <QuickSmsModal
+        isOpen={Boolean(smsTargetRenewal)}
+        onClose={() => setSmsTargetRenewal(null)}
+        recipient={smsTargetRenewal ? {
+          id: smsTargetRenewal.id,
+          firstName: smsTargetRenewal.tenantFirstName,
+          lastName: smsTargetRenewal.tenantLastName,
+          name: smsTargetRenewal.tenantName,
+          phone: smsTargetRenewal.tenantPhone || '(303) 555-0100',
+          email: smsTargetRenewal.tenantEmail,
+          roleOrType: 'Active Room Tenant',
+          propertyName: smsTargetRenewal.propertyName,
+          roomName: smsTargetRenewal.roomName,
+          proposedRent: smsTargetRenewal.proposedMonthlyRent,
+          effectiveDate: smsTargetRenewal.renewalEffectiveDate
+        } : null}
+        defaultTemplateId="anniversary_rate"
+      />
     </div>
   );
 };

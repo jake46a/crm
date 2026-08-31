@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FileText, Plus, X, Building, DollarSign, Sparkles, AlertCircle, Calendar, ShieldCheck, Clock, Trash2, User, Mail, Phone } from 'lucide-react';
 import { LeaseRenewal, LeaseRenewalStatus, Property, Room } from '../../types';
 import { calculateAnnualReviewMilestones } from '../../utils/leaseEngine';
+import { splitFullName, formatFullName } from '../../utils/nameUtils';
 
 interface NewRenewalModalProps {
   isOpen: boolean;
@@ -25,7 +26,8 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
   const occupiedRooms = rooms.filter(r => r.status === 'Occupied' || r.id === editingRenewal?.roomId);
 
   const [roomId, setRoomId] = useState<string>('');
-  const [tenantName, setTenantName] = useState<string>('');
+  const [tenantFirstName, setTenantFirstName] = useState<string>('');
+  const [tenantLastName, setTenantLastName] = useState<string>('');
   const [tenantEmail, setTenantEmail] = useState<string>('');
   const [tenantPhone, setTenantPhone] = useState<string>('');
   const [renewalStatus, setRenewalStatus] = useState<LeaseRenewalStatus>('Review Pending');
@@ -48,7 +50,15 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
       setRoomId(defaultRoomId);
 
       if (editingRenewal) {
-        setTenantName(editingRenewal.tenantName || '');
+        let fName = editingRenewal.tenantFirstName || '';
+        let lName = editingRenewal.tenantLastName || '';
+        if (!fName && !lName && editingRenewal.tenantName) {
+          const split = splitFullName(editingRenewal.tenantName);
+          fName = split.firstName;
+          lName = split.lastName;
+        }
+        setTenantFirstName(fName);
+        setTenantLastName(lName);
         setTenantEmail(editingRenewal.tenantEmail || '');
         setTenantPhone(editingRenewal.tenantPhone || '');
         setRenewalStatus(editingRenewal.renewalStatus || 'Review Pending');
@@ -61,7 +71,15 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
         const r = rooms.find(room => room.id === defaultRoomId);
         const rent = r?.monthlyRent || 895;
         const start = r?.leaseStartDate || '2025-10-01';
-        setTenantName(r?.currentTenantName || '');
+        let fName = r?.currentTenantFirstName || '';
+        let lName = r?.currentTenantLastName || '';
+        if (!fName && !lName && r?.currentTenantName) {
+          const split = splitFullName(r.currentTenantName);
+          fName = split.firstName;
+          lName = split.lastName;
+        }
+        setTenantFirstName(fName);
+        setTenantLastName(lName);
         setTenantEmail(r?.currentTenantEmail || 'resident@moyercoliving.com');
         setTenantPhone(r?.currentTenantPhone || '(303) 555-0100');
         setRenewalStatus('Review Pending');
@@ -84,8 +102,16 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
     setRoomId(newRoomId);
     const r = rooms.find(room => room.id === newRoomId);
     if (r) {
-      if (!editingRenewal || !tenantName) {
-        setTenantName(r.currentTenantName || '');
+      if (!editingRenewal || (!tenantFirstName && !tenantLastName)) {
+        let fName = r.currentTenantFirstName || '';
+        let lName = r.currentTenantLastName || '';
+        if (!fName && !lName && r.currentTenantName) {
+          const split = splitFullName(r.currentTenantName);
+          fName = split.firstName;
+          lName = split.lastName;
+        }
+        setTenantFirstName(fName);
+        setTenantLastName(lName);
         setTenantEmail(r.currentTenantEmail || 'resident@moyercoliving.com');
         setTenantPhone(r.currentTenantPhone || '(303) 555-0100');
       }
@@ -116,8 +142,12 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
       return;
     }
 
-    if (!tenantName.trim()) {
-      setErrorMessage('Please provide a tenant name.');
+    const fName = tenantFirstName.trim();
+    const lName = tenantLastName.trim();
+    const fullName = formatFullName(fName, lName);
+
+    if (!fullName) {
+      setErrorMessage('Please provide a tenant first or last name.');
       return;
     }
 
@@ -129,7 +159,9 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
     const newRenewal: LeaseRenewal = {
       id: editingRenewal?.id || `ren-${Date.now()}`,
       tenantId: editingRenewal?.tenantId || selectedRoom.currentTenantId || `tenant-${Date.now()}`,
-      tenantName: tenantName.trim(),
+      tenantFirstName: fName || undefined,
+      tenantLastName: lName || undefined,
+      tenantName: fullName,
       tenantEmail: tenantEmail.trim() || 'resident@moyercoliving.com',
       tenantPhone: tenantPhone.trim() || '(303) 555-0100',
       propertyId: selectedProperty.id,
@@ -167,7 +199,7 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
             </div>
             <div>
               <h2 className="font-bold text-sm text-white">
-                {editingRenewal ? `Edit Lease Renewal Card: ${editingRenewal.tenantName}` : 'Record 1-Year Rate Increase Review'}
+                {editingRenewal ? `Edit Lease Renewal Card: ${formatFullName(tenantFirstName, tenantLastName, editingRenewal.tenantName)}` : 'Record 1-Year Rate Increase Review'}
               </h2>
               <p className="text-[11px] text-zinc-400">Month-to-Month Tenancy • 1-Year Anniversary Rate Adjustment</p>
             </div>
@@ -193,7 +225,7 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
             >
               {occupiedRooms.map(r => (
                 <option key={r.id} value={r.id}>
-                  {r.propertyName} - {r.name} (Tenant: {r.currentTenantName || 'Occupied'})
+                  {r.propertyName} - {r.name} (Tenant: {formatFullName(r.currentTenantFirstName, r.currentTenantLastName, r.currentTenantName || 'Occupied')})
                 </option>
               ))}
             </select>
@@ -206,19 +238,33 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
               <span>Tenant Information</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
-                <label className="block text-[11px] text-zinc-600 mb-1">Resident Name *</label>
+                <label className="block text-[11px] text-zinc-600 mb-1">First Name *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Alex Miller"
-                  value={tenantName}
-                  onChange={(e) => setTenantName(e.target.value)}
+                  placeholder="e.g. Alex"
+                  value={tenantFirstName}
+                  onChange={(e) => setTenantFirstName(e.target.value)}
                   className="w-full p-2 bg-white border border-zinc-300 rounded-md font-semibold text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
               </div>
 
+              <div>
+                <label className="block text-[11px] text-zinc-600 mb-1">Last Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Miller"
+                  value={tenantLastName}
+                  onChange={(e) => setTenantLastName(e.target.value)}
+                  className="w-full p-2 bg-white border border-zinc-300 rounded-md font-semibold text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
                 <label className="block text-[11px] text-zinc-600 mb-1">Email Address</label>
                 <input

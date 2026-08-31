@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Contact as ContactIcon, Plus, X, Trash2, AlertTriangle } from 'lucide-react';
 import { Contact, ContactType, Property } from '../../types';
+import { splitFullName, formatFullName } from '../../utils/nameUtils';
 
 interface NewContactModalProps {
   isOpen: boolean;
@@ -19,7 +20,8 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
   editingContact,
   onDeleteContact
 }) => {
-  const [name, setName] = useState<string>('');
+  const [firstName, setFirstName] = useState<string>('');
+  const [lastName, setLastName] = useState<string>('');
   const [type, setType] = useState<ContactType>('Tenant');
   const [email, setEmail] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
@@ -39,7 +41,15 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
     if (isOpen) {
       setIsConfirmingDelete(false);
       if (editingContact) {
-        setName(editingContact.name || '');
+        let fName = editingContact.firstName || '';
+        let lName = editingContact.lastName || '';
+        if (!fName && !lName && editingContact.name) {
+          const split = splitFullName(editingContact.name);
+          fName = split.firstName;
+          lName = split.lastName;
+        }
+        setFirstName(fName);
+        setLastName(lName);
         setType(editingContact.type || 'Tenant');
         setEmail(editingContact.email || '');
         setPhone(editingContact.phone || '');
@@ -54,7 +64,8 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         setEmergencyContactName(editingContact.emergencyContactName || '');
         setEmergencyContactPhone(editingContact.emergencyContactPhone || '');
       } else {
-        setName('');
+        setFirstName('');
+        setLastName('');
         setType('Leasing Agent');
         setEmail('');
         setPhone('');
@@ -76,7 +87,10 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !phone.trim()) return;
+    const fName = firstName.trim();
+    const lName = lastName.trim();
+    const fullName = formatFullName(fName, lName);
+    if (!fullName || !phone.trim()) return;
 
     const prop = properties.find(p => p.id === propertyId);
 
@@ -97,7 +111,9 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
 
     const newContact: Contact = {
       id: editingContact?.id || `con-${Date.now()}`,
-      name: name.trim(),
+      firstName: fName || undefined,
+      lastName: lName || undefined,
+      name: fullName,
       type,
       status: isAgent ? status : (editingContact?.status || 'Active'),
       email: email.trim() || undefined,
@@ -129,7 +145,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
             </div>
             <div>
               <h2 className="font-bold text-sm text-white">
-                {editingContact ? `Edit Contact: ${editingContact.name}` : 'Add Directory Contact'}
+                {editingContact ? `Edit Contact: ${formatFullName(firstName, lastName, editingContact.name)}` : 'Add Directory Contact'}
               </h2>
               <p className="text-[11px] text-zinc-400">Save tenant, contractor vendor, or property investor</p>
             </div>
@@ -140,32 +156,43 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         <form onSubmit={handleSubmit} className="p-5 space-y-3.5 text-xs max-h-[700px] overflow-y-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-zinc-700 mb-1">Full Name *</label>
+              <label className="block font-bold text-zinc-700 mb-1">First Name *</label>
               <input
                 type="text"
                 required
-                placeholder="e.g. Sarah Jenkins"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Sarah"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
                 className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
             </div>
-
             <div>
-              <label className="block font-bold text-zinc-700 mb-1">Contact Type *</label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value as any)}
-                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                <option value="Leasing Agent">Leasing Agent</option>
-                <option value="Tenant">Active Room Tenant</option>
-                <option value="Vendor / Contractor">Vendor / Contractor</option>
-                <option value="Property Owner">Property Owner</option>
-                <option value="Lead">Lead / Prospect</option>
-                <option value="Emergency Contact">Emergency Contact</option>
-              </select>
+              <label className="block font-bold text-zinc-700 mb-1">Last Name *</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Jenkins"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              />
             </div>
+          </div>
+
+          <div>
+            <label className="block font-bold text-zinc-700 mb-1">Contact Type *</label>
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value as any)}
+              className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            >
+              <option value="Leasing Agent">Leasing Agent</option>
+              <option value="Tenant">Active Room Tenant</option>
+              <option value="Vendor / Contractor">Vendor / Contractor</option>
+              <option value="Property Owner">Property Owner</option>
+              <option value="Lead">Lead / Prospect</option>
+              <option value="Emergency Contact">Emergency Contact</option>
+            </select>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

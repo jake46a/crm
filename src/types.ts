@@ -58,6 +58,8 @@ export interface Room {
   status: RoomStatus;
   leaseType?: 'Month-to-Month' | 'Fixed'; // All standard leases are Month-to-Month
   currentTenantId?: string;
+  currentTenantFirstName?: string;
+  currentTenantLastName?: string;
   currentTenantName?: string;
   currentTenantPhone?: string;
   currentTenantEmail?: string;
@@ -93,6 +95,8 @@ export interface NoticeToVacateRecord {
 export interface LeaseRenewal {
   id: string;
   tenantId: string;
+  tenantFirstName?: string;
+  tenantLastName?: string;
   tenantName: string;
   tenantEmail: string;
   tenantPhone: string;
@@ -160,6 +164,8 @@ export interface WorkOrder {
   roomName?: string; // e.g. "Room 201" or "Shared Kitchen / Common Area"
   isCommonArea: boolean;
   tenantId?: string;
+  reportedByFirstName?: string;
+  reportedByLastName?: string;
   reportedByName: string;
   reportedByPhone: string;
   reportedByEmail?: string;
@@ -211,6 +217,8 @@ export interface LeadActivity {
 
 export interface TenantLead {
   id: string;
+  firstName?: string;
+  lastName?: string;
   name: string;
   email: string;
   phone: string;
@@ -244,6 +252,8 @@ export type ContactType = 'Tenant' | 'Lead' | 'Vendor / Contractor' | 'Property 
 export interface Contact {
   id: string;
   type: ContactType;
+  firstName?: string;
+  lastName?: string;
   name: string;
   company?: string;
   email?: string;
