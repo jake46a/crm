@@ -60,16 +60,18 @@ export const WorkOrderStatusBadge: React.FC<{ status: WorkOrderStatus }> = ({ st
 
 export const RenewalStatusBadge: React.FC<{ status: LeaseRenewalStatus }> = ({ status }) => {
   const styles: Record<LeaseRenewalStatus, string> = {
-    'Review Pending': 'bg-zinc-100 text-zinc-700 border-zinc-200',
-    'Notice Sent': 'bg-indigo-50 text-indigo-700 border-indigo-200',
-    'Negotiating Terms': 'bg-amber-50 text-amber-700 border-amber-200',
+    'Auto-Renewing Month-to-Month': 'bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold',
+    'Review Pending': 'bg-zinc-100 text-zinc-700 border-zinc-200 font-medium',
+    'Notice Sent': 'bg-indigo-50 text-indigo-700 border-indigo-200 font-medium',
+    'Negotiating Terms': 'bg-amber-50 text-amber-700 border-amber-200 font-medium',
     'Tenant Accepted': 'bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold',
     'Tenant Declined (Vacating)': 'bg-rose-50 text-rose-700 border-rose-200',
+    'Notice to Vacate Given': 'bg-rose-100 text-rose-800 border-rose-300 font-bold',
     'Renewed Signed': 'bg-teal-50 text-teal-800 border-teal-300 font-bold'
   };
 
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-sm text-[10px] font-semibold uppercase tracking-tight border ${styles[status]}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-sm text-[10px] uppercase tracking-tight border ${styles[status] || 'bg-zinc-100 text-zinc-700 border-zinc-200'}`}>
       {status}
     </span>
   );

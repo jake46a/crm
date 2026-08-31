@@ -31,6 +31,15 @@ import {
   Contact, 
   ActivityLog 
 } from '../types';
+import {
+  INITIAL_PROPERTIES,
+  INITIAL_ROOMS,
+  INITIAL_RENEWALS,
+  INITIAL_WORK_ORDERS,
+  INITIAL_LEADS,
+  INITIAL_CONTACTS,
+  INITIAL_ACTIVITY_LOGS
+} from '../data/initialData';
 
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
@@ -480,11 +489,56 @@ export const FirebaseService = {
     await this.clearAllData();
   },
 
+  async seedInitialData(): Promise<void> {
+    const batch = writeBatch(db);
+
+    INITIAL_PROPERTIES.forEach(p => {
+      batch.set(doc(db, COLLECTIONS.PROPERTIES, p.id), sanitizeForFirestore(p));
+    });
+
+    INITIAL_ROOMS.forEach(r => {
+      batch.set(doc(db, COLLECTIONS.ROOMS, r.id), sanitizeForFirestore(r));
+    });
+
+    INITIAL_RENEWALS.forEach(ren => {
+      batch.set(doc(db, COLLECTIONS.RENEWALS, ren.id), sanitizeForFirestore(ren));
+    });
+
+    INITIAL_WORK_ORDERS.forEach(wo => {
+      batch.set(doc(db, COLLECTIONS.WORK_ORDERS, wo.id), sanitizeForFirestore(wo));
+    });
+
+    INITIAL_LEADS.forEach(l => {
+      batch.set(doc(db, COLLECTIONS.LEADS, l.id), sanitizeForFirestore(l));
+    });
+
+    INITIAL_CONTACTS.forEach(c => {
+      batch.set(doc(db, COLLECTIONS.CONTACTS, c.id), sanitizeForFirestore(c));
+    });
+
+    INITIAL_ACTIVITY_LOGS.forEach(act => {
+      batch.set(doc(db, COLLECTIONS.ACTIVITY_LOGS, act.id), sanitizeForFirestore(act));
+    });
+
+    await batch.commit();
+  },
+
   async resetToSeedData(): Promise<void> {
     await this.clearAllData();
+    await this.seedInitialData();
   },
 
   async seedInitialDataIfEmpty(): Promise<boolean> {
-    return false;
+    try {
+      const propSnap = await getDocs(collection(db, COLLECTIONS.PROPERTIES));
+      if (propSnap.empty) {
+        await this.seedInitialData();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.warn('Could not auto-check seed data:', e);
+      return false;
+    }
   }
 };

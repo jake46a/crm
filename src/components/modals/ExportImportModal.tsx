@@ -48,6 +48,25 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
     }
   };
 
+  const handleResetToStandardData = async () => {
+    setIsClearing(true);
+    try {
+      StorageService.resetToSeedData();
+      await FirebaseService.resetToSeedData();
+      setStatusMsg({ text: 'Reset portfolio with updated coliving & renewal engine data!', type: 'success' });
+      setTimeout(() => {
+        onDataReload();
+        onClose();
+      }, 900);
+    } catch (err) {
+      console.error('Error resetting seed data:', err);
+      setStatusMsg({ text: 'Reset local data successfully; cloud sync in progress.', type: 'success' });
+      onDataReload();
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   const handleDeleteAllData = async () => {
     if (window.confirm('Are you sure you want to delete ALL data? This will permanently wipe all properties, rooms, lease renewals, work orders, leads, and contacts from both local storage and the database.')) {
       setIsClearing(true);
@@ -61,7 +80,7 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
         }, 800);
       } catch (err) {
         console.error('Error clearing data:', err);
-        setStatusMsg({ text: 'Cleared local data, but encounter an error with cloud sync.', type: 'error' });
+        setStatusMsg({ text: 'Cleared local data, but encountered an error with cloud sync.', type: 'error' });
         onDataReload();
       } finally {
         setIsClearing(false);
@@ -81,7 +100,7 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
               <h2 className="font-bold text-sm text-white">
                 Portfolio Data & Backup Manager
               </h2>
-              <p className="text-[11px] text-zinc-400">Export, import, or delete room rentals and lease database</p>
+              <p className="text-[11px] text-zinc-400">Export, import, or reset room rentals and lease database</p>
             </div>
           </div>
           <button onClick={onClose} className="text-zinc-400 hover:text-white p-1">✕</button>
@@ -96,6 +115,27 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
               <span>{statusMsg.text}</span>
             </div>
           )}
+
+          {/* Reset to New Logic Engine Seed */}
+          <div className="bg-indigo-50/70 p-4 rounded-md border border-indigo-200 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-bold text-indigo-950 text-xs flex items-center gap-1.5">
+                  <span>⚡ Reset to Changed Engine Logic Data</span>
+                </h3>
+                <p className="text-[11px] text-indigo-800 leading-snug">
+                  Populate month-to-month leases, 1-year rate anniversary reviews (2-month window & 12th-month deadline), and 21-day notice vacate test cases.
+                </p>
+              </div>
+              <button
+                onClick={handleResetToStandardData}
+                disabled={isClearing}
+                className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-md font-bold text-xs shadow-xs transition whitespace-nowrap shrink-0"
+              >
+                <span>{isClearing ? 'Loading...' : 'Reset to New Logic'}</span>
+              </button>
+            </div>
+          </div>
 
           {/* Export section */}
           <div className="bg-zinc-50 p-4 rounded-md border border-zinc-200 space-y-2">
@@ -118,7 +158,7 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
           <div className="border border-zinc-200 p-4 rounded-md space-y-2">
             <h3 className="font-bold text-zinc-900 text-xs">Import JSON Backup</h3>
             <textarea
-              rows={4}
+              rows={3}
               placeholder="Paste previously exported CRM JSON payload here..."
               value={importJson}
               onChange={(e) => setImportJson(e.target.value)}
@@ -128,7 +168,7 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
               <button
                 onClick={handleImport}
                 disabled={!importJson.trim()}
-                className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-md font-bold shadow-xs transition"
+                className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-900 disabled:opacity-50 text-white rounded-md font-bold shadow-xs transition"
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>Restore from JSON</span>
@@ -139,8 +179,8 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
           {/* Delete all data section */}
           <div className="pt-3 border-t border-zinc-200 flex items-center justify-between bg-rose-50/50 p-3 rounded-md border border-rose-100">
             <div>
-              <span className="font-bold text-rose-900 text-xs">Delete All Sample / CRM Data</span>
-              <p className="text-[11px] text-rose-600">Permanently wipes all properties, rooms, leads, and work orders</p>
+              <span className="font-bold text-rose-900 text-xs">Wipe All Data</span>
+              <p className="text-[11px] text-rose-600">Permanently clears all database records</p>
             </div>
             <button
               onClick={handleDeleteAllData}

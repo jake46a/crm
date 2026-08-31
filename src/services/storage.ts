@@ -10,13 +10,13 @@ import {
 } from '../data/initialData';
 
 const STORAGE_KEYS = {
-  PROPERTIES: 'moyer_crm_properties_v2',
-  ROOMS: 'moyer_crm_rooms_v2',
-  RENEWALS: 'moyer_crm_renewals_v2',
-  WORK_ORDERS: 'moyer_crm_workorders_v2',
-  LEADS: 'moyer_crm_leads_v2',
-  CONTACTS: 'moyer_crm_contacts_v2',
-  ACTIVITY_LOGS: 'moyer_crm_activity_logs_v2'
+  PROPERTIES: 'moyer_crm_properties_v3',
+  ROOMS: 'moyer_crm_rooms_v3',
+  RENEWALS: 'moyer_crm_renewals_v3',
+  WORK_ORDERS: 'moyer_crm_workorders_v3',
+  LEADS: 'moyer_crm_leads_v3',
+  CONTACTS: 'moyer_crm_contacts_v3',
+  ACTIVITY_LOGS: 'moyer_crm_activity_logs_v3'
 };
 
 const LEGACY_SAMPLE_LEAD_IDS = new Set([
@@ -169,7 +169,13 @@ export const StorageService = {
     this.clearAll();
   },
   resetToSeedData(): void {
-    this.clearAll();
+    this.saveProperties(INITIAL_PROPERTIES);
+    this.saveRooms(INITIAL_ROOMS);
+    this.saveRenewals(INITIAL_RENEWALS);
+    this.saveWorkOrders(INITIAL_WORK_ORDERS);
+    this.saveLeads(INITIAL_LEADS);
+    this.saveContacts(INITIAL_CONTACTS);
+    this.saveActivityLogs(INITIAL_ACTIVITY_LOGS);
   },
 
   // Export full CRM database state

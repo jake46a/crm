@@ -129,7 +129,10 @@ export default function App() {
     // 1. Instant local cache load
     loadAllData();
 
-    // 2. Real-time Firebase Sync Listeners
+    // 2. Ensure initial seed if Firestore empty
+    FirebaseService.seedInitialDataIfEmpty().catch(() => {});
+
+    // 3. Real-time Firebase Sync Listeners
     const unsubProperties = subscribeToProperties((liveProps) => {
       if (liveProps) {
         setProperties(liveProps);
@@ -374,6 +377,32 @@ export default function App() {
     showToast(`Updated renewal for ${ren.tenantName}`);
   };
 
+  // Lease Renewal Deletion
+  const handleDeleteRenewal = (renewalId: string) => {
+    const target = renewals.find(r => r.id === renewalId);
+    const name = target?.tenantName || 'Lease';
+    const nextRenewals = renewals.filter(r => r.id !== renewalId);
+    setRenewals(nextRenewals);
+    StorageService.saveLeaseRenewals(nextRenewals);
+    FirebaseService.deleteRenewal(renewalId).catch(err => console.warn("Firestore delete renewal err:", err));
+    logActivity('Lease', `Deleted Lease Renewal Card for: ${name}`, renewalId);
+    showToast(`Deleted renewal card for ${name}`);
+  };
+
+  // Lease Renewal Deduplication Bulk Deletion
+  const handleDeleteDuplicateRenewals = (idsToDelete: string[]) => {
+    if (idsToDelete.length === 0) return;
+    const idSet = new Set(idsToDelete);
+    const nextRenewals = renewals.filter(r => !idSet.has(r.id));
+    setRenewals(nextRenewals);
+    StorageService.saveLeaseRenewals(nextRenewals);
+    idsToDelete.forEach(id => {
+      FirebaseService.deleteRenewal(id).catch(err => console.warn("Firestore delete duplicate renewal err:", err));
+    });
+    logActivity('Lease', `Cleaned ${idsToDelete.length} duplicate lease cards`, 'system');
+    showToast(`Successfully deleted ${idsToDelete.length} duplicate lease card${idsToDelete.length === 1 ? '' : 's'}.`);
+  };
+
   // Work Order Save / Update
   const handleSaveWorkOrder = (wo: WorkOrder) => {
     const isExisting = workOrders.some(w => w.id === wo.id);
@@ -569,6 +598,17 @@ export default function App() {
     showToast(`🎉 Converted ${lead.name} to active tenant in ${selectedRoom.name}!`);
   };
 
+  const handleResetToChangedLogic = async () => {
+    StorageService.resetToSeedData();
+    try {
+      await FirebaseService.resetToSeedData();
+    } catch (err) {
+      console.warn("Could not reset Firebase directly, updated localStorage:", err);
+    }
+    loadAllData();
+    showToast('⚡ Reset portfolio with coliving month-to-month and 21-day notice test data!');
+  };
+
   const handleResetDemoData = async () => {
     StorageService.clearAll();
     try {
@@ -726,8 +766,15 @@ export default function App() {
               setEditingRenewal(null);
               setIsNewRenewalModalOpen(true);
             }}
+            onOpenEditRenewalModal={(renewal) => {
+              setEditingRenewal(renewal);
+              setIsNewRenewalModalOpen(true);
+            }}
+            onDeleteRenewal={handleDeleteRenewal}
+            onDeleteDuplicateRenewals={handleDeleteDuplicateRenewals}
             onOpenRenewalLetterModal={(renewal) => setSelectedRenewalForLetter(renewal)}
             onOpenAssistant={() => setIsAssistantOpen(true)}
+            onResetToChangedLogic={handleResetToChangedLogic}
           />
         )}
 
@@ -881,6 +928,7 @@ export default function App() {
         rooms={rooms}
         onSave={handleSaveRenewal}
         editingRenewal={editingRenewal}
+        onDelete={handleDeleteRenewal}
       />
 
       {/* Renewal Formal Notice Letter Generator */}

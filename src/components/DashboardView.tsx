@@ -63,11 +63,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const potentialGrossRentRoll = rooms.reduce((sum, r) => sum + r.monthlyRent, 0);
 
-  // Expirations
+  // 1-Year Anniversary Rate Reviews & 21-Day Notices
+  const activeMonthToMonthCount = rooms.filter(r => r.status === 'Occupied').length;
   const urgentRenewals = renewals.filter(
-    r => r.daysUntilExpiration <= 30 && r.renewalStatus !== 'Renewed Signed' && r.renewalStatus !== 'Tenant Declined (Vacating)'
+    r => r.daysUntilExpiration <= 30 && 
+    r.renewalStatus !== 'Renewed Signed' && 
+    r.renewalStatus !== 'Tenant Accepted' && 
+    r.renewalStatus !== 'Tenant Declined (Vacating)' && 
+    r.renewalStatus !== 'Notice to Vacate Given'
   );
-  const next60DaysRenewals = renewals.filter(r => r.daysUntilExpiration > 30 && r.daysUntilExpiration <= 60);
+  const vacatingRenewals = renewals.filter(r => r.renewalStatus === 'Notice to Vacate Given' || r.renewalStatus === 'Tenant Declined (Vacating)');
 
   // Active Work Orders
   const openWorkOrders = workOrders.filter(w => w.status !== 'Completed' && w.status !== 'Cancelled');
@@ -140,14 +145,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Card 2: Lease Expirations */}
+        {/* Card 2: Lease Expirations & 1-Year Rate Reviews */}
         <div 
           onClick={() => onSelectTab('renewals')}
-          className="bg-white p-5 rounded-sm border border-zinc-200 shadow-xs relative overflow-hidden flex flex-col justify-between cursor-pointer hover:border-amber-500 transition-colors group"
+          className="bg-white p-5 rounded-sm border border-zinc-200 shadow-xs relative overflow-hidden flex flex-col justify-between cursor-pointer hover:border-indigo-500 transition-colors group"
         >
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-zinc-400 uppercase tracking-tight">Lease Renewals</span>
+              <span className="text-xs font-bold text-zinc-400 uppercase tracking-tight">1-Yr Rate Reviews</span>
               <FileText className={`w-4 h-4 ${urgentRenewals.length > 0 ? 'text-amber-600' : 'text-zinc-400'}`} />
             </div>
             <div className="text-3xl font-light text-zinc-900 mt-2">
@@ -156,7 +161,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between text-xs">
             <span className="text-[11px] text-amber-700 font-semibold uppercase tracking-tight">
-              Expiring &lt;30 days
+              {urgentRenewals.length > 0 ? 'Deadline &le;30 days' : 'Month-to-Month Active'}
             </span>
             <span className="text-[11px] text-indigo-600 font-bold uppercase tracking-wider group-hover:translate-x-0.5 transition-transform">
               Review &rarr;
@@ -355,16 +360,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Two-Column Action Grid: Urgent Renewals & High Priority Work Orders */}
+      {/* Two-Column Action Grid: 1-Year Rate Reviews & High Priority Work Orders */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Upcoming Lease Renewals (Action Center) */}
+        {/* Left: 1-Year Rate Reviews & Expirations (Action Center) */}
         <div className="bg-white rounded-sm border border-zinc-200 shadow-xs flex flex-col justify-between overflow-hidden">
           <div>
             <div className="px-5 py-3.5 border-b border-zinc-100 bg-zinc-50/50 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-indigo-600" />
                 <h3 className="text-xs font-bold text-zinc-700 uppercase tracking-wider">
-                  Upcoming Lease Renewals
+                  1-Year Rate Reviews & Expirations
                 </h3>
               </div>
               <button 
@@ -387,7 +392,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       {ren.propertyName} • <span className="font-medium text-zinc-700">{ren.roomName}</span>
                     </p>
                     <div className="flex items-center gap-3 mt-1.5 text-[11px] text-zinc-600">
-                      <span>Expires: <strong className="text-zinc-900 font-mono">{ren.currentLeaseEndDate}</strong></span>
+                      <span>Deadline: <strong className="text-zinc-900 font-mono">{ren.decisionDeadline || ren.currentLeaseEndDate}</strong></span>
                       <span>Rent: ${ren.currentMonthlyRent} &rarr; <strong className="text-emerald-700 font-mono">${ren.proposedMonthlyRent}/mo</strong></span>
                     </div>
                   </div>
@@ -402,14 +407,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       onClick={() => onOpenRenewalLetterModal(ren)}
                       className="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 text-white rounded-sm text-[11px] font-medium transition"
                     >
-                      Renewal Letter
+                      Rate Notice
                     </button>
                   </div>
                 </div>
               ))}
               {urgentRenewals.length === 0 && (
                 <div className="p-6 text-center text-xs text-zinc-500">
-                  No leases expiring within the next 30 days.
+                  All bedrooms are active Month-to-Month with no pending 1-year rate deadlines.
                 </div>
               )}
             </div>
@@ -420,7 +425,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onClick={() => onSelectTab('renewals')}
               className="text-xs text-indigo-600 hover:text-indigo-800 font-bold uppercase tracking-wider"
             >
-              Open Renewal Manager & Rate Calculator &rarr;
+              Open Expiration & Renewal Engine &rarr;
             </button>
           </div>
         </div>

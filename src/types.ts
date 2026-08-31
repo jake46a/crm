@@ -71,12 +71,24 @@ export interface Room {
 }
 
 export type LeaseRenewalStatus = 
+  | 'Auto-Renewing Month-to-Month'
   | 'Review Pending' 
   | 'Notice Sent' 
   | 'Negotiating Terms' 
   | 'Tenant Accepted' 
   | 'Tenant Declined (Vacating)' 
+  | 'Notice to Vacate Given'
   | 'Renewed Signed';
+
+export interface NoticeToVacateRecord {
+  noticeDate: string;
+  givenBy: 'Tenant' | 'Landlord';
+  minNoticeDays: number;
+  effectiveVacateDate: string;
+  totalNoticeDays: number;
+  reason?: string;
+  acknowledged: boolean;
+}
 
 export interface LeaseRenewal {
   id: string;
@@ -91,17 +103,20 @@ export interface LeaseRenewal {
   currentMonthlyRent: number;
   proposedMonthlyRent: number;
   leaseStartDate: string;
-  currentLeaseEndDate: string;
-  daysUntilExpiration: number;
+  currentLeaseEndDate: string; // End of current month or anniversary date
+  daysUntilExpiration: number; // Days until anniversary / review or effective vacate date
   renewalStatus: LeaseRenewalStatus;
   renewalTermMonths: number;
   proposedTermMonths: number;
   leaseType?: 'Month-to-Month';
   lastContactDate?: string;
   noticeSentDate?: string;
-  decisionDeadline: string;
+  anniversaryDate?: string; // 1-year anniversary date
+  negotiationStartDate?: string; // 2 months before anniversary
+  decisionDeadline: string; // Beginning of 12th month
   tenantResponseNotes?: string;
   internalNotes: string;
+  noticeToVacate?: NoticeToVacateRecord;
   generatedNoticeLetter?: string;
 }
 
