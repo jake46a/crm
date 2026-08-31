@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Database, Download, Upload, Trash2, Check, AlertCircle, X } from 'lucide-react';
+import { Database, Download, Upload, Trash2, Check, AlertCircle, X, Printer, FileText } from 'lucide-react';
 import { StorageService } from '../../services/storage';
 import { FirebaseService } from '../../services/firebase';
 
@@ -7,12 +7,14 @@ interface ExportImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onDataReload: () => void;
+  onOpenPrintSchema?: () => void;
 }
 
 export const ExportImportModal: React.FC<ExportImportModalProps> = ({
   isOpen,
   onClose,
-  onDataReload
+  onDataReload,
+  onOpenPrintSchema
 }) => {
   const [importJson, setImportJson] = useState<string>('');
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -153,6 +155,31 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Print Schema Reference Section */}
+          {onOpenPrintSchema && (
+            <div className="bg-zinc-50 p-4 rounded-md border border-zinc-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-zinc-900 text-xs flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Print Firestore Schema & Field Guide</span>
+                  </h3>
+                  <p className="text-[11px] text-zinc-500">Print or save PDF of all database collections, fields, and types</p>
+                </div>
+                <button
+                  onClick={() => {
+                    onClose();
+                    onOpenPrintSchema();
+                  }}
+                  className="flex items-center gap-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-bold shadow-xs transition"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print Schema</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Import section */}
           <div className="border border-zinc-200 p-4 rounded-md space-y-2">

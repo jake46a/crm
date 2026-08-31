@@ -46,6 +46,7 @@ interface HeaderProps {
   onOpenNewContact: () => void;
   onOpenAssistant: () => void;
   onOpenExportImport: () => void;
+  onOpenPrintSchema?: () => void;
   onResetData: () => void;
   onQuickNavigate: (tab: NavigationTab, filterQuery?: string) => void;
 }
@@ -67,6 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewContact,
   onOpenAssistant,
   onOpenExportImport,
+  onOpenPrintSchema,
   onResetData,
   onQuickNavigate
 }) => {
@@ -227,15 +229,12 @@ export const Header: React.FC<HeaderProps> = ({
               <span>Backup</span>
             </button>
             <button
-              onClick={() => {
-                if (window.confirm('Delete all sample CRM data? This will clear all properties, rooms, renewals, work orders, and contacts.')) {
-                  onResetData();
-                }
-              }}
-              className="flex items-center justify-center text-zinc-400 hover:text-rose-300 text-xs px-2 py-1.5 rounded-sm hover:bg-zinc-900 border border-zinc-800 transition"
-              title="Delete All Sample Data"
+              onClick={onOpenPrintSchema}
+              className="flex items-center justify-center gap-1 text-zinc-400 hover:text-zinc-200 text-xs px-2 py-1.5 rounded-sm hover:bg-zinc-900 border border-zinc-800 transition"
+              title="Print Firestore Schema & Field Reference"
             >
-              <span>Clear Data</span>
+              <FileText className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Schema</span>
             </button>
           </div>
         </div>

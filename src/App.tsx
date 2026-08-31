@@ -57,6 +57,7 @@ import { RenewalNoticeLetterModal } from './components/modals/RenewalNoticeLette
 import { PrintWorkOrderModal } from './components/modals/PrintWorkOrderModal';
 import { LeadDetailModal } from './components/modals/LeadDetailModal';
 import { ExportImportModal } from './components/modals/ExportImportModal';
+import { PrintSchemaModal } from './components/modals/PrintSchemaModal';
 
 export default function App() {
   // Navigation State
@@ -75,6 +76,7 @@ export default function App() {
   // Modal State
   const [isAssistantOpen, setIsAssistantOpen] = useState<boolean>(false);
   const [isExportImportOpen, setIsExportImportOpen] = useState<boolean>(false);
+  const [isPrintSchemaOpen, setIsPrintSchemaOpen] = useState<boolean>(false);
 
   // Work Order Modal & Print
   const [isNewWorkOrderModalOpen, setIsNewWorkOrderModalOpen] = useState<boolean>(false);
@@ -669,6 +671,7 @@ export default function App() {
         }}
         onOpenAssistant={() => setIsAssistantOpen(true)}
         onOpenExportImport={() => setIsExportImportOpen(true)}
+        onOpenPrintSchema={() => setIsPrintSchemaOpen(true)}
         onResetData={handleResetDemoData}
         onQuickNavigate={(tab) => setActiveTab(tab)}
       >
@@ -1012,6 +1015,13 @@ export default function App() {
         isOpen={isExportImportOpen}
         onClose={() => setIsExportImportOpen(false)}
         onDataReload={loadAllData}
+        onOpenPrintSchema={() => setIsPrintSchemaOpen(true)}
+      />
+
+      {/* Printable Firestore Schema & Field Reference Modal */}
+      <PrintSchemaModal
+        isOpen={isPrintSchemaOpen}
+        onClose={() => setIsPrintSchemaOpen(false)}
       />
     </>
   );
