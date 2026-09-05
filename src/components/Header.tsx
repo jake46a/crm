@@ -24,7 +24,8 @@ import {
   ShieldAlert,
   Copy,
   Check,
-  ExternalLink
+  ExternalLink,
+  Receipt
 } from 'lucide-react';
 import { NavigationTab, LeaseRenewal, WorkOrder, TenantLead, Room, Property, Contact } from '../types';
 import { useFirebase } from '../context/FirebaseContext';
@@ -118,6 +119,7 @@ export const Header: React.FC<HeaderProps> = ({
       case 'workorders': return 'Maintenance Hub & Vendor Dispatch';
       case 'leads': return 'Tenant Leads & Roommate Screening CRM';
       case 'contacts': return 'Unified Contacts & Contractor Directory';
+      case 'invoicing': return 'Square Invoicing & Payment Processing';
     }
   };
 
@@ -132,6 +134,12 @@ export const Header: React.FC<HeaderProps> = ({
       label: 'Room Inventory', 
       icon: Home,
       badge: <span className="text-[10px] bg-zinc-800 text-zinc-300 font-mono px-1.5 py-0.5 rounded-sm">{totalRoomsCount}</span>
+    },
+    { 
+      id: 'invoicing', 
+      label: 'Invoicing', 
+      icon: Receipt,
+      badge: <span className="text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-800 px-1.5 py-0.5 rounded-sm font-semibold">Square</span>
     },
     { 
       id: 'renewals', 

@@ -5,6 +5,7 @@ export type NavigationTab =
   | 'workorders' 
   | 'leads' 
   | 'contacts'
+  | 'invoicing'
   | 'tenant-portal'
   | 'assistant';
 
@@ -28,6 +29,7 @@ export interface Property {
   wifiNetwork?: string;
   wifiPassword?: string;
   keypadMasterCode?: string;
+  squareLocationId?: string; // Square Location ID for payment processing
   notes?: string;
   imageUrl?: string;
 }
@@ -276,14 +278,87 @@ export interface Contact {
   notes: string;
   paymentStatus?: 'Current / Paid' | 'Payment Pending' | 'Past Due';
   avatarBg: string;
+  squareCustomerId?: string; // Square Customer ID from searchCustomers or createCustomer
 }
 
 export interface ActivityLog {
   id: string;
   timestamp: string;
-  category: 'Lease' | 'Maintenance' | 'Lead' | 'Room' | 'System';
+  category: 'Lease' | 'Maintenance' | 'Lead' | 'Room' | 'System' | 'Invoicing';
   message: string;
   user: string;
   entityId?: string;
+}
+
+export type InvoicingSubtask = 
+  | 'monthly-rental'
+  | 'utility'
+  | 'supplies'
+  | 'late-fee'
+  | 'special'
+  | 'all-invoices';
+
+export type InvoiceType = 'Rental' | 'Utility' | 'Supplies' | 'Late Fee' | 'Special';
+export type InvoiceStatus = 'UNPAID' | 'PAID' | 'CANCELED' | 'SCHEDULED' | 'REFUNDED' | 'OVERDUE' | 'DRAFT' | 'SENT';
+
+export interface InvoiceLineItem {
+  id: string;
+  name: string;
+  quantity: number;
+  amount: number;
+  description?: string;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string; // e.g. "INV-2026-08-101"
+  squareInvoiceId?: string; // Square Invoices API invoice.id
+  squareOrderId?: string; // Square Orders API order.id
+  squareLocationId?: string; // Square Location ID associated with property
+  squareCustomerId?: string; // Square Customer ID associated with tenant
+  propertyId: string;
+  propertyName: string;
+  roomId?: string;
+  roomName?: string;
+  roomNumber?: string;
+  tenantId?: string;
+  tenantName: string;
+  tenantEmail?: string;
+  tenantPhone?: string;
+  invoiceType: InvoiceType;
+  month: string; // e.g. "August"
+  year: number; // e.g. 2026
+  amount: number; // base amount in USD
+  lateFeeAmount?: number; // Late fee amount if applied (5% or $50 minimum)
+  lateFeeApplied?: boolean;
+  totalAmount: number; // base amount + late fee if applied
+  status: InvoiceStatus;
+  paymentUrl?: string; // Public Square payment checkout URL
+  viewUrl?: string; // Public Square invoice view URL
+  createdAt: string; // ISO date string or Square created_at
+  dueDate: string; // e.g. "2026-08-01"
+  paidAt?: string; // ISO timestamp when paid
+  paymentMethod?: string; // e.g. "Visa ending in 4242" or "ACH Bank Transfer"
+  amountPaid?: number;
+  description?: string;
+  notes?: string;
+  allowPartialPayments?: boolean; // Always false for Square invoices per rule
+  subtask?: InvoicingSubtask;
+  billingMonth?: string;
+  billingYear?: number;
+  rentAmount?: number;
+  utilityAmount?: number;
+  suppliesAmount?: number;
+  specialAmount?: number;
+  squarePaymentUrl?: string;
+}
+
+export interface SquareCustomerSearchResult {
+  id: string;
+  given_name?: string;
+  family_name?: string;
+  email_address?: string;
+  phone_number?: string;
+  note?: string;
 }
 

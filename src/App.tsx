@@ -18,7 +18,8 @@ import {
   TenantLead, 
   Contact, 
   ActivityLog,
-  NavigationTab
+  NavigationTab,
+  Invoice
 } from './types';
 
 import { StorageService } from './services/storage';
@@ -30,7 +31,8 @@ import {
   subscribeToWorkOrders,
   subscribeToLeads,
   subscribeToContacts,
-  subscribeToActivityLogs
+  subscribeToActivityLogs,
+  subscribeToInvoices
 } from './services/firebase';
 import { useFirebase } from './context/FirebaseContext';
 
@@ -38,6 +40,7 @@ import { useFirebase } from './context/FirebaseContext';
 import { Header } from './components/Header';
 import { DashboardView } from './components/DashboardView';
 import { PropertiesRoomsView } from './components/PropertiesRoomsView';
+import { InvoicingView } from './components/invoicing/InvoicingView';
 import { LeaseRenewalsView } from './components/LeaseRenewalsView';
 import { WorkOrdersView } from './components/WorkOrdersView';
 import { LeadsPipelineView } from './components/LeadsPipelineView';
@@ -72,6 +75,7 @@ export default function App() {
   const [leads, setLeads] = useState<TenantLead[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
 
   // Modal State
   const [isAssistantOpen, setIsAssistantOpen] = useState<boolean>(false);
@@ -125,6 +129,7 @@ export default function App() {
     setLeads(StorageService.getTenantLeads());
     setContacts(StorageService.getContacts());
     setActivityLogs(StorageService.getActivityLogs());
+    setInvoices(StorageService.getInvoices());
   };
 
   useEffect(() => {
@@ -192,6 +197,13 @@ export default function App() {
       }
     });
 
+    const unsubInvoices = subscribeToInvoices((liveInvoices) => {
+      if (liveInvoices) {
+        setInvoices(liveInvoices);
+        StorageService.saveInvoices(liveInvoices);
+      }
+    });
+
     return () => {
       unsubProperties();
       unsubRooms();
@@ -200,6 +212,7 @@ export default function App() {
       unsubLeads();
       unsubContacts();
       unsubLogs();
+      unsubInvoices();
     };
   }, []);
 
@@ -625,7 +638,21 @@ export default function App() {
     setLeads([]);
     setContacts([]);
     setActivityLogs([]);
+    setInvoices([]);
     showToast('All sample data deleted successfully.');
+  };
+
+  const handleSaveInvoices = (newInvoices: Invoice[]) => {
+    setInvoices(newInvoices);
+    StorageService.saveInvoices(newInvoices);
+    logActivity('Invoicing', `Updated Square invoices records (${newInvoices.length} total)`);
+  };
+
+  const handleUpdateInvoiceStatus = (invoiceId: string, status: Invoice['status'], details?: Partial<Invoice>) => {
+    setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status, ...details } : inv));
+    const current = StorageService.getInvoices();
+    const updated = current.map(inv => inv.id === invoiceId ? { ...inv, status, ...details } : inv);
+    StorageService.saveInvoices(updated);
   };
 
   // Urgent counts for header badges
@@ -755,6 +782,18 @@ export default function App() {
               setIsNewPropertyModalOpen(true);
             }}
             onDeleteRoom={handleDeleteRoom}
+          />
+        )}
+
+        {/* Tab: Square Invoicing & Payment Processing */}
+        {activeTab === 'invoicing' && (
+          <InvoicingView
+            properties={properties}
+            rooms={rooms}
+            contacts={contacts}
+            invoices={invoices}
+            onSaveInvoices={handleSaveInvoices}
+            onUpdateInvoiceStatus={handleUpdateInvoiceStatus}
           />
         )}
 

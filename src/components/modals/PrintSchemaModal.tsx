@@ -80,6 +80,7 @@ export const PrintSchemaModal: React.FC<PrintSchemaModalProps> = ({ isOpen, onCl
             <tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">sharedAmenities / houseRules</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">string[]</td><td style="padding: 4px 6px;">Shared amenities array & house rules/guidelines</td></tr>
             <tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">wifiNetwork / wifiPassword</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">string?</td><td style="padding: 4px 6px;">Resident Wi-Fi network SSID & access key</td></tr>
             <tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">keypadMasterCode</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">string?</td><td style="padding: 4px 6px;">Front door smartlock / master keypad code</td></tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">squareLocationId</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">string?</td><td style="padding: 4px 6px;">Square Location ID linked for payment processing</td></tr>
             <tr><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">notes / imageUrl</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">string?</td><td style="padding: 4px 6px;">Manager remarks & property cover image URL</td></tr>
           </tbody>
         </table>
@@ -234,6 +235,7 @@ export const PrintSchemaModal: React.FC<PrintSchemaModalProps> = ({ isOpen, onCl
             <tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">propertyId / roomId</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">string?</td><td style="padding: 4px 6px;">Unit occupancy or property assignment link</td></tr>
             <tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">hourlyRate / rating / licenseNumber</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">num / str?</td><td style="padding: 4px 6px;">Contractor billing rate, 1-5 star rating, license code</td></tr>
             <tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">emergencyContactName / Phone</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">string?</td><td style="padding: 4px 6px;">Next-of-kin emergency contact info for tenants</td></tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">squareCustomerId</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">string?</td><td style="padding: 4px 6px;">Square Customer ID synced via search/create Customers API</td></tr>
             <tr><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">status / avatarBg</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">string</td><td style="padding: 4px 6px;">Active, Past, Available 24/7 & avatar color class</td></tr>
           </tbody>
         </table>
@@ -264,10 +266,40 @@ export const PrintSchemaModal: React.FC<PrintSchemaModalProps> = ({ isOpen, onCl
         </table>
       </section>
 
+      <!-- Collection 8: invoices -->
+      <section style="margin-bottom: 16px; page-break-inside: avoid;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #d1d5db; padding-bottom: 4px; margin-bottom: 6px;">
+          <h2 style="font-size: 12px; font-weight: bold; text-transform: uppercase; font-family: monospace; margin: 0; color: #312e81;">
+            8. Collection: <code style="background: #e0e7ff; color: #3730a3; padding: 2px 4px; border-radius: 3px;">invoices</code>
+          </h2>
+          <span style="font-size: 10px; color: #6b7280;">Square Payment Processing & Invoicing Orders</span>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; font-size: 10.5px; text-align: left;">
+          <thead>
+            <tr style="background-color: #f3f4f6; color: #1f2937; font-weight: bold; border-bottom: 1px solid #d1d5db;">
+              <th style="padding: 4px 6px; border-right: 1px solid #d1d5db; width: 26%;">Field Name</th>
+              <th style="padding: 4px 6px; border-right: 1px solid #d1d5db; width: 14%; font-family: monospace; color: #4338ca;">Type</th>
+              <th style="padding: 4px 6px;">Description / Allowed Values</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">id / subtask</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">string</td><td style="padding: 4px 6px;">Invoice ID & subtask: rent, utility, supplies, late_fee, special</td></tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">propertyId / propertyName / roomId / roomName</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">string</td><td style="padding: 4px 6px;">Property & bedroom entity references</td></tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">tenantId / tenantName / tenantEmail / tenantPhone</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">string</td><td style="padding: 4px 6px;">Billed tenant contact details</td></tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">squareLocationId / squareCustomerId</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">string</td><td style="padding: 4px 6px;">Square Location & Customer references</td></tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">squareOrderId / squareInvoiceId / squarePaymentUrl</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">string?</td><td style="padding: 4px 6px;">Square API created Order, Invoice ID and hosted checkout link</td></tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">billingMonth / billingYear / dueDate</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">str / num</td><td style="padding: 4px 6px;">Billing cycle period & payment due date</td></tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">rentAmount / utilityAmount / suppliesAmount / lateFeeAmount / specialAmount</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">number</td><td style="padding: 4px 6px;">Itemized financial line item components ($)</td></tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">totalAmount / status</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">num / str</td><td style="padding: 4px 6px;">Total balance ($) & status: DRAFT, SENT, PAID, UNPAID, CANCELLED</td></tr>
+            <tr><td style="padding: 4px 6px; font-family: monospace; font-weight: 600; border-right: 1px solid #d1d5db;">allowPartialPayments</td><td style="padding: 4px 6px; font-family: monospace; color: #4b5563; border-right: 1px solid #d1d5db;">boolean</td><td style="padding: 4px 6px;">Strictly false per policy (partial payments disabled)</td></tr>
+          </tbody>
+        </table>
+      </section>
+
       <!-- Document Footer -->
       <div style="padding-top: 12px; border-top: 1px solid #d1d5db; display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; color: #6b7280; font-family: monospace;">
         <span>Moyer Property Management • Firestore Security Rules & Blueprint Synced</span>
-        <span>All 7 Collections Included</span>
+        <span>All 8 Collections Included</span>
       </div>
     `;
   };
@@ -380,6 +412,7 @@ export const PrintSchemaModal: React.FC<PrintSchemaModalProps> = ({ isOpen, onCl
                 <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">sharedAmenities / houseRules</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">string[]</td><td className="p-1.5">Shared amenities & community guidelines</td></tr>
                 <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">wifiNetwork / wifiPassword</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">string?</td><td className="p-1.5">Resident Wi-Fi network SSID & access key</td></tr>
                 <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">keypadMasterCode</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">string?</td><td className="p-1.5">Front door smartlock / master keypad code</td></tr>
+                <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">squareLocationId</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">string?</td><td className="p-1.5">Square Location ID linked for payment processing</td></tr>
                 <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">notes / imageUrl</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">string?</td><td className="p-1.5">Manager remarks & property cover image URL</td></tr>
               </tbody>
             </table>
@@ -535,6 +568,7 @@ export const PrintSchemaModal: React.FC<PrintSchemaModalProps> = ({ isOpen, onCl
                 <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">propertyId / roomId</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">string?</td><td className="p-1.5">Unit occupancy or property assignment link</td></tr>
                 <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">hourlyRate / rating / licenseNumber</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">num / str?</td><td className="p-1.5">Contractor billing rate, 1-5 star rating, license code</td></tr>
                 <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">emergencyContactName / Phone</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">string?</td><td className="p-1.5">Next-of-kin emergency contact info for tenants</td></tr>
+                <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">squareCustomerId</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">string?</td><td className="p-1.5">Square Customer ID synced via search/create Customers API</td></tr>
                 <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">status / avatarBg</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">string</td><td className="p-1.5">Active, Past, Available 24/7 & avatar color class</td></tr>
               </tbody>
             </table>
@@ -565,10 +599,39 @@ export const PrintSchemaModal: React.FC<PrintSchemaModalProps> = ({ isOpen, onCl
             </table>
           </section>
 
+          {/* Collection 8: invoices */}
+          <section className="space-y-2">
+            <div className="flex items-center justify-between border-b border-zinc-300 pb-1">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-indigo-900 font-mono">
+                8. Collection: <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-indigo-700">invoices</code>
+              </h2>
+              <span className="text-[11px] text-zinc-500">Square Payment Processing & Invoicing Orders</span>
+            </div>
+            <table className="w-full text-left border-collapse border border-zinc-300 text-[11px]">
+              <thead>
+                <tr className="bg-zinc-100 text-zinc-800 font-bold border-b border-zinc-300">
+                  <th className="p-1.5 border-r border-zinc-300 w-1/4">Field Name</th>
+                  <th className="p-1.5 border-r border-zinc-300 w-1/6 font-mono text-indigo-800">Type</th>
+                  <th className="p-1.5">Description / Allowed Values</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200">
+                <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">id / subtask</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">string</td><td className="p-1.5">Invoice ID & subtask: rent, utility, supplies, late_fee, special</td></tr>
+                <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">propertyId / roomId</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">string</td><td className="p-1.5">Entity relational references</td></tr>
+                <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">squareLocationId / squareCustomerId</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">string</td><td className="p-1.5">Square Location & Customer API identifiers</td></tr>
+                <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">squareOrderId / squareInvoiceId / squarePaymentUrl</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">string?</td><td className="p-1.5">Square created Order, Invoice ID & hosted checkout link</td></tr>
+                <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">billingMonth / billingYear / dueDate</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">str / num</td><td className="p-1.5">Billing cycle and due date</td></tr>
+                <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">rentAmount / utilityAmount / suppliesAmount / lateFeeAmount / specialAmount</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">number</td><td className="p-1.5">Component charges ($)</td></tr>
+                <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">totalAmount / status</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">num / str</td><td className="p-1.5">Total balance & status: DRAFT, SENT, PAID, UNPAID, CANCELLED</td></tr>
+                <tr><td className="p-1.5 font-mono font-semibold border-r border-zinc-300">allowPartialPayments</td><td className="p-1.5 font-mono text-zinc-600 border-r border-zinc-300">boolean</td><td className="p-1.5">Strictly false per policy (partial payments disabled)</td></tr>
+              </tbody>
+            </table>
+          </section>
+
           {/* Document Footer */}
           <div className="pt-4 border-t border-zinc-300 flex justify-between items-center text-[10px] text-zinc-500 font-mono">
             <span>Moyer Property Management • Firestore Security Rules & Blueprint Synced</span>
-            <span>All 7 Collections Included</span>
+            <span>All 8 Collections Included</span>
           </div>
         </div>
 

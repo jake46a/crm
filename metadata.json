@@ -1,6 +1,6 @@
 {
   "name": "Moyer Property Management CRM",
-  "description": "Room rental CRM for managing multi-room properties, tenant lease renewals, maintenance work orders, tenant leads pipeline, and contacts directory.",
+  "description": "Room rental CRM for managing multi-room properties, tenant lease renewals, maintenance work orders, tenant leads pipeline, contacts directory, and Square payment processing for rent, utilities, supplies, late fees, and special invoicing.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

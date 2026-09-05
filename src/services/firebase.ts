@@ -18,7 +18,8 @@ import {
   onSnapshot, 
   getDocs, 
   getDocFromServer,
-  writeBatch
+  writeBatch,
+  updateDoc
 } from 'firebase/firestore';
 
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -29,7 +30,8 @@ import {
   WorkOrder, 
   TenantLead, 
   Contact, 
-  ActivityLog 
+  ActivityLog,
+  Invoice
 } from '../types';
 import {
   INITIAL_PROPERTIES,
@@ -166,6 +168,7 @@ export const COLLECTIONS = {
   WORK_ORDERS: 'workorders',
   LEADS: 'leads',
   CONTACTS: 'contacts',
+  INVOICES: 'invoices',
   ACTIVITY_LOGS: 'activityLogs',
 };
 
@@ -269,6 +272,26 @@ export function subscribeToContacts(
     collection(db, colPath),
     (snapshot) => {
       const list = snapshot.docs.map(d => d.data() as Contact);
+      onData(list);
+    },
+    (error) => {
+      onError?.(error);
+      handleFirestoreError(error, OperationType.LIST, colPath);
+    }
+  );
+}
+
+export function subscribeToInvoices(
+  onData: (data: Invoice[]) => void,
+  onError?: (err: Error) => void
+) {
+  const colPath = COLLECTIONS.INVOICES;
+  return onSnapshot(
+    collection(db, colPath),
+    (snapshot) => {
+      const list = snapshot.docs.map(d => d.data() as Invoice);
+      // Sort newest created first
+      list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
       onData(list);
     },
     (error) => {
@@ -433,6 +456,53 @@ export const FirebaseService = {
       await deleteDoc(doc(db, COLLECTIONS.CONTACTS, contactId));
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, docPath);
+    }
+  },
+
+  async saveInvoice(invoice: Invoice): Promise<void> {
+    const docPath = `${COLLECTIONS.INVOICES}/${invoice.id}`;
+    try {
+      const sanitized = sanitizeForFirestore(invoice);
+      await setDoc(doc(db, COLLECTIONS.INVOICES, invoice.id), sanitized, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, docPath);
+    }
+  },
+
+  async saveInvoicesBatch(invoices: Invoice[]): Promise<void> {
+    try {
+      const batch = writeBatch(db);
+      invoices.forEach(inv => {
+        const sanitized = sanitizeForFirestore(inv);
+        batch.set(doc(db, COLLECTIONS.INVOICES, inv.id), sanitized, { merge: true });
+      });
+      await batch.commit();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, COLLECTIONS.INVOICES);
+    }
+  },
+
+  async deleteInvoice(invoiceId: string): Promise<void> {
+    const docPath = `${COLLECTIONS.INVOICES}/${invoiceId}`;
+    try {
+      await deleteDoc(doc(db, COLLECTIONS.INVOICES, invoiceId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, docPath);
+    }
+  },
+
+  async updateInvoiceStatus(
+    invoiceId: string, 
+    status: Invoice['status'], 
+    details?: Partial<Invoice>
+  ): Promise<void> {
+    const docPath = `${COLLECTIONS.INVOICES}/${invoiceId}`;
+    try {
+      const payload: any = { status, ...(details || {}) };
+      const sanitized = sanitizeForFirestore(payload);
+      await updateDoc(doc(db, COLLECTIONS.INVOICES, invoiceId), sanitized);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, docPath);
     }
   },
 

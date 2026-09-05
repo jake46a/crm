@@ -1,4 +1,4 @@
-import { Property, Room, LeaseRenewal, WorkOrder, TenantLead, Contact, ActivityLog } from '../types';
+import { Property, Room, LeaseRenewal, WorkOrder, TenantLead, Contact, ActivityLog, Invoice } from '../types';
 import {
   INITIAL_PROPERTIES,
   INITIAL_ROOMS,
@@ -17,6 +17,7 @@ const STORAGE_KEYS = {
   WORK_ORDERS: 'moyer_crm_workorders_v3',
   LEADS: 'moyer_crm_leads_v3',
   CONTACTS: 'moyer_crm_contacts_v3',
+  INVOICES: 'moyer_crm_invoices_v3',
   ACTIVITY_LOGS: 'moyer_crm_activity_logs_v3'
 };
 
@@ -243,6 +244,18 @@ export const StorageService = {
     this.saveContacts(nextContacts);
   },
 
+  // Invoices
+  getInvoices(): Invoice[] {
+    return getItem<Invoice[]>(STORAGE_KEYS.INVOICES, []);
+  },
+  saveInvoices(invoices: Invoice[]): void {
+    setItem(STORAGE_KEYS.INVOICES, invoices);
+  },
+  deleteInvoice(invoiceId: string): void {
+    const next = this.getInvoices().filter(inv => inv.id !== invoiceId);
+    this.saveInvoices(next);
+  },
+
   // Activity Logs
   getActivityLogs(): ActivityLog[] {
     return getItem<ActivityLog[]>(STORAGE_KEYS.ACTIVITY_LOGS, INITIAL_ACTIVITY_LOGS);
@@ -263,6 +276,7 @@ export const StorageService = {
     setItem(STORAGE_KEYS.WORK_ORDERS, []);
     setItem(STORAGE_KEYS.LEADS, []);
     setItem(STORAGE_KEYS.CONTACTS, []);
+    setItem(STORAGE_KEYS.INVOICES, []);
     setItem(STORAGE_KEYS.ACTIVITY_LOGS, []);
     try {
       localStorage.removeItem(STORAGE_KEYS.PROPERTIES);
@@ -271,6 +285,7 @@ export const StorageService = {
       localStorage.removeItem(STORAGE_KEYS.WORK_ORDERS);
       localStorage.removeItem(STORAGE_KEYS.LEADS);
       localStorage.removeItem(STORAGE_KEYS.CONTACTS);
+      localStorage.removeItem(STORAGE_KEYS.INVOICES);
       localStorage.removeItem(STORAGE_KEYS.ACTIVITY_LOGS);
       localStorage.removeItem('moyer_crm_leads');
       localStorage.removeItem('moyer_leads');
@@ -290,6 +305,7 @@ export const StorageService = {
     this.saveWorkOrders(INITIAL_WORK_ORDERS);
     this.saveLeads(INITIAL_LEADS);
     this.saveContacts(INITIAL_CONTACTS);
+    this.saveInvoices([]);
     this.saveActivityLogs(INITIAL_ACTIVITY_LOGS);
   },
 
@@ -303,6 +319,7 @@ export const StorageService = {
       workOrders: this.getWorkOrders(),
       leads: this.getLeads(),
       contacts: this.getContacts(),
+      invoices: this.getInvoices(),
       activityLogs: this.getActivityLogs()
     };
     return JSON.stringify(backup, null, 2);
@@ -322,6 +339,7 @@ export const StorageService = {
         this.saveWorkOrders(data.workOrders || []);
         this.saveLeads(data.leads || []);
         this.saveContacts(data.contacts || []);
+        if (data.invoices) this.saveInvoices(data.invoices);
         this.saveActivityLogs(data.activityLogs || []);
         return true;
       }

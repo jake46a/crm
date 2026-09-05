@@ -24,6 +24,7 @@
         "wifiNetwork": { "type": "string", "maxLength": 128 },
         "wifiPassword": { "type": "string", "maxLength": 128 },
         "keypadMasterCode": { "type": "string", "maxLength": 64 },
+        "squareLocationId": { "type": "string", "maxLength": 128 },
         "notes": { "type": "string", "maxLength": 2048 },
         "imageUrl": { "type": "string", "maxLength": 1024 }
       },
@@ -194,9 +195,47 @@
         "emergencyContactPhone": { "type": "string", "maxLength": 64 },
         "notes": { "type": "string", "maxLength": 2048 },
         "paymentStatus": { "type": "string", "maxLength": 64 },
-        "avatarBg": { "type": "string", "maxLength": 64 }
+        "avatarBg": { "type": "string", "maxLength": 64 },
+        "squareCustomerId": { "type": "string", "maxLength": 128 }
       },
       "required": ["id", "type", "name", "email", "phone"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Square payment invoice issued to a tenant for rent, utilities, supplies, late fees, or special charges.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "invoiceNumber": { "type": "string", "maxLength": 64 },
+        "squareInvoiceId": { "type": "string", "maxLength": 128 },
+        "squareOrderId": { "type": "string", "maxLength": 128 },
+        "squareLocationId": { "type": "string", "maxLength": 128 },
+        "squareCustomerId": { "type": "string", "maxLength": 128 },
+        "propertyId": { "type": "string", "maxLength": 128 },
+        "propertyName": { "type": "string", "maxLength": 128 },
+        "roomId": { "type": "string", "maxLength": 128 },
+        "roomName": { "type": "string", "maxLength": 128 },
+        "tenantId": { "type": "string", "maxLength": 128 },
+        "tenantName": { "type": "string", "maxLength": 128 },
+        "tenantEmail": { "type": "string", "maxLength": 128 },
+        "invoiceType": { "type": "string", "enum": ["Rental", "Utility", "Supplies", "Late Fee", "Special"] },
+        "month": { "type": "string", "maxLength": 64 },
+        "year": { "type": "number" },
+        "amount": { "type": "number" },
+        "lateFeeAmount": { "type": "number" },
+        "lateFeeApplied": { "type": "boolean" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["UNPAID", "PAID", "CANCELED", "SCHEDULED", "REFUNDED", "OVERDUE"] },
+        "paymentUrl": { "type": "string", "maxLength": 1024 },
+        "viewUrl": { "type": "string", "maxLength": 1024 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "dueDate": { "type": "string", "maxLength": 64 },
+        "paidAt": { "type": "string", "maxLength": 64 },
+        "paymentMethod": { "type": "string", "maxLength": 128 },
+        "description": { "type": "string", "maxLength": 2048 },
+        "notes": { "type": "string", "maxLength": 2048 }
+      },
+      "required": ["id", "propertyId", "tenantName", "invoiceType", "amount", "status"]
     },
     "ActivityLog": {
       "title": "ActivityLog",
@@ -237,6 +276,10 @@
     "/contacts/{contactId}": {
       "schema": "Contact",
       "description": "Collection of directory contacts (tenants, owners, vendors)"
+    },
+    "/invoices/{invoiceId}": {
+      "schema": "Invoice",
+      "description": "Collection of Square rental, utility, supplies, late fee, and special invoices"
     },
     "/activityLogs/{logId}": {
       "schema": "ActivityLog",

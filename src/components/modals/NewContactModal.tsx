@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Contact as ContactIcon, Plus, X, Trash2, AlertTriangle } from 'lucide-react';
+import { Contact as ContactIcon, Plus, X, Trash2, AlertTriangle, CreditCard, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Contact, ContactType, Property } from '../../types';
 import { splitFullName, formatFullName } from '../../utils/nameUtils';
+import { SquareService } from '../../services/squareService';
 
 interface NewContactModalProps {
   isOpen: boolean;
@@ -35,11 +36,15 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
   const [notes, setNotes] = useState<string>('');
   const [emergencyContactName, setEmergencyContactName] = useState<string>('');
   const [emergencyContactPhone, setEmergencyContactPhone] = useState<string>('');
+  const [squareCustomerId, setSquareCustomerId] = useState<string>('');
+  const [isSyncingSquare, setIsSyncingSquare] = useState<boolean>(false);
+  const [squareSyncStatus, setSquareSyncStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState<boolean>(false);
 
   useEffect(() => {
     if (isOpen) {
       setIsConfirmingDelete(false);
+      setSquareSyncStatus(null);
       if (editingContact) {
         let fName = editingContact.firstName || '';
         let lName = editingContact.lastName || '';
@@ -63,10 +68,11 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         setNotes(editingContact.notes || '');
         setEmergencyContactName(editingContact.emergencyContactName || '');
         setEmergencyContactPhone(editingContact.emergencyContactPhone || '');
+        setSquareCustomerId(editingContact.squareCustomerId || '');
       } else {
         setFirstName('');
         setLastName('');
-        setType('Leasing Agent');
+        setType('Tenant');
         setEmail('');
         setPhone('');
         setCompany('');
@@ -79,9 +85,49 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         setNotes('');
         setEmergencyContactName('');
         setEmergencyContactPhone('');
+        setSquareCustomerId('');
       }
     }
   }, [isOpen, editingContact]);
+
+  const handleRefreshSquareCustomer = async () => {
+    if (!email.trim()) {
+      setSquareSyncStatus({
+        type: 'error',
+        message: 'Tenant email address is required to query or create in Square.'
+      });
+      return;
+    }
+
+    setIsSyncingSquare(true);
+    setSquareSyncStatus(null);
+    try {
+      const result = await SquareService.searchOrCreateCustomer({
+        email: email.trim(),
+        firstName: firstName.trim() || undefined,
+        lastName: lastName.trim() || undefined,
+        phone: phone.trim() || undefined,
+        note: `Coliving Tenant in Moyer PM CRM`
+      });
+
+      if (result.customerId) {
+        setSquareCustomerId(result.customerId);
+        setSquareSyncStatus({
+          type: 'success',
+          message: result.isNew 
+            ? `New Square customer created: ${result.customerId}` 
+            : `Existing Square customer matched: ${result.customerId}`
+        });
+      }
+    } catch (err: any) {
+      setSquareSyncStatus({
+        type: 'error',
+        message: err.message || 'Error querying Square Customers API'
+      });
+    } finally {
+      setIsSyncingSquare(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -109,30 +155,54 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
     const isOwner = type === 'Property Owner';
     const isAgent = type === 'Leasing Agent';
 
-    const newContact: Contact = {
-      id: editingContact?.id || `con-${Date.now()}`,
-      firstName: fName || undefined,
-      lastName: lName || undefined,
-      name: fullName,
-      type,
-      status: isAgent ? status : (editingContact?.status || 'Active'),
-      email: email.trim() || undefined,
-      phone: phone.trim(),
-      company: (isVendor || isOwner) && company.trim() ? company.trim() : undefined,
-      roleOrSpecialty: (isVendor || isAgent) && roleOrSpecialty.trim() ? roleOrSpecialty.trim() : (isAgent ? 'Leasing Agent' : undefined),
-      hourlyRate: isVendor && hourlyRate ? Number(hourlyRate) : undefined,
-      licenseNumber: isAgent && licenseNumber.trim() ? licenseNumber.trim() : undefined,
-      commissionRate: isAgent && commissionRate.trim() ? commissionRate.trim() : undefined,
-      propertyId: (isTenant || isOwner || isAgent) && propertyId ? propertyId : undefined,
-      propertyName: (isTenant || isOwner || isAgent) ? prop?.name : undefined,
-      notes: notes.trim() || '',
-      emergencyContactName: isTenant && emergencyContactName.trim() ? emergencyContactName.trim() : undefined,
-      emergencyContactPhone: isTenant && emergencyContactPhone.trim() ? emergencyContactPhone.trim() : undefined,
-      avatarBg: editingContact?.avatarBg || (isAgent ? 'bg-indigo-600' : randomBg)
+    // If new tenant has email but no squareCustomerId yet, query Square automatically
+    const saveContactWithSquare = async () => {
+      let finalSquareId = squareCustomerId.trim();
+      if (isTenant && email.trim() && !finalSquareId) {
+        try {
+          const res = await SquareService.searchOrCreateCustomer({
+            email: email.trim(),
+            firstName: fName || undefined,
+            lastName: lName || undefined,
+            phone: phone.trim() || undefined,
+            note: 'Coliving Tenant in Moyer PM CRM'
+          });
+          if (res.customerId) {
+            finalSquareId = res.customerId;
+          }
+        } catch (err) {
+          console.warn('Square customer auto-sync on save notice:', err);
+        }
+      }
+
+      const newContact: Contact = {
+        id: editingContact?.id || `con-${Date.now()}`,
+        firstName: fName || undefined,
+        lastName: lName || undefined,
+        name: fullName,
+        type,
+        status: isAgent ? status : (editingContact?.status || 'Active'),
+        email: email.trim() || undefined,
+        phone: phone.trim(),
+        company: (isVendor || isOwner) && company.trim() ? company.trim() : undefined,
+        roleOrSpecialty: (isVendor || isAgent) && roleOrSpecialty.trim() ? roleOrSpecialty.trim() : (isAgent ? 'Leasing Agent' : undefined),
+        hourlyRate: isVendor && hourlyRate ? Number(hourlyRate) : undefined,
+        licenseNumber: isAgent && licenseNumber.trim() ? licenseNumber.trim() : undefined,
+        commissionRate: isAgent && commissionRate.trim() ? commissionRate.trim() : undefined,
+        propertyId: (isTenant || isOwner || isAgent) && propertyId ? propertyId : undefined,
+        propertyName: (isTenant || isOwner || isAgent) ? prop?.name : undefined,
+        notes: notes.trim() || '',
+        emergencyContactName: isTenant && emergencyContactName.trim() ? emergencyContactName.trim() : undefined,
+        emergencyContactPhone: isTenant && emergencyContactPhone.trim() ? emergencyContactPhone.trim() : undefined,
+        squareCustomerId: isTenant && finalSquareId ? finalSquareId : undefined,
+        avatarBg: editingContact?.avatarBg || (isAgent ? 'bg-indigo-600' : randomBg)
+      };
+
+      onSave(newContact);
+      onClose();
     };
 
-    onSave(newContact);
-    onClose();
+    saveContactWithSquare();
   };
 
   return (
@@ -351,6 +421,50 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
                     className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
                 </div>
+              </div>
+
+              {/* Square Customer ID & Refresh Button */}
+              <div className="pt-2 border-t border-zinc-200">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <label className="flex items-center gap-1.5 font-bold text-zinc-800 text-[11px] uppercase tracking-wider">
+                    <CreditCard className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Square Customer ID</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleRefreshSquareCustomer}
+                    disabled={isSyncingSquare || !email.trim()}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 bg-white hover:bg-indigo-50 border border-indigo-300 rounded-sm shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Query Square Customers API by email address or create new customer"
+                  >
+                    <RefreshCw className={`w-3 h-3 text-indigo-600 ${isSyncingSquare ? 'animate-spin' : ''}`} />
+                    <span>Refresh Square Customer ID</span>
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={squareCustomerId}
+                  onChange={(e) => setSquareCustomerId(e.target.value)}
+                  placeholder="Auto-synced via Square Customers API..."
+                  className="w-full p-2 bg-white border border-zinc-300 rounded-md font-mono text-xs text-zinc-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+                {squareSyncStatus && (
+                  <div className={`mt-1.5 p-2 rounded text-xs flex items-center gap-1.5 ${
+                    squareSyncStatus.type === 'success' 
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                      : 'bg-rose-50 text-rose-800 border border-rose-200'
+                  }`}>
+                    {squareSyncStatus.type === 'success' ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    )}
+                    <span className="leading-tight">{squareSyncStatus.message}</span>
+                  </div>
+                )}
+                <p className="text-[10px] text-zinc-500 mt-1">
+                  Square Customer record is queried using tenant's email address. If no match is found, a customer is created in Square automatically.
+                </p>
               </div>
             </div>
           )}

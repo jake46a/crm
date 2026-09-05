@@ -36,6 +36,7 @@ service cloud.firestore {
         && data.state is string && data.state.size() <= 64
         && data.zip is string && data.zip.size() <= 32
         && (data.totalRooms is number && data.totalRooms >= 0)
+        && (!('squareLocationId' in data) || (data.squareLocationId is string && data.squareLocationId.size() <= 128))
         && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2048));
     }
 
@@ -97,6 +98,24 @@ service cloud.firestore {
         && (!('licenseNumber' in data) || (data.licenseNumber is string && data.licenseNumber.size() <= 128))
         && (!('roleOrSpecialty' in data) || (data.roleOrSpecialty is string && data.roleOrSpecialty.size() <= 128))
         && (!('company' in data) || (data.company is string && data.company.size() <= 128))
+        && (!('squareCustomerId' in data) || (data.squareCustomerId is string && data.squareCustomerId.size() <= 128))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2048));
+    }
+
+    function isValidInvoice(data) {
+      return data.id is string && isValidId(data.id)
+        && data.propertyId is string && isValidId(data.propertyId)
+        && data.tenantName is string && data.tenantName.size() > 0 && data.tenantName.size() <= 128
+        && data.invoiceType is string && data.invoiceType.size() <= 64
+        && data.amount is number && data.amount >= 0
+        && data.status is string && data.status.size() <= 64
+        && (!('squareInvoiceId' in data) || (data.squareInvoiceId is string && data.squareInvoiceId.size() <= 128))
+        && (!('squareOrderId' in data) || (data.squareOrderId is string && data.squareOrderId.size() <= 128))
+        && (!('squareCustomerId' in data) || (data.squareCustomerId is string && data.squareCustomerId.size() <= 128))
+        && (!('squareLocationId' in data) || (data.squareLocationId is string && data.squareLocationId.size() <= 128))
+        && (!('paymentUrl' in data) || (data.paymentUrl is string && data.paymentUrl.size() <= 1024))
+        && (!('viewUrl' in data) || (data.viewUrl is string && data.viewUrl.size() <= 1024))
+        && (!('description' in data) || (data.description is string && data.description.size() <= 2048))
         && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2048));
     }
 
@@ -158,6 +177,14 @@ service cloud.firestore {
       allow create: if isValidId(contactId) && isValidContact(incoming());
       allow update: if isValidId(contactId) && isValidContact(incoming()) && incoming().id == existing().id;
       allow delete: if isValidId(contactId);
+    }
+
+    // Invoices (Square Billing)
+    match /invoices/{invoiceId} {
+      allow get, list: if true;
+      allow create: if isValidId(invoiceId) && isValidInvoice(incoming());
+      allow update: if isValidId(invoiceId) && isValidInvoice(incoming()) && incoming().id == existing().id;
+      allow delete: if isValidId(invoiceId);
     }
 
     // Activity Logs (Append-Only)
