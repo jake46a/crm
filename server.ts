@@ -11,6 +11,17 @@ const PORT = 3000;
 
 app.use(express.json());
 
+// Permissive CORS and preflight headers for all endpoints
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // Square API Configuration
 const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN || '';
 const SQUARE_ENVIRONMENT = (process.env.SQUARE_ENVIRONMENT || 'sandbox').toLowerCase();
@@ -116,7 +127,7 @@ app.get('/api/square/locations', async (req: Request, res: Response) => {
 
 // 3. Search or Create Customer in Square
 // Query by email_address via searchCustomers, if not found calls createCustomer
-app.post('/api/square/customers/search-or-create', async (req: Request, res: Response) => {
+app.post(['/api/square/customers/search-or-create', '/api/square/customers', '/api/square/customers/search-or-create/'], async (req: Request, res: Response) => {
   const { email, firstName, lastName, phone, note } = req.body;
 
   if (!email || !email.trim()) {
@@ -216,7 +227,7 @@ app.post('/api/square/customers/search-or-create', async (req: Request, res: Res
 
 // 4. Batch Create Invoices (createOrder -> createInvoice -> publish)
 // Rule: allow_partial_payments: false, delivery_method: 'EMAIL'
-app.post('/api/square/invoices/create-batch', async (req: Request, res: Response) => {
+app.post(['/api/square/invoices/create-batch', '/api/square/invoices/create-batch/'], async (req: Request, res: Response) => {
   const { invoices } = req.body;
 
   if (!Array.isArray(invoices) || invoices.length === 0) {
