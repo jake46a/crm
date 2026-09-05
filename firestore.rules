@@ -104,19 +104,44 @@ service cloud.firestore {
 
     function isValidInvoice(data) {
       return data.id is string && isValidId(data.id)
-        && data.propertyId is string && isValidId(data.propertyId)
-        && data.tenantName is string && data.tenantName.size() > 0 && data.tenantName.size() <= 128
-        && data.invoiceType is string && data.invoiceType.size() <= 64
-        && data.amount is number && data.amount >= 0
-        && data.status is string && data.status.size() <= 64
+        && (!('propertyId' in data) || (data.propertyId is string && data.propertyId.size() <= 128))
+        && (!('propertyName' in data) || (data.propertyName is string && data.propertyName.size() <= 256))
+        && (!('roomId' in data) || (data.roomId is string && data.roomId.size() <= 128))
+        && (!('roomName' in data) || (data.roomName is string && data.roomName.size() <= 256))
+        && (!('tenantId' in data) || (data.tenantId is string && data.tenantId.size() <= 128))
+        && (!('tenantName' in data) || (data.tenantName is string && data.tenantName.size() <= 256))
+        && (!('tenantEmail' in data) || (data.tenantEmail is string && data.tenantEmail.size() <= 128))
+        && (!('tenantPhone' in data) || (data.tenantPhone is string && data.tenantPhone.size() <= 64))
+        && (!('invoiceNumber' in data) || (data.invoiceNumber is string && data.invoiceNumber.size() <= 128))
+        && (!('invoiceType' in data) || (data.invoiceType is string && data.invoiceType.size() <= 64))
+        && (!('subtask' in data) || (data.subtask is string && data.subtask.size() <= 64))
+        && (!('month' in data) || (data.month is string && data.month.size() <= 64))
+        && (!('billingMonth' in data) || (data.billingMonth is string && data.billingMonth.size() <= 64))
+        && (!('year' in data) || (data.year is number))
+        && (!('billingYear' in data) || (data.billingYear is number))
+        && (!('amount' in data) || (data.amount is number && data.amount >= 0))
+        && (!('rentAmount' in data) || (data.rentAmount is number && data.rentAmount >= 0))
+        && (!('utilityAmount' in data) || (data.utilityAmount is number && data.utilityAmount >= 0))
+        && (!('suppliesAmount' in data) || (data.suppliesAmount is number && data.suppliesAmount >= 0))
+        && (!('lateFeeAmount' in data) || (data.lateFeeAmount is number && data.lateFeeAmount >= 0))
+        && (!('specialAmount' in data) || (data.specialAmount is number && data.specialAmount >= 0))
+        && (!('totalAmount' in data) || (data.totalAmount is number && data.totalAmount >= 0))
+        && (!('status' in data) || (data.status is string && data.status.size() <= 64))
         && (!('squareInvoiceId' in data) || (data.squareInvoiceId is string && data.squareInvoiceId.size() <= 128))
         && (!('squareOrderId' in data) || (data.squareOrderId is string && data.squareOrderId.size() <= 128))
         && (!('squareCustomerId' in data) || (data.squareCustomerId is string && data.squareCustomerId.size() <= 128))
         && (!('squareLocationId' in data) || (data.squareLocationId is string && data.squareLocationId.size() <= 128))
         && (!('paymentUrl' in data) || (data.paymentUrl is string && data.paymentUrl.size() <= 1024))
+        && (!('squarePaymentUrl' in data) || (data.squarePaymentUrl is string && data.squarePaymentUrl.size() <= 1024))
         && (!('viewUrl' in data) || (data.viewUrl is string && data.viewUrl.size() <= 1024))
-        && (!('description' in data) || (data.description is string && data.description.size() <= 2048))
-        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2048));
+        && (!('dueDate' in data) || (data.dueDate is string && data.dueDate.size() <= 64))
+        && (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64))
+        && (!('paidAt' in data) || (data.paidAt is string && data.paidAt.size() <= 64))
+        && (!('paymentMethod' in data) || (data.paymentMethod is string && data.paymentMethod.size() <= 128))
+        && (!('allowPartialPayments' in data) || (data.allowPartialPayments is bool))
+        && (!('lateFeeApplied' in data) || (data.lateFeeApplied is bool))
+        && (!('description' in data) || (data.description is string && data.description.size() <= 4096))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 4096));
     }
 
     function isValidActivityLog(data) {
@@ -183,7 +208,7 @@ service cloud.firestore {
     match /invoices/{invoiceId} {
       allow get, list: if true;
       allow create: if isValidId(invoiceId) && isValidInvoice(incoming());
-      allow update: if isValidId(invoiceId) && isValidInvoice(incoming()) && incoming().id == existing().id;
+      allow update: if isValidId(invoiceId) && isValidInvoice(incoming()) && (!('id' in incoming()) || incoming().id == existing().id);
       allow delete: if isValidId(invoiceId);
     }
 

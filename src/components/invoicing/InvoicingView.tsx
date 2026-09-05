@@ -200,9 +200,12 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
         }
 
         const invoiceId = `inv-rent-${selectedProperty.id}-${item.room.id}-${selectedYear}-${MONTHS.indexOf(selectedMonth) + 1}`;
+        const invoiceNum = `INV-RENT-${selectedYear}-${String(MONTHS.indexOf(selectedMonth) + 1).padStart(2, '0')}-${String(invoicesToCreate.length + 101)}`;
 
         invoicesToCreate.push({
           id: invoiceId,
+          invoiceNumber: invoiceNum,
+          invoiceType: 'Rental',
           subtask: 'monthly-rental',
           propertyId: selectedProperty.id,
           propertyName: selectedProperty.name,
@@ -214,8 +217,11 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           tenantPhone: item.tenantPhone,
           squareLocationId: selectedProperty.squareLocationId,
           squareCustomerId: customerId || `CUST_SANDBOX_${item.room.id}`,
+          month: selectedMonth,
+          year: selectedYear,
           billingMonth: selectedMonth,
           billingYear: selectedYear,
+          amount: item.rent,
           rentAmount: item.rent,
           utilityAmount: 0,
           suppliesAmount: 0,
@@ -236,11 +242,14 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       // Map results and prepare full Invoice models
       const finalInvoices: Invoice[] = invoicesToCreate.map((inv, idx) => {
         const sqRes = squareBatchRes.results?.[idx];
+        const paymentUrl = sqRes?.paymentUrl || `https://square.link/u/moyer-pm-${inv.id}`;
         return {
           ...inv,
           squareOrderId: sqRes?.squareOrderId || `sq-order-${Date.now()}-${idx}`,
           squareInvoiceId: sqRes?.squareInvoiceId || `sq-inv-${Date.now()}-${idx}`,
-          squarePaymentUrl: sqRes?.paymentUrl || `https://square.link/u/moyer-pm-${inv.id}`,
+          paymentUrl,
+          squarePaymentUrl: paymentUrl,
+          viewUrl: sqRes?.viewUrl || paymentUrl,
           status: 'SENT' as InvoiceStatus
         } as unknown as Invoice;
       });
@@ -289,42 +298,55 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
     const dueDate = getDueDate(selectedMonth, selectedYear);
 
     try {
-      const utilityInvoices: Partial<Invoice>[] = occupiedBedroomsWithTenants.map((item, idx) => ({
-        id: `inv-util-${selectedProperty.id}-${item.room.id}-${selectedYear}-${MONTHS.indexOf(selectedMonth) + 1}`,
-        subtask: 'utility',
-        propertyId: selectedProperty.id,
-        propertyName: selectedProperty.name,
-        roomId: item.room.id,
-        roomName: item.room.name,
-        tenantId: item.contact?.id || item.room.currentTenantId || '',
-        tenantName: item.tenantName,
-        tenantEmail: item.tenantEmail,
-        tenantPhone: item.tenantPhone,
-        squareLocationId: selectedProperty.squareLocationId!,
-        squareCustomerId: item.squareCustomerId || `CUST_SANDBOX_${item.room.id}`,
-        billingMonth: selectedMonth,
-        billingYear: selectedYear,
-        rentAmount: 0,
-        utilityAmount: sharePerResident,
-        suppliesAmount: 0,
-        lateFeeAmount: 0,
-        specialAmount: 0,
-        totalAmount: sharePerResident,
-        dueDate,
-        createdAt: new Date().toISOString(),
-        description: `Shared Utilities Split (${selectedMonth} ${selectedYear}): Electric ($${electricAmount}) + Gas ($${gasAmount}) + Water/Trash ($${waterAmount}) + Fiber Internet ($${internetAmount}) / ${occupiedBedroomsWithTenants.length} rooms`,
-        allowPartialPayments: false,
-        status: 'SENT'
-      }));
+      const utilityInvoices: Partial<Invoice>[] = occupiedBedroomsWithTenants.map((item, idx) => {
+        const invoiceNum = `INV-UTIL-${selectedYear}-${String(MONTHS.indexOf(selectedMonth) + 1).padStart(2, '0')}-${String(idx + 101)}`;
+        return {
+          id: `inv-util-${selectedProperty.id}-${item.room.id}-${selectedYear}-${MONTHS.indexOf(selectedMonth) + 1}`,
+          invoiceNumber: invoiceNum,
+          invoiceType: 'Utility',
+          subtask: 'utility',
+          propertyId: selectedProperty.id,
+          propertyName: selectedProperty.name,
+          roomId: item.room.id,
+          roomName: item.room.name,
+          tenantId: item.contact?.id || item.room.currentTenantId || '',
+          tenantName: item.tenantName,
+          tenantEmail: item.tenantEmail,
+          tenantPhone: item.tenantPhone,
+          squareLocationId: selectedProperty.squareLocationId!,
+          squareCustomerId: item.squareCustomerId || `CUST_SANDBOX_${item.room.id}`,
+          month: selectedMonth,
+          year: selectedYear,
+          billingMonth: selectedMonth,
+          billingYear: selectedYear,
+          amount: sharePerResident,
+          rentAmount: 0,
+          utilityAmount: sharePerResident,
+          suppliesAmount: 0,
+          lateFeeAmount: 0,
+          specialAmount: 0,
+          totalAmount: sharePerResident,
+          dueDate,
+          createdAt: new Date().toISOString(),
+          description: `Shared Utilities Split (${selectedMonth} ${selectedYear}): Electric ($${electricAmount}) + Gas ($${gasAmount}) + Water/Trash ($${waterAmount}) + Fiber Internet ($${internetAmount}) / ${occupiedBedroomsWithTenants.length} rooms`,
+          allowPartialPayments: false,
+          status: 'SENT' as InvoiceStatus
+        };
+      });
 
       const res = await SquareService.createInvoiceBatch(utilityInvoices);
-      const savedInvoices: Invoice[] = utilityInvoices.map((inv, idx) => ({
-        ...inv,
-        squareOrderId: res.results?.[idx]?.squareOrderId || `sq-order-util-${Date.now()}-${idx}`,
-        squareInvoiceId: res.results?.[idx]?.squareInvoiceId || `sq-inv-util-${Date.now()}-${idx}`,
-        squarePaymentUrl: res.results?.[idx]?.paymentUrl || `https://square.link/u/moyer-pm-${inv.id}`,
-        status: 'SENT' as InvoiceStatus
-      } as unknown as Invoice));
+      const savedInvoices: Invoice[] = utilityInvoices.map((inv, idx) => {
+        const paymentUrl = res.results?.[idx]?.paymentUrl || `https://square.link/u/moyer-pm-${inv.id}`;
+        return {
+          ...inv,
+          squareOrderId: res.results?.[idx]?.squareOrderId || `sq-order-util-${Date.now()}-${idx}`,
+          squareInvoiceId: res.results?.[idx]?.squareInvoiceId || `sq-inv-util-${Date.now()}-${idx}`,
+          paymentUrl,
+          squarePaymentUrl: paymentUrl,
+          viewUrl: res.results?.[idx]?.viewUrl || paymentUrl,
+          status: 'SENT' as InvoiceStatus
+        } as unknown as Invoice;
+      });
 
       await FirebaseService.saveInvoicesBatch(savedInvoices);
       onSaveInvoices([...invoices.filter(i => !savedInvoices.some(si => si.id === i.id)), ...savedInvoices]);
@@ -367,42 +389,55 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
     const dueDate = getDueDate(selectedMonth, selectedYear);
 
     try {
-      const suppliesInvoices: Partial<Invoice>[] = occupiedBedroomsWithTenants.map((item, idx) => ({
-        id: `inv-supplies-${selectedProperty.id}-${item.room.id}-${selectedYear}-${MONTHS.indexOf(selectedMonth) + 1}`,
-        subtask: 'supplies',
-        propertyId: selectedProperty.id,
-        propertyName: selectedProperty.name,
-        roomId: item.room.id,
-        roomName: item.room.name,
-        tenantId: item.contact?.id || item.room.currentTenantId || '',
-        tenantName: item.tenantName,
-        tenantEmail: item.tenantEmail,
-        tenantPhone: item.tenantPhone,
-        squareLocationId: selectedProperty.squareLocationId!,
-        squareCustomerId: item.squareCustomerId || `CUST_SANDBOX_${item.room.id}`,
-        billingMonth: selectedMonth,
-        billingYear: selectedYear,
-        rentAmount: 0,
-        utilityAmount: 0,
-        suppliesAmount: sharePerResident,
-        lateFeeAmount: 0,
-        specialAmount: 0,
-        totalAmount: sharePerResident,
-        dueDate,
-        createdAt: new Date().toISOString(),
-        description: `Common House Supplies: ${suppliesCategory} (${selectedMonth} ${selectedYear}) - $${suppliesAmount.toFixed(2)} total / ${occupiedBedroomsWithTenants.length} residents`,
-        allowPartialPayments: false,
-        status: 'SENT'
-      }));
+      const suppliesInvoices: Partial<Invoice>[] = occupiedBedroomsWithTenants.map((item, idx) => {
+        const invoiceNum = `INV-SUP-${selectedYear}-${String(MONTHS.indexOf(selectedMonth) + 1).padStart(2, '0')}-${String(idx + 101)}`;
+        return {
+          id: `inv-supplies-${selectedProperty.id}-${item.room.id}-${selectedYear}-${MONTHS.indexOf(selectedMonth) + 1}`,
+          invoiceNumber: invoiceNum,
+          invoiceType: 'Supplies',
+          subtask: 'supplies',
+          propertyId: selectedProperty.id,
+          propertyName: selectedProperty.name,
+          roomId: item.room.id,
+          roomName: item.room.name,
+          tenantId: item.contact?.id || item.room.currentTenantId || '',
+          tenantName: item.tenantName,
+          tenantEmail: item.tenantEmail,
+          tenantPhone: item.tenantPhone,
+          squareLocationId: selectedProperty.squareLocationId!,
+          squareCustomerId: item.squareCustomerId || `CUST_SANDBOX_${item.room.id}`,
+          month: selectedMonth,
+          year: selectedYear,
+          billingMonth: selectedMonth,
+          billingYear: selectedYear,
+          amount: sharePerResident,
+          rentAmount: 0,
+          utilityAmount: 0,
+          suppliesAmount: sharePerResident,
+          lateFeeAmount: 0,
+          specialAmount: 0,
+          totalAmount: sharePerResident,
+          dueDate,
+          createdAt: new Date().toISOString(),
+          description: `Common House Supplies: ${suppliesCategory} (${selectedMonth} ${selectedYear}) - $${suppliesAmount.toFixed(2)} total / ${occupiedBedroomsWithTenants.length} residents`,
+          allowPartialPayments: false,
+          status: 'SENT' as InvoiceStatus
+        };
+      });
 
       const res = await SquareService.createInvoiceBatch(suppliesInvoices);
-      const savedInvoices: Invoice[] = suppliesInvoices.map((inv, idx) => ({
-        ...inv,
-        squareOrderId: res.results?.[idx]?.squareOrderId || `sq-order-supplies-${Date.now()}-${idx}`,
-        squareInvoiceId: res.results?.[idx]?.squareInvoiceId || `sq-inv-supplies-${Date.now()}-${idx}`,
-        squarePaymentUrl: res.results?.[idx]?.paymentUrl || `https://square.link/u/moyer-pm-${inv.id}`,
-        status: 'SENT' as InvoiceStatus
-      } as unknown as Invoice));
+      const savedInvoices: Invoice[] = suppliesInvoices.map((inv, idx) => {
+        const paymentUrl = res.results?.[idx]?.paymentUrl || `https://square.link/u/moyer-pm-${inv.id}`;
+        return {
+          ...inv,
+          squareOrderId: res.results?.[idx]?.squareOrderId || `sq-order-supplies-${Date.now()}-${idx}`,
+          squareInvoiceId: res.results?.[idx]?.squareInvoiceId || `sq-inv-supplies-${Date.now()}-${idx}`,
+          paymentUrl,
+          squarePaymentUrl: paymentUrl,
+          viewUrl: res.results?.[idx]?.viewUrl || paymentUrl,
+          status: 'SENT' as InvoiceStatus
+        } as unknown as Invoice;
+      });
 
       await FirebaseService.saveInvoicesBatch(savedInvoices);
       onSaveInvoices([...invoices.filter(i => !savedInvoices.some(si => si.id === i.id)), ...savedInvoices]);
@@ -443,8 +478,11 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
     setBatchResult(null);
 
     try {
+      const invoiceNum = `INV-SPEC-${selectedYear}-${Date.now().toString().slice(-4)}`;
       const specialInv: Partial<Invoice> = {
         id: `inv-spec-${Date.now()}`,
+        invoiceNumber: invoiceNum,
+        invoiceType: 'Special',
         subtask: 'special',
         propertyId: selectedProperty.id,
         propertyName: selectedProperty.name,
@@ -456,8 +494,11 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
         tenantPhone: tenant.phone,
         squareLocationId: selectedProperty.squareLocationId,
         squareCustomerId: tenant.squareCustomerId || `CUST_SPECIAL_${tenant.id}`,
+        month: selectedMonth,
+        year: selectedYear,
         billingMonth: selectedMonth,
         billingYear: selectedYear,
+        amount: Number(specialAmount),
         rentAmount: 0,
         utilityAmount: 0,
         suppliesAmount: 0,
@@ -472,11 +513,14 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       };
 
       const res = await SquareService.createInvoiceBatch([specialInv]);
+      const paymentUrl = res.results?.[0]?.paymentUrl || `https://square.link/u/moyer-spec-${specialInv.id}`;
       const saved: Invoice = {
         ...specialInv,
         squareOrderId: res.results?.[0]?.squareOrderId || `sq-order-spec-${Date.now()}`,
         squareInvoiceId: res.results?.[0]?.squareInvoiceId || `sq-inv-spec-${Date.now()}`,
-        squarePaymentUrl: res.results?.[0]?.paymentUrl || `https://square.link/u/moyer-spec-${specialInv.id}`,
+        paymentUrl,
+        squarePaymentUrl: paymentUrl,
+        viewUrl: res.results?.[0]?.viewUrl || paymentUrl,
         status: 'SENT' as InvoiceStatus
       } as unknown as Invoice;
 
