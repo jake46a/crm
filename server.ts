@@ -24,12 +24,24 @@ app.use((req, res, next) => {
 
 // Square API Configuration
 const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN || '';
-const SQUARE_ENVIRONMENT = (process.env.SQUARE_ENVIRONMENT || 'sandbox').toLowerCase();
-const SQUARE_BASE_URL = SQUARE_ENVIRONMENT === 'production' 
-  ? 'https://connect.squareup.com' 
-  : 'https://connect.squareupsandbox.com';
+let currentSquareEnvironment = 'production'; // Defaulting to Production per user directive
+
+if (process.env.SQUARE_ENVIRONMENT) {
+  const envVal = process.env.SQUARE_ENVIRONMENT.trim().toLowerCase();
+  if (envVal === 'production' || envVal === 'prod') {
+    currentSquareEnvironment = 'production';
+  } else if (envVal === 'sandbox') {
+    currentSquareEnvironment = 'sandbox';
+  }
+}
 
 const SQUARE_VERSION = '2025-02-20';
+
+function getSquareBaseUrl() {
+  return currentSquareEnvironment === 'production' 
+    ? 'https://connect.squareup.com' 
+    : 'https://connect.squareupsandbox.com';
+}
 
 function getSquareHeaders() {
   return {
@@ -95,13 +107,39 @@ initialSeedEmails.forEach(c => {
 
 // 1. Square Connection & Health Status
 app.get('/api/square/status', (req: Request, res: Response) => {
+  const baseUrl = getSquareBaseUrl();
+  const hasToken = Boolean(SQUARE_ACCESS_TOKEN && SQUARE_ACCESS_TOKEN.trim().length > 5);
   res.json({
-    hasToken: Boolean(SQUARE_ACCESS_TOKEN && SQUARE_ACCESS_TOKEN.trim().length > 5),
-    environment: SQUARE_ENVIRONMENT,
-    baseUrl: SQUARE_BASE_URL,
+    hasToken,
+    environment: currentSquareEnvironment,
+    baseUrl,
     version: SQUARE_VERSION,
-    mode: SQUARE_ACCESS_TOKEN ? 'Live Square API' : 'Simulated Sandbox Mode (Ready)',
+    mode: currentSquareEnvironment === 'production' 
+      ? (hasToken ? 'Production (Live API)' : 'Production (Awaiting Live Token)')
+      : (hasToken ? 'Sandbox (Connected)' : 'Sandbox Mode'),
+    isProduction: currentSquareEnvironment === 'production',
     activeLocationsCount: simulatedSquareStore.locations.length
+  });
+});
+
+// Mode switcher: allows toggling between 'production' and 'sandbox'
+app.post('/api/square/mode', (req: Request, res: Response) => {
+  const { mode } = req.body || {};
+  if (mode === 'production' || mode === 'sandbox') {
+    currentSquareEnvironment = mode;
+  }
+  const baseUrl = getSquareBaseUrl();
+  const hasToken = Boolean(SQUARE_ACCESS_TOKEN && SQUARE_ACCESS_TOKEN.trim().length > 5);
+  res.json({
+    success: true,
+    environment: currentSquareEnvironment,
+    baseUrl,
+    version: SQUARE_VERSION,
+    mode: currentSquareEnvironment === 'production' 
+      ? (hasToken ? 'Production (Live API)' : 'Production (Awaiting Live Token)')
+      : (hasToken ? 'Sandbox (Connected)' : 'Sandbox Mode'),
+    isProduction: currentSquareEnvironment === 'production',
+    hasToken
   });
 });
 
@@ -109,7 +147,7 @@ app.get('/api/square/status', (req: Request, res: Response) => {
 app.get('/api/square/locations', async (req: Request, res: Response) => {
   if (SQUARE_ACCESS_TOKEN) {
     try {
-      const response = await fetch(`${SQUARE_BASE_URL}/v2/locations`, {
+      const response = await fetch(`${getSquareBaseUrl()}/v2/locations`, {
         headers: getSquareHeaders()
       });
       const data = await response.json();
@@ -140,7 +178,7 @@ app.post(['/api/square/customers/search-or-create', '/api/square/customers', '/a
   if (SQUARE_ACCESS_TOKEN) {
     try {
       // Step A: Search Customers by exact email
-      const searchRes = await fetch(`${SQUARE_BASE_URL}/v2/customers/search`, {
+      const searchRes = await fetch(`${getSquareBaseUrl()}/v2/customers/search`, {
         method: 'POST',
         headers: getSquareHeaders(),
         body: JSON.stringify({
@@ -168,7 +206,7 @@ app.post(['/api/square/customers/search-or-create', '/api/square/customers', '/a
       }
 
       // Step B: Customer does not exist, call createCustomer
-      const createRes = await fetch(`${SQUARE_BASE_URL}/v2/customers`, {
+      const createRes = await fetch(`${getSquareBaseUrl()}/v2/customers`, {
         method: 'POST',
         headers: getSquareHeaders(),
         body: JSON.stringify({
@@ -249,7 +287,7 @@ app.post(['/api/square/invoices/create-batch', '/api/square/invoices/create-batc
       if (SQUARE_ACCESS_TOKEN) {
         try {
           // 1. Create Square Order
-          const orderRes = await fetch(`${SQUARE_BASE_URL}/v2/orders`, {
+          const orderRes = await fetch(`${getSquareBaseUrl()}/v2/orders`, {
             method: 'POST',
             headers: getSquareHeaders(),
             body: JSON.stringify({
@@ -277,7 +315,7 @@ app.post(['/api/square/invoices/create-batch', '/api/square/invoices/create-batc
             const squareOrderId = orderData.order.id;
 
             // 2. Create Square Invoice
-            const invoiceRes = await fetch(`${SQUARE_BASE_URL}/v2/invoices`, {
+            const invoiceRes = await fetch(`${getSquareBaseUrl()}/v2/invoices`, {
               method: 'POST',
               headers: getSquareHeaders(),
               body: JSON.stringify({
@@ -309,7 +347,7 @@ app.post(['/api/square/invoices/create-batch', '/api/square/invoices/create-batc
               const version = invoiceData.invoice.version;
 
               // 3. Publish Invoice so Square emails it to the tenant
-              const publishRes = await fetch(`${SQUARE_BASE_URL}/v2/invoices/${squareInvoiceId}/publish`, {
+              const publishRes = await fetch(`${getSquareBaseUrl()}/v2/invoices/${squareInvoiceId}/publish`, {
                 method: 'POST',
                 headers: getSquareHeaders(),
                 body: JSON.stringify({
@@ -398,7 +436,7 @@ app.get('/api/square/invoices/:invoiceId/sync', async (req: Request, res: Respon
 
   if (SQUARE_ACCESS_TOKEN && !invoiceId.startsWith('sq_inv_')) {
     try {
-      const response = await fetch(`${SQUARE_BASE_URL}/v2/invoices/${invoiceId}`, {
+      const response = await fetch(`${getSquareBaseUrl()}/v2/invoices/${invoiceId}`, {
         headers: getSquareHeaders()
       });
       const data = await response.json();
@@ -454,13 +492,13 @@ app.post('/api/square/late-fees/apply', async (req: Request, res: Response) => {
   if (SQUARE_ACCESS_TOKEN && orderId && invoiceId && !orderId.startsWith('sq_ord_')) {
     try {
       // In Square API: Update order with line item for late fee
-      const orderRes = await fetch(`${SQUARE_BASE_URL}/v2/orders/${orderId}`, {
+      const orderRes = await fetch(`${getSquareBaseUrl()}/v2/orders/${orderId}`, {
         headers: getSquareHeaders()
       });
       const orderData = await orderRes.json();
       if (orderRes.ok && orderData.order) {
         const currentVersion = orderData.order.version;
-        const updateOrderRes = await fetch(`${SQUARE_BASE_URL}/v2/orders/${orderId}`, {
+        const updateOrderRes = await fetch(`${getSquareBaseUrl()}/v2/orders/${orderId}`, {
           method: 'PUT',
           headers: getSquareHeaders(),
           body: JSON.stringify({
@@ -483,7 +521,7 @@ app.post('/api/square/late-fees/apply', async (req: Request, res: Response) => {
         });
 
         // Next fetch invoice and update
-        const invRes = await fetch(`${SQUARE_BASE_URL}/v2/invoices/${invoiceId}`, {
+        const invRes = await fetch(`${getSquareBaseUrl()}/v2/invoices/${invoiceId}`, {
           headers: getSquareHeaders()
         });
         const invData = await invRes.json();

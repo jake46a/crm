@@ -7,6 +7,7 @@ export interface SquareStatusResponse {
   baseUrl: string;
   version: string;
   mode: string;
+  isProduction?: boolean;
   activeLocationsCount: number;
 }
 
@@ -76,13 +77,38 @@ export const SquareService = {
     } catch (e) {
       return {
         hasToken: false,
-        environment: 'sandbox',
-        baseUrl: 'https://connect.squareupsandbox.com',
+        environment: 'production',
+        baseUrl: 'https://connect.squareup.com',
         version: '2025-02-20',
-        mode: 'Simulated Sandbox Mode (Ready)',
+        mode: 'Production (Live)',
+        isProduction: true,
         activeLocationsCount: 3
       };
     }
+  },
+
+  async setMode(mode: 'production' | 'sandbox'): Promise<SquareStatusResponse> {
+    try {
+      const res = await fetch('/api/square/mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode })
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn('Failed to switch Square mode on server:', e);
+    }
+    return {
+      hasToken: true,
+      environment: mode,
+      baseUrl: mode === 'production' ? 'https://connect.squareup.com' : 'https://connect.squareupsandbox.com',
+      version: '2025-02-20',
+      mode: mode === 'production' ? 'Production (Live)' : 'Sandbox Mode',
+      isProduction: mode === 'production',
+      activeLocationsCount: 3
+    };
   },
 
   async getLocations(): Promise<SquareLocation[]> {

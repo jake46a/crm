@@ -146,6 +146,18 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
     checkStatus();
   }, []);
 
+  const handleToggleSquareMode = async (targetMode: 'production' | 'sandbox') => {
+    setIsLoadingStatus(true);
+    try {
+      const res = await SquareService.setMode(targetMode);
+      setSquareStatus(res);
+    } catch (err) {
+      console.warn('Could not switch Square mode:', err);
+    } finally {
+      setIsLoadingStatus(false);
+    }
+  };
+
   // Update selected property if properties change and current selection is invalid
   useEffect(() => {
     if (!selectedPropertyId && properties.length > 0) {
@@ -1012,19 +1024,57 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           </div>
         </div>
 
-        {/* Square Status Indicator */}
-        <div className="flex items-center gap-3 text-xs bg-zinc-900/90 border border-zinc-800 px-3 py-2 rounded-md">
-          <div className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${squareStatus?.hasToken ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+        {/* Square Status Indicator & Mode Switcher */}
+        <div className="flex items-center gap-3 text-xs bg-zinc-900/90 border border-zinc-800 px-3 py-2 rounded-md shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${
+                squareStatus?.environment === 'production'
+                  ? 'bg-emerald-400 ring-4 ring-emerald-950/60 animate-pulse'
+                  : 'bg-amber-400 ring-4 ring-amber-950/60'
+              }`}
+            />
             <div>
-              <p className="font-semibold text-zinc-200">
-                {squareStatus?.hasToken ? 'Square Live / Sandbox Connected' : 'Square Sandbox Ready'}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="font-semibold text-zinc-100">
+                  {squareStatus?.environment === 'production' ? 'Square: Production (Live)' : 'Square: Sandbox Mode'}
+                </p>
+                <span
+                  className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold tracking-wide ${
+                    squareStatus?.environment === 'production'
+                      ? 'bg-emerald-900/80 text-emerald-200 border border-emerald-700/60'
+                      : 'bg-amber-900/80 text-amber-200 border border-amber-700/60'
+                  }`}
+                >
+                  {squareStatus?.environment === 'production' ? 'PRODUCTION' : 'SANDBOX'}
+                </span>
+              </div>
               <p className="text-[10px] text-zinc-400 font-mono">
-                {squareStatus?.mode || 'Active'} • {squareStatus?.activeLocationsCount || 3} Locations
+                {squareStatus?.baseUrl ? squareStatus.baseUrl.replace('https://', '') : 'connect.squareup.com'} •{' '}
+                {squareStatus?.hasToken ? 'Live Token Configured' : 'No Token (Mock Mode)'}
               </p>
             </div>
           </div>
+
+          <div className="h-6 w-px bg-zinc-800" />
+
+          {/* Mode Switcher Button */}
+          <button
+            onClick={() => handleToggleSquareMode(squareStatus?.environment === 'production' ? 'sandbox' : 'production')}
+            disabled={isLoadingStatus}
+            className={`px-2.5 py-1 text-[11px] font-medium rounded transition-colors whitespace-nowrap ${
+              squareStatus?.environment === 'production'
+                ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
+                : 'bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-sm'
+            }`}
+            title={
+              squareStatus?.environment === 'production'
+                ? 'Switch back to Sandbox test mode'
+                : 'Switch to Live Production Square mode'
+            }
+          >
+            {squareStatus?.environment === 'production' ? 'Switch to Sandbox' : 'Switch to Production'}
+          </button>
         </div>
       </div>
 
