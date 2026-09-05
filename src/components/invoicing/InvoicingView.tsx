@@ -33,6 +33,7 @@ import { Property, Room, Contact, Invoice, InvoicingSubtask, InvoiceStatus, Leas
 import { splitFullName, formatFullName } from '../../utils/nameUtils';
 import { SquareService, SquareStatusResponse } from '../../services/squareService';
 import { FirebaseService } from '../../services/firebase';
+import { INITIAL_ROOMS } from '../../data/initialData';
 
 interface InvoicingViewProps {
   properties: Property[];
@@ -158,19 +159,38 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
   const propertyRooms = rooms.filter(r => r.propertyId === selectedPropertyId);
   const occupiedRooms = propertyRooms.filter(r => r.status === 'Occupied' && (r.currentTenantId || r.currentTenantName));
 
-  // Quick Email Modal State
+  // Quick Email & Rent Modal State
   const [editingEmailItem, setEditingEmailItem] = useState<{
     room: Room;
     contact?: Contact;
     tenantName: string;
     currentEmail: string;
     currentPhone: string;
+    currentRent?: number;
   } | null>(null);
   const [modalEmail, setModalEmail] = useState<string>('');
   const [modalPhone, setModalPhone] = useState<string>('');
+  const [modalRent, setModalRent] = useState<number>(0);
   const [isSavingEmailModal, setIsSavingEmailModal] = useState<boolean>(false);
   const [emailModalError, setEmailModalError] = useState<string>('');
   const [emailSuccessMsg, setEmailSuccessMsg] = useState<string>('');
+
+  // Selected room IDs to invoice under "Do Monthly Rent"
+  const [selectedRoomIdsForInvoice, setSelectedRoomIdsForInvoice] = useState<string[]>([]);
+  // Custom rent amount overrides for the current session/order
+  const [customRentOverrides, setCustomRentOverrides] = useState<Record<string, number>>({});
+
+  // Auto-sync selected room IDs when occupied rooms change or property changes
+  useEffect(() => {
+    if (occupiedRooms.length > 0) {
+      setSelectedRoomIdsForInvoice(prev => {
+        const validExisting = prev.filter(id => occupiedRooms.some(r => r.id === id));
+        return validExisting.length > 0 ? validExisting : occupiedRooms.map(r => r.id);
+      });
+    } else {
+      setSelectedRoomIdsForInvoice([]);
+    }
+  }, [selectedPropertyId, occupiedRooms.length]);
 
   const handleOpenEmailModal = (item: {
     room: Room;
@@ -178,16 +198,19 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
     tenantName: string;
     tenantEmail: string;
     tenantPhone: string;
+    rent?: number;
   }) => {
     setEditingEmailItem({
       room: item.room,
       contact: item.contact,
       tenantName: item.tenantName,
       currentEmail: item.tenantEmail,
-      currentPhone: item.tenantPhone
+      currentPhone: item.tenantPhone,
+      currentRent: item.rent || Number(item.room.monthlyRent) || 895
     });
     setModalEmail(item.tenantEmail || '');
     setModalPhone(item.tenantPhone || '');
+    setModalRent(item.rent || Number(item.room.monthlyRent) || 895);
     setEmailModalError('');
   };
 
@@ -205,13 +228,18 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
     try {
       const cleanPhone = modalPhone.trim();
       const targetRoom = editingEmailItem.room;
+      const cleanRent = modalRent > 0 ? modalRent : (Number(targetRoom.monthlyRent) || 895);
 
-      // 1. Update Room
+      // 1. Update Room with email, phone, and current rent
       const updatedRoom: Room = {
         ...targetRoom,
         currentTenantEmail: cleanEmail,
-        currentTenantPhone: cleanPhone || targetRoom.currentTenantPhone
+        currentTenantPhone: cleanPhone || targetRoom.currentTenantPhone,
+        monthlyRent: cleanRent
       };
+
+      // Also set local override
+      setCustomRentOverrides(prev => ({ ...prev, [targetRoom.id]: cleanRent }));
 
       // 2. Update or create Contact
       let updatedContact: Contact;
@@ -256,7 +284,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       onUpdateRoom?.(updatedRoom);
       onUpdateContact?.(updatedContact);
 
-      setEmailSuccessMsg(`Email updated for ${editingEmailItem.tenantName} (${cleanEmail})`);
+      setEmailSuccessMsg(`Details saved for ${editingEmailItem.tenantName} ($${cleanRent}/mo)`);
       setTimeout(() => setEmailSuccessMsg(''), 4000);
       setEditingEmailItem(null);
     } catch (err: any) {
@@ -361,8 +389,39 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
     // 4. Square customer ID
     const squareCustomerId = matchedContact?.squareCustomerId || '';
 
-    // 5. Monthly rent
-    const rent = room.monthlyRent ?? (room as any).rent ?? 950;
+    // 5. Monthly rent: resolve current rent accurately
+    let rent: number | undefined = customRentOverrides[room.id];
+    if (rent === undefined || rent === null || isNaN(rent) || rent <= 0) {
+      if (renewals && renewals.length > 0) {
+        const renewal = renewals.find(r => 
+          r.roomId === room.id || 
+          getSimilarityScore(r.tenantName || `${r.tenantFirstName || ''} ${r.tenantLastName || ''}`, rawName) >= 0.75
+        );
+        if (renewal && typeof renewal.currentMonthlyRent === 'number' && renewal.currentMonthlyRent > 0) {
+          rent = renewal.currentMonthlyRent;
+        }
+      }
+    }
+    if (rent === undefined || rent === null || isNaN(rent) || rent <= 0) {
+      const parsedRoomRent = Number(room.monthlyRent);
+      if (!isNaN(parsedRoomRent) && parsedRoomRent > 0) {
+        rent = parsedRoomRent;
+      }
+    }
+    if (rent === undefined || rent === null || isNaN(rent) || rent <= 0) {
+      const initialMatch = INITIAL_ROOMS.find(r => r.id === room.id || r.name === room.name);
+      if (initialMatch && typeof initialMatch.monthlyRent === 'number' && initialMatch.monthlyRent > 0) {
+        rent = initialMatch.monthlyRent;
+      }
+    }
+    if (rent === undefined || rent === null || isNaN(rent) || rent <= 0) {
+      const parsedAlt = Number((room as any).rent);
+      if (!isNaN(parsedAlt) && parsedAlt > 0) {
+        rent = parsedAlt;
+      } else {
+        rent = 895;
+      }
+    }
 
     return {
       room,
@@ -378,7 +437,32 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
   // Match occupied rooms with Contact records to ensure Square Customer ID exists
   const occupiedBedroomsWithTenants = occupiedRooms.map(room => resolveTenantForRoom(room));
 
+  // Invoicing selection helpers
+  const itemsToInvoice = occupiedBedroomsWithTenants.filter(item => 
+    selectedRoomIdsForInvoice.includes(item.room.id)
+  );
+
   const totalOccupiedRent = occupiedBedroomsWithTenants.reduce((acc, item) => acc + item.rent, 0);
+  const totalSelectedRent = itemsToInvoice.reduce((acc, item) => acc + item.rent, 0);
+
+  const isAllSelected = occupiedBedroomsWithTenants.length > 0 && 
+    occupiedBedroomsWithTenants.every(item => selectedRoomIdsForInvoice.includes(item.room.id));
+
+  const isSomeSelected = occupiedBedroomsWithTenants.some(item => selectedRoomIdsForInvoice.includes(item.room.id)) && !isAllSelected;
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedRoomIdsForInvoice([]);
+    } else {
+      setSelectedRoomIdsForInvoice(occupiedBedroomsWithTenants.map(item => item.room.id));
+    }
+  };
+
+  const handleToggleRoomSelect = (roomId: string) => {
+    setSelectedRoomIdsForInvoice(prev => 
+      prev.includes(roomId) ? prev.filter(id => id !== roomId) : [...prev, roomId]
+    );
+  };
 
   // Helper to calculate Due Date (1st of the specified month/year)
   const getDueDate = (month: string, year: number) => {
@@ -406,6 +490,11 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       return;
     }
 
+    if (itemsToInvoice.length === 0) {
+      alert('Please check at least one resident checkbox in the list to create and mail an invoice.');
+      return;
+    }
+
     setIsGenerating(true);
     setBatchResult(null);
 
@@ -413,7 +502,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       const invoicesToCreate: Partial<Invoice>[] = [];
       const dueDate = getDueDate(selectedMonth, selectedYear);
 
-      for (const item of occupiedBedroomsWithTenants) {
+      for (const item of itemsToInvoice) {
         // Fallback or auto-generate Square Customer ID if not assigned
         let customerId = item.squareCustomerId;
         if (!customerId && item.tenantEmail) {
@@ -1131,9 +1220,33 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
                   <span className="text-indigo-600">{selectedProperty?.name}</span>
                   <span className="text-zinc-400 font-normal">({selectedMonth} {selectedYear})</span>
                 </h3>
-                <p className="text-xs text-zinc-500">
-                  {occupiedBedroomsWithTenants.length} occupied bedrooms ready for Square invoice generation.
-                </p>
+                <div className="flex items-center gap-3 mt-1">
+                  <p className="text-xs text-zinc-500">
+                    {occupiedBedroomsWithTenants.length} occupied bedrooms.
+                  </p>
+                  <span className="text-zinc-300">•</span>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="font-semibold text-zinc-700">Invoicing:</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRoomIdsForInvoice(occupiedBedroomsWithTenants.map(i => i.room.id))}
+                      className="text-indigo-600 hover:text-indigo-800 font-semibold hover:underline text-[11px]"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-zinc-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRoomIdsForInvoice([])}
+                      className="text-zinc-500 hover:text-zinc-700 font-semibold hover:underline text-[11px]"
+                    >
+                      Select None
+                    </button>
+                    <span className="text-indigo-700 bg-indigo-50 border border-indigo-200 font-semibold px-2 py-0.5 rounded text-[11px]">
+                      {itemsToInvoice.length} of {occupiedBedroomsWithTenants.length} selected
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* Action Buttons: Print Order & Create/Mail Invoices */}
@@ -1151,16 +1264,16 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
                 <button
                   type="button"
                   onClick={handleCreateAndMailRentInvoices}
-                  disabled={isGenerating || occupiedBedroomsWithTenants.length === 0}
+                  disabled={isGenerating || itemsToInvoice.length === 0}
                   className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-md shadow-xs transition"
-                  title="Call Square createOrder then createInvoice (allow_partial_payments: false)"
+                  title={itemsToInvoice.length === 0 ? "Select at least one resident" : `Call Square createOrder then createInvoice for ${itemsToInvoice.length} selected resident(s)`}
                 >
                   {isGenerating ? (
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                   ) : (
                     <Send className="w-3.5 h-3.5" />
                   )}
-                  <span>Create / Mail Invoices</span>
+                  <span>Create / Mail Invoices ({itemsToInvoice.length})</span>
                 </button>
               </div>
             </div>
@@ -1186,77 +1299,144 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-600 font-bold uppercase tracking-wider text-[10px]">
+                      <th className="p-3 w-12 text-center">
+                        <div className="flex items-center justify-center">
+                          <input
+                            type="checkbox"
+                            id="select-all-invoices"
+                            checked={isAllSelected}
+                            ref={el => {
+                              if (el) el.indeterminate = isSomeSelected;
+                            }}
+                            onChange={handleToggleSelectAll}
+                            className="w-4 h-4 rounded text-indigo-600 border-zinc-300 focus:ring-indigo-500 cursor-pointer"
+                            title={isAllSelected ? "Deselect All" : "Select All"}
+                          />
+                        </div>
+                      </th>
                       <th className="p-3">Room</th>
                       <th className="p-3">Resident / Contact</th>
                       <th className="p-3">Email</th>
                       <th className="p-3">Square Customer ID</th>
                       <th className="p-3">Square Location ID</th>
                       <th className="p-3 text-right">Rent Amount</th>
+                      <th className="p-3 w-16 text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-200">
-                    {occupiedBedroomsWithTenants.map((item) => (
-                      <tr key={item.room.id} className="hover:bg-zinc-50/70 transition-colors">
-                        <td className="p-3 font-semibold text-zinc-900">
-                          {item.room.name}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-1.5 font-medium text-zinc-800">
-                            <User className="w-3 h-3 text-zinc-400" />
-                            <span>{item.tenantName}</span>
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          {item.tenantEmail ? (
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-[11px] text-zinc-700">{item.tenantEmail}</span>
+                    {occupiedBedroomsWithTenants.map((item) => {
+                      const isSelected = selectedRoomIdsForInvoice.includes(item.room.id);
+                      return (
+                        <tr 
+                          key={item.room.id} 
+                          className={`hover:bg-zinc-50/80 transition-colors ${isSelected ? 'bg-indigo-50/25' : 'opacity-65 bg-zinc-50/30'}`}
+                        >
+                          <td className="p-3 text-center">
+                            <input
+                              type="checkbox"
+                              id={`checkbox-invoice-${item.room.id}`}
+                              checked={isSelected}
+                              onChange={() => handleToggleRoomSelect(item.room.id)}
+                              className="w-4 h-4 rounded text-indigo-600 border-zinc-300 focus:ring-indigo-500 cursor-pointer"
+                              title={isSelected ? "Uncheck to exclude from invoicing" : "Check to include in invoicing"}
+                            />
+                          </td>
+                          <td className="p-3 font-semibold text-zinc-900">
+                            {item.room.name}
+                          </td>
+                          <td className="p-3">
+                            <div className="flex items-center gap-1.5 font-medium text-zinc-800">
+                              <User className="w-3 h-3 text-zinc-400" />
+                              <span>{item.tenantName}</span>
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            {item.tenantEmail ? (
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-[11px] text-zinc-700">{item.tenantEmail}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEmailModal(item)}
+                                  title="Edit resident email, phone or rent"
+                                  className="text-zinc-400 hover:text-indigo-600 p-0.5 rounded transition-colors"
+                                >
+                                  <Edit2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ) : (
                               <button
                                 type="button"
                                 onClick={() => handleOpenEmailModal(item)}
-                                title="Edit resident email"
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded transition-colors"
+                                title="Click to set tenant email address"
+                              >
+                                <AlertCircle className="w-3 h-3 text-amber-500" />
+                                <span>Add email</span>
+                              </button>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            {item.squareCustomerId ? (
+                              <span className="font-mono text-[11px] bg-zinc-100 text-zinc-800 px-1.5 py-0.5 rounded border border-zinc-200">
+                                {item.squareCustomerId}
+                              </span>
+                            ) : (
+                              <span className="text-amber-600 italic text-[11px]">
+                                Auto-generates on send
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 font-mono text-[11px] text-zinc-700">
+                            {selectedProperty?.squareLocationId || 'N/A'}
+                          </td>
+                          <td className="p-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span className="font-mono font-bold text-zinc-900 text-xs">
+                                ${item.rent.toFixed(2)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEmailModal(item)}
+                                title="Edit rent or details"
                                 className="text-zinc-400 hover:text-indigo-600 p-0.5 rounded transition-colors"
                               >
                                 <Edit2 className="w-3 h-3" />
                               </button>
                             </div>
-                          ) : (
+                          </td>
+                          <td className="p-3 text-center">
                             <button
                               type="button"
                               onClick={() => handleOpenEmailModal(item)}
-                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded transition-colors"
-                              title="Click to set tenant email address"
+                              className="text-indigo-600 hover:text-indigo-800 text-[11px] font-medium hover:underline inline-flex items-center gap-1"
+                              title="Edit email, phone or current rent"
                             >
-                              <AlertCircle className="w-3 h-3 text-amber-500" />
-                              <span>Add email</span>
+                              <Edit2 className="w-2.5 h-2.5" />
+                              <span>Edit</span>
                             </button>
-                          )}
-                        </td>
-                        <td className="p-3">
-                          {item.squareCustomerId ? (
-                            <span className="font-mono text-[11px] bg-zinc-100 text-zinc-800 px-1.5 py-0.5 rounded border border-zinc-200">
-                              {item.squareCustomerId}
-                            </span>
-                          ) : (
-                            <span className="text-amber-600 italic text-[11px]">
-                              Auto-generates on send
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-3 font-mono text-[11px] text-zinc-700">
-                          {selectedProperty?.squareLocationId || 'N/A'}
-                        </td>
-                        <td className="p-3 text-right font-mono font-bold text-zinc-900">
-                          ${item.rent.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                   <tfoot>
                     <tr className="bg-zinc-50 font-bold text-zinc-900 border-t-2 border-zinc-200">
-                      <td colSpan={5} className="p-3 text-right">Total Monthly Rent Order:</td>
-                      <td className="p-3 text-right font-mono text-sm text-indigo-700">
-                        ${totalOccupiedRent.toFixed(2)}
+                      <td colSpan={6} className="p-3 text-right">
+                        <div className="flex items-center justify-end gap-2 text-xs">
+                          <span className="font-semibold text-zinc-600">
+                            Total for Selected Invoices ({itemsToInvoice.length} of {occupiedBedroomsWithTenants.length}):
+                          </span>
+                          <span className="font-mono text-sm text-indigo-700">
+                            ${totalSelectedRent.toFixed(2)}
+                          </span>
+                          {itemsToInvoice.length !== occupiedBedroomsWithTenants.length && (
+                            <span className="text-[11px] text-zinc-400 font-normal ml-1">
+                              (Order Total: ${totalOccupiedRent.toFixed(2)})
+                            </span>
+                          )}
+                        </div>
                       </td>
+                      <td colSpan={2}></td>
                     </tr>
                   </tfoot>
                 </table>
@@ -1789,6 +1969,27 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
                   onChange={(e) => setModalPhone(e.target.value)}
                   className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs font-mono text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 mb-1">
+                  Current Monthly Rent ($) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-xs font-mono font-bold text-zinc-500">$</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="5"
+                    value={modalRent || ''}
+                    onChange={(e) => setModalRent(Number(e.target.value))}
+                    className="w-full pl-7 pr-3 py-2 bg-white border border-zinc-300 rounded-md text-xs font-mono font-bold text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="e.g. 895"
+                  />
+                </div>
+                <p className="text-[11px] text-zinc-500 mt-1">
+                  Updates this room's base monthly rent in property inventory and upcoming invoice orders.
+                </p>
               </div>
             </div>
 
