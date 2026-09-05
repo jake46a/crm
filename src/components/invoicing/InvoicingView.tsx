@@ -23,9 +23,14 @@ import {
   Search,
   Filter,
   Check,
-  Plus
+  Plus,
+  Mail,
+  Edit2,
+  X,
+  Loader2
 } from 'lucide-react';
-import { Property, Room, Contact, Invoice, InvoicingSubtask, InvoiceStatus } from '../../types';
+import { Property, Room, Contact, Invoice, InvoicingSubtask, InvoiceStatus, LeaseRenewal } from '../../types';
+import { splitFullName, formatFullName } from '../../utils/nameUtils';
 import { SquareService, SquareStatusResponse } from '../../services/squareService';
 import { FirebaseService } from '../../services/firebase';
 
@@ -34,8 +39,35 @@ interface InvoicingViewProps {
   rooms: Room[];
   contacts: Contact[];
   invoices: Invoice[];
+  renewals?: LeaseRenewal[];
   onSaveInvoices: (invoices: Invoice[]) => void;
   onUpdateInvoiceStatus: (invoiceId: string, status: Invoice['status'], details?: Partial<Invoice>) => void;
+  onUpdateRoom?: (room: Room) => void;
+  onUpdateContact?: (contact: Contact) => void;
+}
+
+// Robust similarity and fuzzy matching helper
+function getSimilarityScore(str1?: string | null, str2?: string | null): number {
+  const s1 = (str1 || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+  const s2 = (str2 || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+  if (!s1 || !s2) return 0;
+  if (s1 === s2) return 1;
+  if (s1.includes(s2) || s2.includes(s1)) return 0.9;
+  
+  // Levenshtein distance
+  const m = s1.length, n = s2.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (s1[i - 1] === s2[j - 1]) dp[i][j] = dp[i - 1][j - 1];
+      else dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  const dist = dp[m][n];
+  const maxLen = Math.max(m, n);
+  return 1 - dist / maxLen;
 }
 
 const MONTHS = [
@@ -48,8 +80,11 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
   rooms,
   contacts,
   invoices,
+  renewals,
   onSaveInvoices,
-  onUpdateInvoiceStatus
+  onUpdateInvoiceStatus,
+  onUpdateRoom,
+  onUpdateContact
 }) => {
   // Current active subtask
   const [activeSubtask, setActiveSubtask] = useState<InvoicingSubtask>('rent');
@@ -123,22 +158,225 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
   const propertyRooms = rooms.filter(r => r.propertyId === selectedPropertyId);
   const occupiedRooms = propertyRooms.filter(r => r.status === 'Occupied' && (r.currentTenantId || r.currentTenantName));
 
-  // Match occupied rooms with Contact records to ensure Square Customer ID exists
-  const occupiedBedroomsWithTenants = occupiedRooms.map(room => {
-    const contact = contacts.find(c => 
-      (room.currentTenantId && c.id === room.currentTenantId) ||
-      (room.currentTenantName && c.name.toLowerCase() === room.currentTenantName.toLowerCase())
-    );
+  // Quick Email Modal State
+  const [editingEmailItem, setEditingEmailItem] = useState<{
+    room: Room;
+    contact?: Contact;
+    tenantName: string;
+    currentEmail: string;
+    currentPhone: string;
+  } | null>(null);
+  const [modalEmail, setModalEmail] = useState<string>('');
+  const [modalPhone, setModalPhone] = useState<string>('');
+  const [isSavingEmailModal, setIsSavingEmailModal] = useState<boolean>(false);
+  const [emailModalError, setEmailModalError] = useState<string>('');
+  const [emailSuccessMsg, setEmailSuccessMsg] = useState<string>('');
+
+  const handleOpenEmailModal = (item: {
+    room: Room;
+    contact?: Contact;
+    tenantName: string;
+    tenantEmail: string;
+    tenantPhone: string;
+  }) => {
+    setEditingEmailItem({
+      room: item.room,
+      contact: item.contact,
+      tenantName: item.tenantName,
+      currentEmail: item.tenantEmail,
+      currentPhone: item.tenantPhone
+    });
+    setModalEmail(item.tenantEmail || '');
+    setModalPhone(item.tenantPhone || '');
+    setEmailModalError('');
+  };
+
+  const handleSaveTenantEmail = async () => {
+    if (!editingEmailItem) return;
+    const cleanEmail = modalEmail.trim();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setEmailModalError('Please enter a valid email address.');
+      return;
+    }
+
+    setIsSavingEmailModal(true);
+    setEmailModalError('');
+
+    try {
+      const cleanPhone = modalPhone.trim();
+      const targetRoom = editingEmailItem.room;
+
+      // 1. Update Room
+      const updatedRoom: Room = {
+        ...targetRoom,
+        currentTenantEmail: cleanEmail,
+        currentTenantPhone: cleanPhone || targetRoom.currentTenantPhone
+      };
+
+      // 2. Update or create Contact
+      let updatedContact: Contact;
+      if (editingEmailItem.contact) {
+        updatedContact = {
+          ...editingEmailItem.contact,
+          email: cleanEmail,
+          phone: cleanPhone || editingEmailItem.contact.phone,
+          roomId: targetRoom.id,
+          roomName: targetRoom.name,
+          propertyId: selectedProperty?.id || editingEmailItem.contact.propertyId,
+          propertyName: selectedProperty?.name || editingEmailItem.contact.propertyName
+        };
+      } else {
+        const split = splitFullName(editingEmailItem.tenantName);
+        updatedContact = {
+          id: targetRoom.currentTenantId || `contact-${Date.now()}`,
+          type: 'Tenant',
+          firstName: targetRoom.currentTenantFirstName || split.firstName,
+          lastName: targetRoom.currentTenantLastName || split.lastName,
+          name: editingEmailItem.tenantName,
+          email: cleanEmail,
+          phone: cleanPhone || targetRoom.currentTenantPhone || '',
+          propertyId: selectedProperty?.id || targetRoom.propertyId,
+          propertyName: selectedProperty?.name || targetRoom.propertyName,
+          roomId: targetRoom.id,
+          roomName: targetRoom.name,
+          status: 'Active',
+          paymentStatus: 'Current / Paid',
+          notes: `Resident of ${targetRoom.name}`,
+          avatarBg: 'bg-indigo-600'
+        };
+      }
+
+      // 3. Save to Firebase
+      await Promise.all([
+        FirebaseService.saveRoom(updatedRoom).catch(e => console.warn("Firestore save room err:", e)),
+        FirebaseService.saveContact(updatedContact).catch(e => console.warn("Firestore save contact err:", e))
+      ]);
+
+      // 4. Propagate to parent state
+      onUpdateRoom?.(updatedRoom);
+      onUpdateContact?.(updatedContact);
+
+      setEmailSuccessMsg(`Email updated for ${editingEmailItem.tenantName} (${cleanEmail})`);
+      setTimeout(() => setEmailSuccessMsg(''), 4000);
+      setEditingEmailItem(null);
+    } catch (err: any) {
+      console.error('Error saving tenant email:', err);
+      setEmailModalError(err?.message || 'Failed to save email. Please try again.');
+    } finally {
+      setIsSavingEmailModal(false);
+    }
+  };
+
+  // Match occupied rooms with Contact records and robust email resolution
+  const resolveTenantForRoom = (room: Room) => {
+    const rawName = room.currentTenantName || `${room.currentTenantFirstName || ''} ${room.currentTenantLastName || ''}`.trim() || 'Occupied Resident';
+    
+    // 1. Find matching contact
+    let matchedContact: Contact | undefined = undefined;
+
+    // Direct ID match
+    if (room.currentTenantId) {
+      matchedContact = contacts.find(c => c.id === room.currentTenantId);
+    }
+    // Room ID match
+    if (!matchedContact) {
+      matchedContact = contacts.find(c => c.roomId === room.id);
+    }
+    // Direct email match with room.currentTenantEmail
+    if (!matchedContact && room.currentTenantEmail) {
+      matchedContact = contacts.find(c => c.email && c.email.toLowerCase() === room.currentTenantEmail?.toLowerCase());
+    }
+    // Exact name match
+    if (!matchedContact && rawName) {
+      matchedContact = contacts.find(c => {
+        const cName = (c.name || `${c.firstName || ''} ${c.lastName || ''}`).trim().toLowerCase();
+        return cName === rawName.toLowerCase();
+      });
+    }
+    // Fuzzy name match (e.g. Daniel Oliveria vs Daniel Oliveira)
+    if (!matchedContact && rawName) {
+      let bestScore = 0;
+      let bestContact: Contact | undefined = undefined;
+      for (const c of contacts) {
+        const cName = (c.name || `${c.firstName || ''} ${c.lastName || ''}`).trim().toLowerCase();
+        const score = getSimilarityScore(cName, rawName);
+        if (score > bestScore && score >= 0.75) {
+          bestScore = score;
+          bestContact = c;
+        }
+      }
+      matchedContact = bestContact;
+    }
+    // Property and first name match
+    if (!matchedContact && room.propertyId) {
+      const fName = room.currentTenantFirstName || rawName.split(' ')[0] || '';
+      if (fName.length > 2) {
+        matchedContact = contacts.find(c => 
+          c.propertyId === room.propertyId && 
+          c.type === 'Tenant' && 
+          ((c.firstName && c.firstName.toLowerCase() === fName.toLowerCase()) || 
+           (c.name && c.name.toLowerCase().startsWith(fName.toLowerCase())))
+        );
+      }
+    }
+
+    // 2. Resolve Tenant Email
+    let resolvedEmail = room.currentTenantEmail?.trim() || matchedContact?.email?.trim() || '';
+
+    // Check renewals
+    if (!resolvedEmail && renewals && renewals.length > 0) {
+      const renewal = renewals.find(r => 
+        r.roomId === room.id || 
+        getSimilarityScore(r.tenantName || `${r.tenantFirstName || ''} ${r.tenantLastName || ''}`, rawName) >= 0.75
+      );
+      if (renewal?.tenantEmail) {
+        resolvedEmail = renewal.tenantEmail.trim();
+      }
+    }
+
+    // Check existing invoices
+    if (!resolvedEmail && invoices && invoices.length > 0) {
+      const inv = invoices.find(i => 
+        i.tenantEmail && 
+        (i.roomId === room.id || getSimilarityScore(i.tenantName, rawName) >= 0.75)
+      );
+      if (inv?.tenantEmail) {
+        resolvedEmail = inv.tenantEmail.trim();
+      }
+    }
+
+    // Check any contact with similar name that has an email
+    if (!resolvedEmail) {
+      const cWithEmail = contacts.find(c => 
+        c.email && getSimilarityScore(c.name || `${c.firstName || ''} ${c.lastName || ''}`, rawName) >= 0.7
+      );
+      if (cWithEmail?.email) {
+        resolvedEmail = cWithEmail.email.trim();
+      }
+    }
+
+    // 3. Resolve Tenant Phone
+    const resolvedPhone = matchedContact?.phone?.trim() || room.currentTenantPhone?.trim() || '';
+
+    // 4. Square customer ID
+    const squareCustomerId = matchedContact?.squareCustomerId || '';
+
+    // 5. Monthly rent
+    const rent = room.monthlyRent ?? (room as any).rent ?? 950;
+
     return {
       room,
-      contact,
-      tenantName: room.currentTenantName || contact?.name || 'Occupied Resident',
-      tenantEmail: contact?.email || '',
-      tenantPhone: contact?.phone || '',
-      squareCustomerId: contact?.squareCustomerId || '',
-      rent: room.rent || 950
+      contact: matchedContact,
+      tenantName: rawName,
+      tenantEmail: resolvedEmail,
+      tenantPhone: resolvedPhone,
+      squareCustomerId,
+      rent
     };
-  });
+  };
+
+  // Match occupied rooms with Contact records to ensure Square Customer ID exists
+  const occupiedBedroomsWithTenants = occupiedRooms.map(room => resolveTenantForRoom(room));
 
   const totalOccupiedRent = occupiedBedroomsWithTenants.reduce((acc, item) => acc + item.rent, 0);
 
@@ -865,6 +1103,23 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           </div>
         )}
 
+        {/* Email updated notification banner */}
+        {emailSuccessMsg && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-md text-xs flex items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="font-semibold">{emailSuccessMsg}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEmailSuccessMsg('')}
+              className="text-emerald-600 hover:text-emerald-800 text-sm font-bold"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         {/* SUBTASK 1: DO MONTHLY RENTAL INVOICES */}
         {activeSubtask === 'rent' && (
           <div className="space-y-6">
@@ -951,8 +1206,30 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
                             <span>{item.tenantName}</span>
                           </div>
                         </td>
-                        <td className="p-3 text-zinc-600 font-mono text-[11px]">
-                          {item.tenantEmail || <span className="text-amber-600 italic">No email</span>}
+                        <td className="p-3">
+                          {item.tenantEmail ? (
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-[11px] text-zinc-700">{item.tenantEmail}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEmailModal(item)}
+                                title="Edit resident email"
+                                className="text-zinc-400 hover:text-indigo-600 p-0.5 rounded transition-colors"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEmailModal(item)}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded transition-colors"
+                              title="Click to set tenant email address"
+                            >
+                              <AlertCircle className="w-3 h-3 text-amber-500" />
+                              <span>Add email</span>
+                            </button>
+                          )}
                         </td>
                         <td className="p-3">
                           {item.squareCustomerId ? (
@@ -1438,6 +1715,114 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Quick Resident Email Edit Modal */}
+      {editingEmailItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-xl shadow-xl border border-zinc-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200 bg-zinc-50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-zinc-900">Resident Email & Contact Info</h3>
+                  <p className="text-[11px] text-zinc-500">{editingEmailItem.room.name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingEmailItem(null)}
+                className="text-zinc-400 hover:text-zinc-600 p-1 rounded-md transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {emailModalError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-md flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{emailModalError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 mb-1">Resident Full Name</label>
+                <input
+                  type="text"
+                  disabled
+                  value={editingEmailItem.tenantName}
+                  className="w-full p-2 bg-zinc-100 border border-zinc-300 rounded-md text-xs text-zinc-700 font-medium cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 mb-1">
+                  Tenant Email Address <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-zinc-400 absolute left-2.5 top-2.5" />
+                  <input
+                    type="email"
+                    required
+                    autoFocus
+                    placeholder="e.g. daniel.oliveria@example.com"
+                    value={modalEmail}
+                    onChange={(e) => setModalEmail(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 bg-white border border-zinc-300 rounded-md text-xs font-mono text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                </div>
+                <p className="text-[11px] text-zinc-500 mt-1">
+                  Required for dispatching Square invoices and receipt notifications.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 mb-1">
+                  Tenant Phone Number <span className="text-zinc-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="tel"
+                  placeholder="e.g. (415) 555-0199"
+                  value={modalPhone}
+                  onChange={(e) => setModalPhone(e.target.value)}
+                  className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs font-mono text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 px-5 py-3.5 bg-zinc-50 border-t border-zinc-200">
+              <button
+                type="button"
+                onClick={() => setEditingEmailItem(null)}
+                disabled={isSavingEmailModal}
+                className="px-3.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-200 rounded-md transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveTenantEmail}
+                disabled={isSavingEmailModal}
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-md shadow-xs transition"
+              >
+                {isSavingEmailModal ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Save & Update Invoicing</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

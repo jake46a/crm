@@ -49,6 +49,8 @@ service cloud.firestore {
         && (!('currentTenantFirstName' in data) || (data.currentTenantFirstName is string && data.currentTenantFirstName.size() <= 128))
         && (!('currentTenantLastName' in data) || (data.currentTenantLastName is string && data.currentTenantLastName.size() <= 128))
         && (!('currentTenantName' in data) || (data.currentTenantName is string && data.currentTenantName.size() <= 256))
+        && (!('currentTenantEmail' in data) || (data.currentTenantEmail is string && data.currentTenantEmail.size() <= 128))
+        && (!('currentTenantPhone' in data) || (data.currentTenantPhone is string && data.currentTenantPhone.size() <= 64))
         && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2048));
     }
 
@@ -95,6 +97,10 @@ service cloud.firestore {
         && (!('name' in data) || (data.name is string && data.name.size() <= 256))
         && (!('email' in data) || (data.email is string && data.email.size() <= 128))
         && data.phone is string && data.phone.size() <= 64
+        && (!('roomId' in data) || (data.roomId is string && data.roomId.size() <= 128))
+        && (!('roomName' in data) || (data.roomName is string && data.roomName.size() <= 256))
+        && (!('propertyId' in data) || (data.propertyId is string && data.propertyId.size() <= 128))
+        && (!('propertyName' in data) || (data.propertyName is string && data.propertyName.size() <= 256))
         && (!('licenseNumber' in data) || (data.licenseNumber is string && data.licenseNumber.size() <= 128))
         && (!('roleOrSpecialty' in data) || (data.roleOrSpecialty is string && data.roleOrSpecialty.size() <= 128))
         && (!('company' in data) || (data.company is string && data.company.size() <= 128))

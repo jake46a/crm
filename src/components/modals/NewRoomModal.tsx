@@ -49,6 +49,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
   // Tenancy if occupied
   const [currentTenantFirstName, setCurrentTenantFirstName] = useState<string>('');
   const [currentTenantLastName, setCurrentTenantLastName] = useState<string>('');
+  const [currentTenantEmail, setCurrentTenantEmail] = useState<string>('');
   const [currentTenantPhone, setCurrentTenantPhone] = useState<string>('');
   const [leaseEndDate, setLeaseEndDate] = useState<string>('');
   const [amenities, setAmenities] = useState<string>(
@@ -102,6 +103,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
         }
         setCurrentTenantFirstName(fName);
         setCurrentTenantLastName(lName);
+        setCurrentTenantEmail(editingRoom.currentTenantEmail || '');
         setCurrentTenantPhone(editingRoom.currentTenantPhone || '');
         setLeaseEndDate(editingRoom.leaseEndDate || '');
         setAmenities(
@@ -126,6 +128,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
         setStatus('Available');
         setCurrentTenantFirstName('');
         setCurrentTenantLastName('');
+        setCurrentTenantEmail('');
         setCurrentTenantPhone('');
         setLeaseEndDate('');
         setAmenities('Queen Bed, Desk & Ergonomic Chair, Walk-in Closet, Blackout Blinds');
@@ -218,6 +221,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
         if (lName) newRoom.currentTenantLastName = lName;
         const fullName = formatFullName(fName, lName);
         if (fullName) newRoom.currentTenantName = fullName;
+        if (currentTenantEmail.trim()) newRoom.currentTenantEmail = currentTenantEmail.trim();
         if (currentTenantPhone.trim()) newRoom.currentTenantPhone = currentTenantPhone.trim();
         if (leaseEndDate.trim()) newRoom.leaseEndDate = leaseEndDate.trim();
       }
@@ -484,6 +488,16 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
                     value={currentTenantPhone}
                     onChange={(e) => setCurrentTenantPhone(e.target.value)}
                     className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-zinc-500">Tenant Email Address</label>
+                  <input
+                    type="email"
+                    placeholder="e.g. resident@gmail.com"
+                    value={currentTenantEmail}
+                    onChange={(e) => setCurrentTenantEmail(e.target.value)}
+                    className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
                 <div>

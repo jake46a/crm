@@ -792,8 +792,11 @@ export default function App() {
             rooms={rooms}
             contacts={contacts}
             invoices={invoices}
+            renewals={renewals}
             onSaveInvoices={handleSaveInvoices}
             onUpdateInvoiceStatus={handleUpdateInvoiceStatus}
+            onUpdateRoom={handleSaveRoom}
+            onUpdateContact={handleSaveContact}
           />
         )}
 
