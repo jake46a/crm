@@ -27,13 +27,15 @@ import {
   Mail,
   Edit2,
   X,
-  Loader2
+  Loader2,
+  Cloud
 } from 'lucide-react';
 import { Property, Room, Contact, Invoice, InvoicingSubtask, InvoiceStatus, LeaseRenewal } from '../../types';
 import { splitFullName, formatFullName } from '../../utils/nameUtils';
 import { SquareService, SquareStatusResponse } from '../../services/squareService';
 import { FirebaseService } from '../../services/firebase';
 import { INITIAL_ROOMS } from '../../data/initialData';
+import { CloudflareSecretsModal } from '../modals/CloudflareSecretsModal';
 
 interface InvoicingViewProps {
   properties: Property[];
@@ -98,6 +100,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
   // Square API Status
   const [squareStatus, setSquareStatus] = useState<SquareStatusResponse | null>(null);
   const [isLoadingStatus, setIsLoadingStatus] = useState<boolean>(false);
+  const [isCloudflareModalOpen, setIsCloudflareModalOpen] = useState<boolean>(false);
 
   // Rental Invoicing state
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -1057,6 +1060,16 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           </div>
 
           <div className="h-6 w-px bg-zinc-800" />
+
+          {/* Cloudflare Pages Secrets Setup Button */}
+          <button
+            onClick={() => setIsCloudflareModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition-colors whitespace-nowrap"
+            title="View instructions for passing Square production secrets to Cloudflare Pages"
+          >
+            <Cloud className="w-3.5 h-3.5 text-orange-400" />
+            <span>Cloudflare Secrets Guide</span>
+          </button>
 
           {/* Mode Switcher Button */}
           <button
@@ -2074,6 +2087,12 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           </div>
         </div>
       )}
+      {/* Cloudflare Pages Secrets Setup Guide Modal */}
+      <CloudflareSecretsModal
+        isOpen={isCloudflareModalOpen}
+        onClose={() => setIsCloudflareModalOpen(false)}
+        squareStatus={squareStatus}
+      />
     </div>
   );
 };
