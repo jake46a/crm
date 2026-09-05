@@ -9,6 +9,8 @@ export interface SquareStatusResponse {
   mode: string;
   isProduction?: boolean;
   activeLocationsCount: number;
+  apiConnected?: boolean;
+  diagnostics?: string;
 }
 
 export interface SquareLocation {
@@ -70,19 +72,51 @@ export interface ApplyLateFeeResult {
 
 export const SquareService = {
   async getStatus(): Promise<SquareStatusResponse> {
+    const buildTimeToken = ((import.meta as any).env?.VITE_SQUARE_ACCESS_TOKEN || (process as any)?.env?.SQUARE_ACCESS_TOKEN || '').trim();
+    const buildTimeEnv = (((import.meta as any).env?.VITE_SQUARE_ENVIRONMENT || (process as any)?.env?.SQUARE_ENVIRONMENT || 'production') as string).toLowerCase();
+    const isProd = buildTimeEnv === 'production' || buildTimeEnv === 'prod';
+    const defaultBaseUrl = isProd ? 'https://connect.squareup.com' : 'https://connect.squareupsandbox.com';
+
     try {
       const res = await fetch('/api/square/status');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (e) {
+      if (!res.ok) {
+        const hasBuildToken = buildTimeToken.length > 5;
+        return {
+          hasToken: hasBuildToken,
+          environment: isProd ? 'production' : 'sandbox',
+          baseUrl: defaultBaseUrl,
+          version: '2025-02-20',
+          mode: isProd
+            ? (hasBuildToken ? 'Production (Build Token Active)' : 'Production (Live)')
+            : (hasBuildToken ? 'Sandbox (Connected)' : 'Sandbox Mode'),
+          isProduction: isProd,
+          activeLocationsCount: 3,
+          apiConnected: false,
+          diagnostics: `API endpoint /api/square/status returned HTTP ${res.status}.`
+        };
+      }
+      const data = await res.json();
+      const hasToken = Boolean(data.hasToken || buildTimeToken.length > 5);
       return {
-        hasToken: false,
-        environment: 'production',
-        baseUrl: 'https://connect.squareup.com',
+        ...data,
+        hasToken,
+        apiConnected: true,
+        diagnostics: hasToken ? 'Square API live token active' : 'Square API connected (no token in environment)'
+      };
+    } catch (e: any) {
+      const hasBuildToken = buildTimeToken.length > 5;
+      return {
+        hasToken: hasBuildToken,
+        environment: isProd ? 'production' : 'sandbox',
+        baseUrl: defaultBaseUrl,
         version: '2025-02-20',
-        mode: 'Production (Live)',
-        isProduction: true,
-        activeLocationsCount: 3
+        mode: isProd
+          ? (hasBuildToken ? 'Production (Build Token Active)' : 'Production (Live)')
+          : (hasBuildToken ? 'Sandbox (Connected)' : 'Sandbox Mode'),
+        isProduction: isProd,
+        activeLocationsCount: 3,
+        apiConnected: false,
+        diagnostics: `Could not reach API: ${e?.message || 'Network error'}`
       };
     }
   },

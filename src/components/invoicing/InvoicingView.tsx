@@ -1052,10 +1052,21 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
                   {squareStatus?.environment === 'production' ? 'PRODUCTION' : 'SANDBOX'}
                 </span>
               </div>
-              <p className="text-[10px] text-zinc-400 font-mono">
-                {squareStatus?.baseUrl ? squareStatus.baseUrl.replace('https://', '') : 'connect.squareup.com'} •{' '}
-                {squareStatus?.hasToken ? 'Live Token Configured' : 'No Token (Mock Mode)'}
-              </p>
+              <div className="flex items-center gap-1.5 text-[10px] text-zinc-400 font-mono">
+                <span>{squareStatus?.baseUrl ? squareStatus.baseUrl.replace('https://', '') : 'connect.squareup.com'}</span>
+                <span>•</span>
+                {squareStatus?.hasToken ? (
+                  <span className="text-emerald-400 font-semibold">Live Token Configured</span>
+                ) : (
+                  <button
+                    onClick={() => setIsCloudflareModalOpen(true)}
+                    className="text-amber-400 hover:text-amber-300 underline font-semibold flex items-center gap-1 transition-colors"
+                    title={squareStatus?.diagnostics || 'No Token detected in Cloudflare Pages. Click to view how to add SQUARE_ACCESS_TOKEN in Cloudflare.'}
+                  >
+                    <span>No Token in Cloudflare (Needs Secret)</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 

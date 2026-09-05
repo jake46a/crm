@@ -112,14 +112,17 @@ export const CloudflareSecretsModal: React.FC<CloudflareSecretsModalProps> = ({
           </div>
 
           {/* Explanation Banner */}
-          <div className="p-4 rounded-lg bg-blue-950/30 border border-blue-800/50 flex gap-3 text-xs leading-relaxed text-blue-200">
-            <ShieldAlert className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-blue-100 mb-1">
-                Why didn't secrets transfer to Cloudflare automatically?
+          <div className="p-4 rounded-lg bg-blue-950/40 border border-blue-700/60 flex gap-3 text-xs leading-relaxed text-blue-200">
+            <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-semibold text-white text-xs">
+                Why didn't changing secrets here in AI Studio pass to Cloudflare?
               </p>
-              <p className="text-blue-300/90">
-                Secrets entered in Google AI Studio are isolated within your private Google Cloud Run sandbox container for security. They are never pushed to external Git repositories or third-party hosting platforms like Cloudflare Pages.
+              <p className="text-blue-200/90 text-[11px]">
+                Secrets entered in Google AI Studio are isolated within your private Google Cloud Run container. For security, AI Studio <strong>never automatically exports or syncs secrets to external hosts or Cloudflare</strong>.
+              </p>
+              <p className="text-amber-300 text-[11px] font-medium pt-1">
+                👉 You must add <code className="bg-black/40 px-1 py-0.5 rounded font-mono text-amber-200">SQUARE_ACCESS_TOKEN</code> directly into your Cloudflare Pages Dashboard under Settings &rarr; Environment variables, then click <strong>"Retry deployment"</strong>.
               </p>
             </div>
           </div>
