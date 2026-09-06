@@ -132,32 +132,42 @@ export function setConsoleLoggingEnabled(val: boolean): void {
 }
 
 /**
- * Diagnostic analysis specifically tailored to HTTP 405 Method Not Allowed
+ * Diagnostic analysis specifically tailored to HTTP 405 Method Not Allowed and Edge SPA HTML Fallbacks
  */
 function analyze405Error(
   method: string,
   endpoint: string,
   responseHeaders: Record<string, string>,
-  responsePayload: any
+  responsePayload: any,
+  status: number = 405
 ) {
+  const isHtml = typeof responsePayload === 'string' && (responsePayload.trim().startsWith('<!doctype') || responsePayload.includes('<html'));
   const allowHeader = responseHeaders['allow'] || responseHeaders['Allow'] || '';
   const serverHeader = responseHeaders['server'] || responseHeaders['Server'] || '';
   const cfRay = responseHeaders['cf-ray'] || responseHeaders['cf-cache-status'] || '';
+  const isCloudflare = cfRay || serverHeader.toLowerCase().includes('cloudflare');
+  const cacheStatus = responseHeaders['cf-cache-status'] || '';
 
   let cause = `The server rejected HTTP method ${method} on endpoint "${endpoint}".`;
   let explanation = `HTTP 405 indicates that the target URL exists, but does not permit requests with the ${method} verb.`;
-  let suggestedFix = `Verify route exports in Cloudflare Pages functions (e.g. onRequest${method.charAt(0).toUpperCase() + method.slice(1).toLowerCase()}) or use the resilient GET query fallback.`;
+  let suggestedFix = `Verify route exports in Cloudflare Pages functions or use the resilient edge mode.`;
 
-  if (cfRay || serverHeader.toLowerCase().includes('cloudflare')) {
-    cause += ' (Cloudflare edge proxy detected)';
-    explanation += ' Cloudflare Pages serves static assets first; if an API path is matched as a static asset or directory rather than an exported function handler, Cloudflare returns 405 to POST requests.';
-    suggestedFix = 'Ensure the Cloudflare Pages Function at functions/api/square/... exports onRequestPost or use the resilient query fallback / Cloud Run backend gateway.';
+  if (isHtml) {
+    cause = `Cloudflare Pages returned frontend SPA "index.html" (HTTP ${status}) instead of executing API function on "${endpoint}".`;
+    explanation = `When Cloudflare Pages receives a request for an API path that lacks an active Pages Function or _worker.js, its static routing rules serve index.html (SPA fallback) with HTTP 200.${cacheStatus ? ` The edge cache returned "${cacheStatus}".` : ''}`;
+    suggestedFix = `Deploy with the bundled "dist/_worker.js" and "_routes.json" or ensure Cloudflare Pages Functions is active for the repository. In the meantime, the application seamlessly operates in Resilient Edge Mode.`;
+  } else if (status === 405) {
+    if (isCloudflare) {
+      cause += ' (Cloudflare edge static proxy detected)';
+      explanation = 'Cloudflare Pages serves static assets first. If an API path is matched as a static asset or directory rather than an exported function handler, Cloudflare returns 405 Method Not Allowed to POST and OPTIONS requests.';
+      suggestedFix = 'Ensure the Cloudflare Pages deployment contains dist/_worker.js with _routes.json configured for /api/*, or use the resilient query fallback / Cloud Run backend gateway.';
+    }
   }
 
   return {
     cause,
     explanation,
-    allowedMethods: allowHeader || 'Not specified by server',
+    allowedMethods: allowHeader || (isHtml ? 'SPA Fallback (HTML index)' : 'Not specified by server'),
     suggestedFix,
     fallbackTriggered: true,
     fallbackResult: 'Client-side resilience fallback active'
@@ -216,7 +226,8 @@ export function recordApiActivity(data: {
         data.method,
         data.endpoint,
         data.responseHeaders,
-        data.responsePayload
+        data.responsePayload,
+        data.responseStatus
       )
     } : {})
   };

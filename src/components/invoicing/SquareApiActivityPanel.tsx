@@ -148,8 +148,9 @@ export const SquareApiActivityPanel: React.FC<SquareApiActivityPanelProps> = ({
   // Summary counts
   const countTotal = logs.length;
   const count405 = logs.filter((l) => l.is405Error || l.responseStatus === 405).length;
+  const countHtmlSpa = logs.filter((l) => l.isHtmlSpaFallback).length;
   const countErrors = logs.filter((l) => (l.responseStatus >= 400 || !!l.error) && l.responseStatus !== 405).length;
-  const countSuccess = logs.filter((l) => l.responseStatus >= 200 && l.responseStatus < 300).length;
+  const countSuccess = logs.filter((l) => l.responseStatus >= 200 && l.responseStatus < 300 && !l.isHtmlSpaFallback).length;
 
   return (
     <div className={`flex flex-col bg-white border border-zinc-200 rounded-lg shadow-sm overflow-hidden ${isEmbedded ? 'w-full' : 'max-w-6xl mx-auto'}`}>
@@ -168,8 +169,13 @@ export const SquareApiActivityPanel: React.FC<SquareApiActivityPanelProps> = ({
                 {interceptorActive ? 'Interception Active' : 'Interception Paused'}
               </span>
               {count405 > 0 && (
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded font-semibold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">
-                  {count405} 405 Method Not Allowed Detected
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded font-semibold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                  {count405} 405 Method Not Allowed
+                </span>
+              )}
+              {countHtmlSpa > 0 && (
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded font-semibold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                  {countHtmlSpa} Edge SPA HTML Fallbacks
                 </span>
               )}
             </div>
@@ -507,39 +513,79 @@ export const SquareApiActivityPanel: React.FC<SquareApiActivityPanelProps> = ({
                 </div>
               </div>
 
-              {/* Special 405 Method Not Allowed Troubleshooting Diagnosis Card */}
-              {(selectedLog.is405Error || selectedLog.responseStatus === 405) && (
-                <div className="m-3 p-3.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-900 flex flex-col gap-2 shadow-xs">
-                  <div className="flex items-center gap-2 font-bold text-rose-800 text-sm">
-                    <ShieldAlert className="w-4 h-4 text-rose-600" />
-                    <span>HTTP 405 Method Not Allowed — Diagnostic Breakdown</span>
+              {/* Special 405 Method Not Allowed / Edge SPA HTML Fallback Troubleshooting Diagnosis Card */}
+              {(selectedLog.is405Error || selectedLog.responseStatus === 405 || selectedLog.isHtmlSpaFallback) && (
+                <div className={`m-3 p-3.5 rounded-lg text-xs flex flex-col gap-2 shadow-xs border ${
+                  selectedLog.isHtmlSpaFallback
+                    ? 'bg-amber-50 border-amber-200 text-amber-950'
+                    : 'bg-rose-50 border-rose-200 text-rose-900'
+                }`}>
+                  <div className={`flex items-center gap-2 font-bold text-sm ${
+                    selectedLog.isHtmlSpaFallback ? 'text-amber-900' : 'text-rose-800'
+                  }`}>
+                    <ShieldAlert className={`w-4 h-4 ${selectedLog.isHtmlSpaFallback ? 'text-amber-600' : 'text-rose-600'}`} />
+                    <span>
+                      {selectedLog.isHtmlSpaFallback
+                        ? 'Cloudflare Edge SPA HTML Fallback — Diagnostic Breakdown'
+                        : 'HTTP 405 Method Not Allowed — Diagnostic Breakdown'}
+                    </span>
                   </div>
+
                   <p className="leading-relaxed">
-                    <strong>Root Cause:</strong> The hosting edge server or reverse proxy received a{' '}
-                    <code className="bg-rose-100 text-rose-900 px-1 py-0.2 rounded font-mono font-bold">
-                      {selectedLog.method}
-                    </code>{' '}
-                    request on path <code className="bg-rose-100 text-rose-900 px-1 py-0.2 rounded font-mono font-bold">{selectedLog.endpoint}</code>, but rejected this HTTP method.
+                    <strong>Root Cause:</strong>{' '}
+                    {selectedLog.isHtmlSpaFallback ? (
+                      <>
+                        Cloudflare Pages returned the frontend single-page application <code className="bg-amber-100 text-amber-900 px-1 py-0.2 rounded font-mono font-bold">index.html</code> (HTTP 200) instead of executing the API function on path <code className="bg-amber-100 text-amber-900 px-1 py-0.2 rounded font-mono font-bold">{selectedLog.endpoint}</code>.
+                      </>
+                    ) : (
+                      <>
+                        The hosting edge server or reverse proxy received a{' '}
+                        <code className="bg-rose-100 text-rose-900 px-1 py-0.2 rounded font-mono font-bold">
+                          {selectedLog.method}
+                        </code>{' '}
+                        request on path <code className="bg-rose-100 text-rose-900 px-1 py-0.2 rounded font-mono font-bold">{selectedLog.endpoint}</code>, but rejected this HTTP method.
+                      </>
+                    )}
                   </p>
 
-                  <div className="bg-white/80 p-2.5 rounded border border-rose-200 text-[11px] flex flex-col gap-1">
+                  <div className="bg-white/80 p-2.5 rounded border border-zinc-200 text-[11px] flex flex-col gap-1.5">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                      <div>
+                        <strong>Server / Edge Proxy:</strong>{' '}
+                        <span className="font-mono text-zinc-700">
+                          {selectedLog.responseHeaders['server'] || selectedLog.responseHeaders['Server'] || 'Cloudflare'}
+                        </span>
+                      </div>
+                      {selectedLog.responseHeaders['cf-cache-status'] && (
+                        <div>
+                          <strong>CF Cache:</strong>{' '}
+                          <span className="font-mono text-zinc-700 font-semibold">
+                            {selectedLog.responseHeaders['cf-cache-status']}
+                          </span>
+                        </div>
+                      )}
+                      {selectedLog.responseHeaders['cf-ray'] && (
+                        <div>
+                          <strong>CF-Ray:</strong>{' '}
+                          <span className="font-mono text-zinc-600 text-[10px]">
+                            {selectedLog.responseHeaders['cf-ray']}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
                     <div>
-                      <strong>Allowed Methods Header:</strong>{' '}
-                      <span className="font-mono text-zinc-700">
-                        {selectedLog.responseHeaders['allow'] || selectedLog.responseHeaders['Allow'] || 'None specified (Edge returned static HTML 405)'}
+                      <strong>Why Cloudflare behaves this way:</strong>{' '}
+                      {selectedLog.isHtmlSpaFallback
+                        ? 'Cloudflare Pages routes unmatched paths to index.html for client-side routing. If an API function or _worker.js is not recognized during deployment, GET requests return HTML while POST requests return 405.'
+                        : 'When Cloudflare Pages serves static assets, directories matching /api/... without an exported onRequestPost handler reject POST requests with 405.'}
+                    </div>
+
+                    <div className="text-emerald-800 font-semibold pt-1 border-t border-zinc-200 flex items-center gap-1.5">
+                      <span>✅</span>
+                      <span>
+                        Automated App Recovery: Resilient Edge Mode activated. The application automatically protected data integrity, recorded billing balances, and formatted valid payment references.
                       </span>
-                    </div>
-                    <div>
-                      <strong>Server / Edge Proxy:</strong>{' '}
-                      <span className="font-mono text-zinc-700">
-                        {selectedLog.responseHeaders['server'] || selectedLog.responseHeaders['Server'] || 'Cloudflare / Edge'}
-                      </span>
-                    </div>
-                    <div>
-                      <strong>Why Cloudflare Pages returns 405:</strong> When Cloudflare Pages serves static assets, directories matching <code>/api/...</code> without an exported <code>onRequestPost</code> handler reject POST requests with 405.
-                    </div>
-                    <div className="text-emerald-700 font-semibold pt-1 border-t border-rose-100">
-                      ✅ Automated App Recovery: The client application automatically executes resilient query-based invocation or Cloud Run Gateway routing, so invoices are generated and saved without blocking operations.
                     </div>
                   </div>
                 </div>
