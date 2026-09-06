@@ -1,8 +1,14 @@
 name = "crm"
-pages_build_output_dir = "dist"
+main = "dist/_worker.js"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
 
 [vars]
 SQUARE_ENVIRONMENT = "production"
 SQUARE_DEFAULT_LOCATION_ID = "LN4WBHANNNZ2Y"
+
