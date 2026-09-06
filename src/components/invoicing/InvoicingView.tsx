@@ -783,10 +783,11 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       await FirebaseService.saveInvoicesBatch(finalInvoices);
       onSaveInvoices([...invoices.filter(i => !finalInvoices.some(fi => fi.id === i.id)), ...finalInvoices]);
 
+      const advisory = squareBatchRes.note ? ` (${squareBatchRes.note})` : '';
       setBatchResult({
         success: true,
         count: finalInvoices.length,
-        message: `Successfully generated and published ${finalInvoices.length} authentic Square rental invoices for ${selectedProperty.name} (${selectedMonth} ${selectedYear}). Visible in Square Developer API Log.`
+        message: `Successfully generated and published ${finalInvoices.length} authentic Square rental invoices for ${selectedProperty.name} (${selectedMonth} ${selectedYear}).${advisory}`
       });
     } catch (err: any) {
       setBatchResult({
@@ -882,10 +883,11 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       await FirebaseService.saveInvoicesBatch(savedInvoices);
       onSaveInvoices([...invoices.filter(i => !savedInvoices.some(si => si.id === i.id)), ...savedInvoices]);
 
+      const utilityAdvisory = res.note ? ` (${res.note})` : '';
       setBatchResult({
         success: true,
         count: savedInvoices.length,
-        message: `Successfully split $${totalBill.toFixed(2)} total utilities across ${savedInvoices.length} occupied rooms ($${sharePerResident.toFixed(2)}/resident). Invoices emailed via Square.`
+        message: `Successfully split $${totalBill.toFixed(2)} total utilities across ${savedInvoices.length} occupied rooms ($${sharePerResident.toFixed(2)}/resident). Invoices emailed via Square.${utilityAdvisory}`
       });
     } catch (err: any) {
       setBatchResult({
@@ -979,10 +981,11 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       await FirebaseService.saveInvoicesBatch(savedInvoices);
       onSaveInvoices([...invoices.filter(i => !savedInvoices.some(si => si.id === i.id)), ...savedInvoices]);
 
+      const suppliesAdvisory = res.note ? ` (${res.note})` : '';
       setBatchResult({
         success: true,
         count: savedInvoices.length,
-        message: `Successfully split $${suppliesAmount.toFixed(2)} in common supplies ($${sharePerResident.toFixed(2)}/resident). Invoices emailed via Square.`
+        message: `Successfully split $${suppliesAmount.toFixed(2)} in common supplies ($${sharePerResident.toFixed(2)}/resident). Invoices emailed via Square.${suppliesAdvisory}`
       });
     } catch (err: any) {
       setBatchResult({

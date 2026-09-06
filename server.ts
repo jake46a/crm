@@ -527,8 +527,24 @@ app.all(['/api/square/customers/search-or-create', '/api/square/customers', '/ap
 
 // 4. Batch Create Invoices (createOrder -> createInvoice -> publish)
 // Rule: allow_partial_payments: false, delivery_method: 'EMAIL'
-app.post(['/api/square/invoices/create-batch', '/api/square/invoices/create-batch/'], async (req: Request, res: Response) => {
-  const { invoices } = req.body;
+app.all(['/api/square/invoices/create-batch', '/api/square/invoices/create-batch/'], async (req: Request, res: Response) => {
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    return res.status(405).json({ success: false, error: 'Method Not Allowed' });
+  }
+
+  let invoices = req.body?.invoices;
+  if ((!invoices || !Array.isArray(invoices)) && req.method === 'GET') {
+    try {
+      const rawPayload = (req.query?.payload || req.query?.invoices) as string;
+      if (rawPayload) {
+        const parsed = JSON.parse(rawPayload);
+        invoices = Array.isArray(parsed) ? parsed : (parsed.invoices || []);
+      }
+    } catch (e) {
+      console.warn('[Square Backend API] Failed to parse GET invoices payload:', e);
+    }
+  }
+
   const activeToken = resolveSquareToken(req);
 
   if (!Array.isArray(invoices) || invoices.length === 0) {

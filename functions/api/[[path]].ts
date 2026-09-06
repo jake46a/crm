@@ -501,9 +501,22 @@ export async function onRequest(context: { request: Request; env: Env; params: a
   }
 
   // 5. Batch Create Invoices (createOrder -> createInvoice -> publish)
-  if (pathname === '/api/square/invoices/create-batch' && request.method === 'POST') {
-    const body = (await request.json().catch(() => ({}))) as any;
-    const { invoices } = body;
+  if ((pathname === '/api/square/invoices/create-batch' || pathname === '/api/square/invoices/create-batch/') && (request.method === 'POST' || request.method === 'GET')) {
+    let invoices: any[] = [];
+    if (request.method === 'POST') {
+      const body = (await request.json().catch(() => ({}))) as any;
+      invoices = body?.invoices || [];
+    } else {
+      try {
+        const rawPayload = url.searchParams.get('payload') || url.searchParams.get('invoices');
+        if (rawPayload) {
+          const parsed = JSON.parse(rawPayload);
+          invoices = Array.isArray(parsed) ? parsed : (parsed?.invoices || []);
+        }
+      } catch (e) {
+        console.warn('[Cloudflare Pages API] Failed to parse GET invoices payload:', e);
+      }
+    }
 
     if (!Array.isArray(invoices) || invoices.length === 0) {
       return jsonResponse({ error: 'No invoices provided in payload.' }, 400);
