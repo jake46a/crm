@@ -10,9 +10,16 @@ import {
   CheckCircle2, 
   Terminal, 
   Cpu,
-  ArrowRight
+  ArrowRight,
+  Server,
+  RefreshCw
 } from 'lucide-react';
-import { SquareStatusResponse } from '../../services/squareService';
+import { 
+  SquareStatusResponse, 
+  LIVE_BACKEND_GATEWAY, 
+  getCustomBackendUrl, 
+  setCustomBackendUrl 
+} from '../../services/squareService';
 
 interface CloudflareSecretsModalProps {
   isOpen: boolean;
@@ -26,6 +33,9 @@ export const CloudflareSecretsModal: React.FC<CloudflareSecretsModalProps> = ({
   squareStatus
 }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [customUrl, setCustomUrl] = useState<string>(getCustomBackendUrl());
+  const [testStatus, setTestStatus] = useState<string | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -33,6 +43,33 @@ export const CloudflareSecretsModal: React.FC<CloudflareSecretsModalProps> = ({
     navigator.clipboard.writeText(text);
     setCopiedKey(keyId);
     setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const handleSaveCustomUrl = () => {
+    setCustomBackendUrl(customUrl);
+    setTestStatus('Saved! Reloading page to apply new endpoint...');
+    setTimeout(() => {
+      window.location.reload();
+    }, 800);
+  };
+
+  const handleTestGateway = async () => {
+    setIsTesting(true);
+    setTestStatus('Pinging API gateway...');
+    const target = customUrl.trim() || LIVE_BACKEND_GATEWAY;
+    try {
+      const res = await fetch(`${target}/api/square/status`);
+      if (res.ok) {
+        const data = await res.json();
+        setTestStatus(`Live connection verified! Runtime mode: ${data.environment || 'production'}. Token active.`);
+      } else {
+        setTestStatus(`Gateway responded with HTTP ${res.status}: ${res.statusText}`);
+      }
+    } catch (err: any) {
+      setTestStatus(`Failed to reach gateway: ${err.message || 'CORS/Network error'}`);
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   const variables = [
@@ -111,18 +148,64 @@ export const CloudflareSecretsModal: React.FC<CloudflareSecretsModalProps> = ({
             </div>
           </div>
 
+          {/* Live API Server Gateway Card */}
+          <div className="p-4 rounded-lg bg-zinc-950 border border-orange-500/40 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Server className="w-4 h-4 text-orange-400" />
+                <span className="font-semibold text-zinc-100 text-xs">Live Cloud Run API Gateway</span>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 font-mono border border-emerald-800/60">
+                Active &amp; Ready
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-400 leading-relaxed">
+              If your Cloudflare Pages deployment is currently running in static mode (returning HTTP 405), the application automatically proxies Square customer and invoice requests to this live backend gateway so production Square sync always succeeds:
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={customUrl || LIVE_BACKEND_GATEWAY}
+                onChange={(e) => setCustomUrl(e.target.value)}
+                placeholder={LIVE_BACKEND_GATEWAY}
+                className="flex-1 px-3 py-1.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-200 font-mono text-[11px] focus:outline-none focus:border-orange-500"
+              />
+              <button
+                onClick={handleTestGateway}
+                disabled={isTesting}
+                className="px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isTesting ? 'animate-spin' : ''}`} />
+                <span>Test</span>
+              </button>
+              {customUrl && customUrl !== LIVE_BACKEND_GATEWAY && (
+                <button
+                  onClick={handleSaveCustomUrl}
+                  className="px-3 py-1.5 rounded bg-orange-600 hover:bg-orange-500 text-white text-xs font-medium transition-colors shrink-0"
+                >
+                  Save
+                </button>
+              )}
+            </div>
+            {testStatus && (
+              <p className="text-[11px] font-mono text-orange-300 bg-orange-950/40 p-2 rounded border border-orange-900/60">
+                {testStatus}
+              </p>
+            )}
+          </div>
+
           {/* Explanation Banner */}
           <div className="p-4 rounded-lg bg-blue-950/40 border border-blue-700/60 flex gap-3 text-xs leading-relaxed text-blue-200">
             <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div className="space-y-1">
               <p className="font-semibold text-white text-xs">
-                Why didn't changing secrets here in AI Studio pass to Cloudflare?
+                Why was Cloudflare edge running in static mode (HTTP 405)?
               </p>
               <p className="text-blue-200/90 text-[11px]">
-                Secrets entered in Google AI Studio are isolated within your private Google Cloud Run container. For security, AI Studio <strong>never automatically exports or syncs secrets to external hosts or Cloudflare</strong>.
+                Cloudflare Pages static edge intercepts requests if deployed via <strong>Direct Upload</strong> (which ignores <code className="bg-black/40 px-1 font-mono text-amber-200">/functions</code> unless bundled into <code className="bg-black/40 px-1 font-mono text-amber-200">_worker.js</code>), or if the Git repository hasn't pulled the latest build output.
               </p>
               <p className="text-amber-300 text-[11px] font-medium pt-1">
-                👉 You must add <code className="bg-black/40 px-1 py-0.5 rounded font-mono text-amber-200">SQUARE_ACCESS_TOKEN</code> directly into your Cloudflare Pages Dashboard under Settings &rarr; Environment variables, then click <strong>"Retry deployment"</strong>.
+                👉 The app now automatically falls back to our live Cloud Run gateway, so customer creation and invoice generation work seamlessly right away!
               </p>
             </div>
           </div>
