@@ -648,6 +648,18 @@ export default function App() {
     logActivity('Invoicing', `Updated Square invoices records (${newInvoices.length} total)`);
   };
 
+  const handleDeleteInvoice = async (invoiceId: string) => {
+    setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
+    StorageService.deleteInvoice(invoiceId);
+    try {
+      await FirebaseService.deleteInvoice(invoiceId);
+    } catch (err) {
+      console.error('Failed to delete invoice from Firebase:', err);
+    }
+    logActivity('Invoicing', `Deleted invoice record ${invoiceId}`);
+    showToast('Invoice deleted from ledger.');
+  };
+
   const handleUpdateInvoiceStatus = (invoiceId: string, status: Invoice['status'], details?: Partial<Invoice>) => {
     setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status, ...details } : inv));
     const current = StorageService.getInvoices();
@@ -794,6 +806,7 @@ export default function App() {
             invoices={invoices}
             renewals={renewals}
             onSaveInvoices={handleSaveInvoices}
+            onDeleteInvoice={handleDeleteInvoice}
             onUpdateInvoiceStatus={handleUpdateInvoiceStatus}
             onUpdateRoom={handleSaveRoom}
             onUpdateContact={handleSaveContact}

@@ -24,6 +24,7 @@ import {
   SquareDiagnosticResult,
   logDiagnosticReportToConsole,
   getSavedSquareLocationId,
+  setSavedSquareLocationId,
   getSavedSquareEnvironment
 } from '../../services/squareService';
 
@@ -35,6 +36,8 @@ interface SquareDiagnosticModalProps {
   selectedPropertyName?: string;
   selectedPropertyId?: string;
   onAssignLocationToProperty?: (propertyId: string, newLocationId: string) => Promise<void> | void;
+  onDiagnosticReport?: (report: SquareDiagnosticResult) => void;
+  onSelectActiveLocation?: (locationId: string) => void;
 }
 
 export const SquareDiagnosticModal: React.FC<SquareDiagnosticModalProps> = ({
@@ -44,7 +47,9 @@ export const SquareDiagnosticModal: React.FC<SquareDiagnosticModalProps> = ({
   initialEnvironment,
   selectedPropertyName,
   selectedPropertyId,
-  onAssignLocationToProperty
+  onAssignLocationToProperty,
+  onDiagnosticReport,
+  onSelectActiveLocation
 }) => {
   const [testLocationId, setTestLocationId] = useState<string>(
     initialLocationId || getSavedSquareLocationId() || 'LN4WBHANNNZ2Y'
@@ -76,6 +81,9 @@ export const SquareDiagnosticModal: React.FC<SquareDiagnosticModalProps> = ({
     try {
       const result = await SquareService.runDiagnostics(loc, env);
       setReport(result);
+      if (onDiagnosticReport) {
+        onDiagnosticReport(result);
+      }
       setConsoleLogged(true);
       setTimeout(() => setConsoleLogged(false), 3000);
     } catch (err) {
@@ -525,6 +533,21 @@ export const SquareDiagnosticModal: React.FC<SquareDiagnosticModalProps> = ({
                               >
                                 {isCurrentlyTested ? 'Testing Now' : 'Test Location'}
                               </button>
+
+                              {onSelectActiveLocation && (
+                                <button
+                                  onClick={() => {
+                                    setSavedSquareLocationId(loc.id);
+                                    onSelectActiveLocation(loc.id);
+                                    setAssignSuccess(`Location ${loc.id} (${loc.name}) set as active VITE_SQUARE_DEFAULT_LOCATION_ID.`);
+                                    setTimeout(() => setAssignSuccess(null), 3500);
+                                  }}
+                                  className="px-2 py-1 bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 border border-emerald-700/80 rounded text-[11px] font-medium transition-colors"
+                                  title={`Set ${loc.id} as active VITE_SQUARE_DEFAULT_LOCATION_ID in real-time`}
+                                >
+                                  Set Active
+                                </button>
+                              )}
 
                               {selectedPropertyId && onAssignLocationToProperty && loc.id !== testLocationId && (
                                 <button

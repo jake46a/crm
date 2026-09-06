@@ -296,10 +296,13 @@ export type InvoicingSubtask =
   | 'supplies'
   | 'late-fee'
   | 'special'
-  | 'all-invoices';
+  | 'all-invoices'
+  | 'rent'
+  | 'late_fee'
+  | 'payment-history';
 
 export type InvoiceType = 'Rental' | 'Utility' | 'Supplies' | 'Late Fee' | 'Special';
-export type InvoiceStatus = 'UNPAID' | 'PAID' | 'CANCELED' | 'SCHEDULED' | 'REFUNDED' | 'OVERDUE' | 'DRAFT' | 'SENT';
+export type InvoiceStatus = 'UNPAID' | 'PAID' | 'CANCELED' | 'SCHEDULED' | 'REFUNDED' | 'OVERDUE' | 'DRAFT' | 'SENT' | 'FAILED';
 
 export interface InvoiceLineItem {
   id: string;
@@ -342,6 +345,9 @@ export interface Invoice {
   amountPaid?: number;
   description?: string;
   notes?: string;
+  failureReason?: string;
+  failedAt?: string;
+  paymentReference?: string;
   allowPartialPayments?: boolean; // Always false for Square invoices per rule
   subtask?: InvoicingSubtask;
   billingMonth?: string;

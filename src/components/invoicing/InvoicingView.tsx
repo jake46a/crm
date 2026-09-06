@@ -29,15 +29,21 @@ import {
   X,
   Loader2,
   Cloud,
-  Activity
+  Activity,
+  History,
+  Trash2
 } from 'lucide-react';
 import { Property, Room, Contact, Invoice, InvoicingSubtask, InvoiceStatus, LeaseRenewal } from '../../types';
 import { splitFullName, formatFullName } from '../../utils/nameUtils';
 import { SquareService, SquareStatusResponse } from '../../services/squareService';
 import { FirebaseService } from '../../services/firebase';
+import { StorageService } from '../../services/storage';
 import { INITIAL_ROOMS } from '../../data/initialData';
 import { CloudflareSecretsModal } from '../modals/CloudflareSecretsModal';
 import { SquareDiagnosticModal } from './SquareDiagnosticModal';
+import { PaymentHistoryTab } from './PaymentHistoryTab';
+import { SquareLocationSelector, DiagnosticLocationOption } from './SquareLocationSelector';
+import { getSavedSquareLocationId, setSavedSquareLocationId } from '../../services/squareService';
 
 interface InvoicingViewProps {
   properties: Property[];
@@ -46,6 +52,7 @@ interface InvoicingViewProps {
   invoices: Invoice[];
   renewals?: LeaseRenewal[];
   onSaveInvoices: (invoices: Invoice[]) => void;
+  onDeleteInvoice?: (invoiceId: string) => void;
   onUpdateInvoiceStatus: (invoiceId: string, status: Invoice['status'], details?: Partial<Invoice>) => void;
   onUpdateRoom?: (room: Room) => void;
   onUpdateContact?: (contact: Contact) => void;
@@ -88,6 +95,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
   invoices,
   renewals,
   onSaveInvoices,
+  onDeleteInvoice,
   onUpdateInvoiceStatus,
   onUpdateRoom,
   onUpdateContact,
@@ -107,6 +115,24 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
   const [isCloudflareModalOpen, setIsCloudflareModalOpen] = useState<boolean>(false);
   const [isDiagnosticModalOpen, setIsDiagnosticModalOpen] = useState<boolean>(false);
 
+  // Dynamic Active Square Location ID state (persisted & bound to VITE_SQUARE_DEFAULT_LOCATION_ID in real-time)
+  const [activeSquareLocationId, setActiveSquareLocationId] = useState<string>(() => getSavedSquareLocationId());
+  const [diagnosticLocations, setDiagnosticLocations] = useState<DiagnosticLocationOption[]>(() => {
+    try {
+      const cached = localStorage.getItem('moyer_square_diagnostic_locations_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [
+      { id: 'LN4WBHANNNZ2Y', name: '1070 (1070 Yank St, Golden, CO)', status: 'ACTIVE', capabilities: ['CREDIT_CARD_PROCESSING'] },
+      { id: 'S2C67DJTB5S53', name: 'PWA (ProWeb.Agency)', status: 'ACTIVE', capabilities: ['CREDIT_CARD_PROCESSING'] },
+      { id: 'LW2PEV9NMHM5Q', name: 'christinescollectibles.com', status: 'ACTIVE', capabilities: ['CREDIT_CARD_PROCESSING'] }
+    ];
+  });
+  const [isLoadingLocations, setIsLoadingLocations] = useState<boolean>(false);
+
   // Quick helper to assign a verified Square Location ID to a property
   const handleAssignLocationToProperty = async (propertyId: string, newLocationId: string) => {
     const prop = properties.find(p => p.id === propertyId);
@@ -119,6 +145,57 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       onUpdateProperty(updated);
     }
     await FirebaseService.saveProperty(updated);
+  };
+
+  // Fetch live locations from Square Diagnostics / locations API
+  const handleFetchSquareLocations = async () => {
+    setIsLoadingLocations(true);
+    try {
+      const diag = await SquareService.runDiagnostics(activeSquareLocationId);
+      if (diag.locations && diag.locations.length > 0) {
+        setDiagnosticLocations(diag.locations);
+        try {
+          localStorage.setItem('moyer_square_diagnostic_locations_cache', JSON.stringify(diag.locations));
+        } catch {}
+      }
+    } catch (err) {
+      console.warn('Could not fetch locations from Square diagnostics:', err);
+    } finally {
+      setIsLoadingLocations(false);
+    }
+  };
+
+  // Listen to external location changes (e.g. from diagnostic modal or custom events)
+  useEffect(() => {
+    const handleLocationEvent = (e: any) => {
+      if (e.detail?.locationId) {
+        setActiveSquareLocationId(e.detail.locationId);
+      }
+    };
+    window.addEventListener('square-location-changed', handleLocationEvent);
+    return () => window.removeEventListener('square-location-changed', handleLocationEvent);
+  }, []);
+
+  // Handler for switching the active Square Location ID dynamically
+  const handleSwitchSquareLocation = async (newLocationId: string, applyToCurrentProperty = false) => {
+    const cleanId = newLocationId.trim();
+    if (!cleanId) return;
+
+    setActiveSquareLocationId(cleanId);
+    setSavedSquareLocationId(cleanId);
+
+    const foundLoc = diagnosticLocations.find(l => l.id === cleanId);
+    const locName = foundLoc ? foundLoc.name : cleanId;
+
+    if (applyToCurrentProperty && selectedProperty) {
+      await handleAssignLocationToProperty(selectedProperty.id, cleanId);
+    }
+
+    setBatchResult({
+      success: true,
+      count: 0,
+      message: `Active Square Location switched to "${locName}" (${cleanId}). VITE_SQUARE_DEFAULT_LOCATION_ID updated in real-time for subsequent invoice generation.`
+    });
   };
 
   // Rental Invoicing state
@@ -514,8 +591,9 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
   const handleCreateAndMailRentInvoices = async () => {
     if (!selectedProperty) return;
 
-    if (!selectedProperty.squareLocationId) {
-      alert(`Selected property "${selectedProperty.name}" does not have a Square Location ID set. Please edit the property to configure SquareLocationID first.`);
+    const effectiveLocationId = activeSquareLocationId || selectedProperty.squareLocationId || getSavedSquareLocationId();
+    if (!effectiveLocationId) {
+      alert(`Selected property "${selectedProperty.name}" does not have a Square Location ID set. Please select an active Square Location ID.`);
       return;
     }
 
@@ -577,7 +655,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           tenantName: item.tenantName,
           tenantEmail: item.tenantEmail,
           tenantPhone: item.tenantPhone,
-          squareLocationId: selectedProperty.squareLocationId,
+          squareLocationId: effectiveLocationId,
           squareCustomerId: customerId || `CUST_SANDBOX_${item.room.id}`,
           month: selectedMonth,
           year: selectedYear,
@@ -638,8 +716,9 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
 
   // 3. CREATE UTILITY INVOICES (Split equally among occupied rooms)
   const handleCreateUtilityInvoices = async () => {
-    if (!selectedProperty || !selectedProperty.squareLocationId) {
-      alert('Selected property must have a Square Location ID set.');
+    const effectiveLocationId = activeSquareLocationId || selectedProperty?.squareLocationId || getSavedSquareLocationId();
+    if (!selectedProperty || !effectiveLocationId) {
+      alert('Please select an active Square Location ID before generating utility invoices.');
       return;
     }
     if (occupiedBedroomsWithTenants.length === 0) {
@@ -675,7 +754,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           tenantName: item.tenantName,
           tenantEmail: item.tenantEmail,
           tenantPhone: item.tenantPhone,
-          squareLocationId: selectedProperty.squareLocationId!,
+          squareLocationId: effectiveLocationId,
           squareCustomerId: item.squareCustomerId || `CUST_SANDBOX_${item.room.id}`,
           month: selectedMonth,
           year: selectedYear,
@@ -731,8 +810,9 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
 
   // 4. CREATE COMMON SUPPLIES INVOICING
   const handleCreateSuppliesInvoices = async () => {
-    if (!selectedProperty || !selectedProperty.squareLocationId) {
-      alert('Selected property must have a Square Location ID set.');
+    const effectiveLocationId = activeSquareLocationId || selectedProperty?.squareLocationId || getSavedSquareLocationId();
+    if (!selectedProperty || !effectiveLocationId) {
+      alert('Please select an active Square Location ID before generating supplies invoices.');
       return;
     }
     if (occupiedBedroomsWithTenants.length === 0) {
@@ -766,7 +846,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           tenantName: item.tenantName,
           tenantEmail: item.tenantEmail,
           tenantPhone: item.tenantPhone,
-          squareLocationId: selectedProperty.squareLocationId!,
+          squareLocationId: effectiveLocationId,
           squareCustomerId: item.squareCustomerId || `CUST_SANDBOX_${item.room.id}`,
           month: selectedMonth,
           year: selectedYear,
@@ -822,8 +902,9 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
 
   // 5. CREATE SPECIAL INVOICE (One-off fee)
   const handleCreateSpecialInvoice = async () => {
-    if (!selectedProperty || !selectedProperty.squareLocationId) {
-      alert('Selected property must have a Square Location ID set.');
+    const effectiveLocationId = activeSquareLocationId || selectedProperty?.squareLocationId || getSavedSquareLocationId();
+    if (!selectedProperty || !effectiveLocationId) {
+      alert('Please select an active Square Location ID before generating special invoices.');
       return;
     }
     const tenant = contacts.find(c => c.id === specialContactId);
@@ -854,7 +935,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
         tenantName: tenant.name,
         tenantEmail: tenant.email,
         tenantPhone: tenant.phone,
-        squareLocationId: selectedProperty.squareLocationId,
+        squareLocationId: effectiveLocationId,
         squareCustomerId: tenant.squareCustomerId || `CUST_SPECIAL_${tenant.id}`,
         month: selectedMonth,
         year: selectedYear,
@@ -1007,6 +1088,44 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
     }
   };
 
+  // 9. DELETE INVOICE FROM LEDGER
+  const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
+  const [isDeletingInvoice, setIsDeletingInvoice] = useState<boolean>(false);
+
+  const handleConfirmDeleteInvoice = async () => {
+    if (!invoiceToDelete) return;
+    const targetId = invoiceToDelete.id;
+    const desc = `${invoiceToDelete.tenantName || 'Resident'} (${invoiceToDelete.billingMonth} ${invoiceToDelete.billingYear} - $${invoiceToDelete.totalAmount.toFixed(2)})`;
+
+    setIsDeletingInvoice(true);
+    try {
+      if (onDeleteInvoice) {
+        onDeleteInvoice(targetId);
+      } else {
+        const remaining = invoices.filter(inv => inv.id !== targetId);
+        onSaveInvoices(remaining);
+        StorageService.deleteInvoice(targetId);
+        try {
+          await FirebaseService.deleteInvoice(targetId);
+        } catch (fbErr) {
+          console.error('Failed to delete invoice from Firebase:', fbErr);
+        }
+      }
+
+      setBatchResult({
+        success: true,
+        count: 1,
+        message: `Invoice record for ${desc} was deleted successfully from the Square Invoices Record Ledger.`
+      });
+      setInvoiceToDelete(null);
+    } catch (err: any) {
+      console.error('Error deleting invoice:', err);
+      alert(`Could not delete invoice: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setIsDeletingInvoice(false);
+    }
+  };
+
   // Filtered Invoices List
   const filteredInvoices = invoices.filter(inv => {
     if (filterInvoiceStatus !== 'all' && inv.status !== filterInvoiceStatus) return false;
@@ -1072,7 +1191,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
                   {squareStatus?.environment === 'production' ? 'PRODUCTION' : 'SANDBOX'}
                 </span>
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-zinc-400 font-mono">
+              <div className="flex items-center gap-1.5 text-[10px] text-zinc-400 font-mono flex-wrap">
                 <span>{squareStatus?.baseUrl ? squareStatus.baseUrl.replace('https://', '') : 'connect.squareup.com'}</span>
                 <span>•</span>
                 {squareStatus?.hasToken ? (
@@ -1086,6 +1205,11 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
                     <span>No Token in Cloudflare (Needs Secret)</span>
                   </button>
                 )}
+                <span>•</span>
+                <span className="text-zinc-400">Loc:</span>
+                <span className="font-mono text-indigo-300 font-bold bg-indigo-950/70 px-1 rounded border border-indigo-800/60" title="Current real-time VITE_SQUARE_DEFAULT_LOCATION_ID">
+                  {activeSquareLocationId}
+                </span>
               </div>
             </div>
           </div>
@@ -1194,152 +1318,192 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           <Sliders className="w-3.5 h-3.5" />
           <span>Do Special Invoicing</span>
         </button>
+
+        <button
+          id="tab-payment-history"
+          onClick={() => setActiveSubtask('payment-history')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
+            activeSubtask === 'payment-history'
+              ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50'
+              : 'border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
+          }`}
+        >
+          <History className="w-3.5 h-3.5" />
+          <span>Payment History</span>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
+            activeSubtask === 'payment-history'
+              ? 'bg-indigo-100 text-indigo-800'
+              : 'bg-zinc-100 text-zinc-600'
+          }`}>
+            {invoices.length}
+          </span>
+        </button>
       </div>
 
       {/* Primary Workspace Panel */}
       <div className="bg-white rounded-b-lg border border-t-0 border-zinc-200 p-6 shadow-xs space-y-6">
-        {/* Global Controls Bar: Property, Month, Year */}
-        <div className="bg-zinc-50 border border-zinc-200 p-4 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1">
-            {/* Property Selector */}
-            <div>
-              <label className="block text-xs font-bold text-zinc-700 mb-1 flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-zinc-500" />
-                <span>Select Property *</span>
-              </label>
-              <select
-                value={selectedPropertyId}
-                onChange={(e) => setSelectedPropertyId(e.target.value)}
-                className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs font-medium text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                {properties.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} {p.squareLocationId ? `[Location: ${p.squareLocationId}]` : '[No Square Location]'}
-                  </option>
-                ))}
-              </select>
-            </div>
+        {activeSubtask !== 'payment-history' && (
+          <>
+            {/* Global Controls Bar: Property, Month, Year & Dynamic Square Location */}
+            <div className="bg-zinc-50 border border-zinc-200 p-4 rounded-lg space-y-3.5">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1">
+                  {/* Property Selector */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 mb-1 flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-zinc-500" />
+                      <span>Select Property *</span>
+                    </label>
+                    <select
+                      value={selectedPropertyId}
+                      onChange={(e) => setSelectedPropertyId(e.target.value)}
+                      className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs font-medium text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    >
+                      {properties.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} {p.squareLocationId ? `[Location: ${p.squareLocationId}]` : '[No Square Location]'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-            {/* Month Selector */}
-            <div>
-              <label className="block text-xs font-bold text-zinc-700 mb-1 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-zinc-500" />
-                <span>Billing Month *</span>
-              </label>
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs font-medium text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                {MONTHS.map(m => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
+                  {/* Month Selector */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 mb-1 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-zinc-500" />
+                      <span>Billing Month *</span>
+                    </label>
+                    <select
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(e.target.value)}
+                      className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs font-medium text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    >
+                      {MONTHS.map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
 
-            {/* Year Selector */}
-            <div>
-              <label className="block text-xs font-bold text-zinc-700 mb-1 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-zinc-500" />
-                <span>Billing Year *</span>
-              </label>
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
-                className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs font-medium text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                {[2025, 2026, 2027].map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+                  {/* Year Selector */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 mb-1 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-zinc-500" />
+                      <span>Billing Year *</span>
+                    </label>
+                    <select
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(Number(e.target.value))}
+                      className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs font-medium text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    >
+                      {[2025, 2026, 2027].map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-          {/* Property Square Location Status Warning/Info */}
-          <div className="shrink-0 md:text-right border-t md:border-t-0 md:border-l border-zinc-200 pt-3 md:pt-0 md:pl-4">
-            <p className="text-[11px] font-semibold text-zinc-500">Property Square Location:</p>
-            {selectedProperty?.squareLocationId ? (
-              <div className="flex items-center md:justify-end gap-1.5 mt-0.5">
-                <span className={`inline-flex items-center gap-1 text-xs font-mono font-bold px-2 py-0.5 rounded border ${
-                  ['LOC_SPEER', 'LOC_CAPHILL', 'LOC_HIGHLANDS', 'LOC_DEMO'].includes(selectedProperty.squareLocationId.toUpperCase())
-                    ? 'text-amber-800 bg-amber-50 border-amber-300'
-                    : 'text-indigo-700 bg-indigo-50 border-indigo-200'
-                }`}>
-                  {['LOC_SPEER', 'LOC_CAPHILL', 'LOC_HIGHLANDS', 'LOC_DEMO'].includes(selectedProperty.squareLocationId.toUpperCase()) ? (
-                    <AlertTriangle className="w-3 h-3 text-amber-600" />
+                {/* Property Square Location Status Warning/Info */}
+                <div className="shrink-0 lg:text-right border-t lg:border-t-0 lg:border-l border-zinc-200 pt-3 lg:pt-0 lg:pl-4">
+                  <p className="text-[11px] font-semibold text-zinc-500">Property Square Location:</p>
+                  {selectedProperty?.squareLocationId ? (
+                    <div className="flex items-center lg:justify-end gap-1.5 mt-0.5">
+                      <span className={`inline-flex items-center gap-1 text-xs font-mono font-bold px-2 py-0.5 rounded border ${
+                        ['LOC_SPEER', 'LOC_CAPHILL', 'LOC_HIGHLANDS', 'LOC_DEMO'].includes(selectedProperty.squareLocationId.toUpperCase())
+                          ? 'text-amber-800 bg-amber-50 border-amber-300'
+                          : 'text-indigo-700 bg-indigo-50 border-indigo-200'
+                      }`}>
+                        {['LOC_SPEER', 'LOC_CAPHILL', 'LOC_HIGHLANDS', 'LOC_DEMO'].includes(selectedProperty.squareLocationId.toUpperCase()) ? (
+                          <AlertTriangle className="w-3 h-3 text-amber-600" />
+                        ) : (
+                          <CheckCircle2 className="w-3 h-3 text-indigo-600" />
+                        )}
+                        <span>{selectedProperty.squareLocationId}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsDiagnosticModalOpen(true)}
+                        className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold underline flex items-center gap-0.5"
+                        title="Run Square API Diagnostics on this location ID"
+                      >
+                        <Activity className="w-3 h-3 text-indigo-600" />
+                        <span>Diagnose</span>
+                      </button>
+                    </div>
                   ) : (
-                    <CheckCircle2 className="w-3 h-3 text-indigo-600" />
+                    <div className="flex items-center lg:justify-end gap-1.5 mt-0.5">
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        <AlertTriangle className="w-3 h-3 text-amber-600" />
+                        <span>SquareLocationID Missing</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsDiagnosticModalOpen(true)}
+                        className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold underline"
+                      >
+                        Assign
+                      </button>
+                    </div>
                   )}
-                  <span>{selectedProperty.squareLocationId}</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setIsDiagnosticModalOpen(true)}
-                  className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold underline flex items-center gap-0.5"
-                  title="Run Square API Diagnostics on this location ID"
-                >
-                  <Activity className="w-3 h-3 text-indigo-600" />
-                  <span>Diagnose</span>
-                </button>
+                </div>
               </div>
-            ) : (
-              <div className="flex items-center md:justify-end gap-1.5 mt-0.5">
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                  <AlertTriangle className="w-3 h-3 text-amber-600" />
-                  <span>SquareLocationID Missing</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setIsDiagnosticModalOpen(true)}
-                  className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold underline"
+
+              {/* Dynamic Square Location ID Switcher */}
+              <div className="pt-3 border-t border-zinc-200/80">
+                <SquareLocationSelector
+                  activeLocationId={activeSquareLocationId}
+                  locations={diagnosticLocations}
+                  isLoadingLocations={isLoadingLocations}
+                  onLocationChange={handleSwitchSquareLocation}
+                  onRefreshLocations={handleFetchSquareLocations}
+                  onOpenDiagnostics={() => setIsDiagnosticModalOpen(true)}
+                  selectedProperty={selectedProperty}
+                  onAssignToProperty={handleAssignLocationToProperty}
+                />
+              </div>
+            </div>
+
+            {/* Batch Operation Feedback Alert */}
+            {batchResult && (
+              <div className={`p-4 rounded-lg flex items-start gap-3 border ${
+                batchResult.success 
+                  ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
+                  : 'bg-rose-50 text-rose-900 border-rose-200'
+              }`}>
+                {batchResult.success ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                )}
+                <div className="flex-1 text-xs">
+                  <p className="font-bold">{batchResult.success ? 'Square Invoices Successfully Generated' : 'Generation Notice'}</p>
+                  <p className="mt-0.5">{batchResult.message}</p>
+                </div>
+                <button 
+                  onClick={() => setBatchResult(null)} 
+                  className="text-zinc-400 hover:text-zinc-600 text-sm font-bold ml-2"
                 >
-                  Assign
+                  ×
                 </button>
               </div>
             )}
-          </div>
-        </div>
 
-        {/* Batch Operation Feedback Alert */}
-        {batchResult && (
-          <div className={`p-4 rounded-lg flex items-start gap-3 border ${
-            batchResult.success 
-              ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
-              : 'bg-rose-50 text-rose-900 border-rose-200'
-          }`}>
-            {batchResult.success ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-            ) : (
-              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            {/* Email updated notification banner */}
+            {emailSuccessMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-md text-xs flex items-center justify-between gap-2 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="font-semibold">{emailSuccessMsg}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEmailSuccessMsg('')}
+                  className="text-emerald-600 hover:text-emerald-800 text-sm font-bold"
+                >
+                  ×
+                </button>
+              </div>
             )}
-            <div className="flex-1 text-xs">
-              <p className="font-bold">{batchResult.success ? 'Square Invoices Successfully Generated' : 'Generation Notice'}</p>
-              <p className="mt-0.5">{batchResult.message}</p>
-            </div>
-            <button 
-              onClick={() => setBatchResult(null)} 
-              className="text-zinc-400 hover:text-zinc-600 text-sm font-bold ml-2"
-            >
-              ×
-            </button>
-          </div>
-        )}
-
-        {/* Email updated notification banner */}
-        {emailSuccessMsg && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-md text-xs flex items-center justify-between gap-2 shadow-2xs">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span className="font-semibold">{emailSuccessMsg}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setEmailSuccessMsg('')}
-              className="text-emerald-600 hover:text-emerald-800 text-sm font-bold"
-            >
-              ×
-            </button>
-          </div>
+          </>
         )}
 
         {/* SUBTASK 1: DO MONTHLY RENTAL INVOICES */}
@@ -1866,10 +2030,25 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
             </div>
           </div>
         )}
+
+        {/* SUBTASK 6: PAYMENT HISTORY */}
+        {activeSubtask === 'payment-history' && (
+          <PaymentHistoryTab
+            invoices={invoices}
+            properties={properties}
+            onUpdateInvoiceStatus={onUpdateInvoiceStatus}
+            onSaveInvoices={onSaveInvoices}
+            onDeleteInvoice={onDeleteInvoice}
+            onSyncInvoiceStatus={handleSyncInvoiceStatus}
+            syncingInvoiceId={syncingInvoiceId}
+            onSwitchToRentTab={() => setActiveSubtask('rent')}
+          />
+        )}
       </div>
 
       {/* HISTORICAL SQUARE INVOICES DISPATCH TABLE */}
-      <div className="bg-white rounded-lg border border-zinc-200 shadow-xs overflow-hidden">
+      {activeSubtask !== 'payment-history' && (
+        <div className="bg-white rounded-lg border border-zinc-200 shadow-xs overflow-hidden">
         <div className="p-4 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-bold text-zinc-900 flex items-center gap-2">
@@ -1986,7 +2165,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
                         {inv.status}
                       </span>
                     </td>
-                    <td className="p-3 text-right space-x-1.5">
+                    <td className="p-3 text-right space-x-1.5 whitespace-nowrap">
                       {inv.squarePaymentUrl && (
                         <a
                           href={inv.squarePaymentUrl}
@@ -2020,6 +2199,16 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
                       >
                         <RefreshCw className={`w-3 h-3 ${syncingInvoiceId === inv.id ? 'animate-spin' : ''}`} />
                       </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setInvoiceToDelete(inv)}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-[11px] text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded font-semibold transition"
+                        title="Delete this invoice record from ledger"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Delete</span>
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -2028,6 +2217,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           </div>
         )}
       </div>
+      )}
 
       {/* Quick Resident Email Edit Modal */}
       {editingEmailItem && (
@@ -2157,6 +2347,106 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           </div>
         </div>
       )}
+      {/* Delete Invoice Record Confirmation Modal */}
+      {invoiceToDelete && (
+        <div className="fixed inset-0 bg-zinc-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white rounded-lg max-w-md w-full shadow-2xl border border-zinc-200 overflow-hidden">
+            <div className="bg-rose-50 border-b border-rose-100 p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5 text-rose-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-zinc-900 text-sm">Delete Invoice Record</h3>
+                  <p className="text-xs text-zinc-500">Confirm removal from Square Invoices Ledger</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setInvoiceToDelete(null)}
+                disabled={isDeletingInvoice}
+                className="text-zinc-400 hover:text-zinc-600 p-1 rounded-md transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3.5 text-xs">
+              <p className="text-zinc-700">
+                Are you sure you want to delete this invoice record from the Square Invoices Record Ledger?
+              </p>
+
+              <div className="bg-zinc-50 border border-zinc-200 rounded-md p-3.5 space-y-1.5 text-zinc-600">
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-400 font-medium">Resident:</span>
+                  <span className="font-semibold text-zinc-900">{invoiceToDelete.tenantName}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-400 font-medium">Property & Room:</span>
+                  <span className="text-zinc-800">{invoiceToDelete.propertyName} {invoiceToDelete.roomName ? `• ${invoiceToDelete.roomName}` : ''}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-400 font-medium">Invoice Type:</span>
+                  <span className="font-bold uppercase tracking-wider text-[10px] px-1.5 py-0.5 bg-zinc-200/80 rounded text-zinc-800">
+                    {invoiceToDelete.subtask}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-400 font-medium">Billing Period:</span>
+                  <span className="text-zinc-800 font-medium">{invoiceToDelete.billingMonth} {invoiceToDelete.billingYear}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-400 font-medium">Invoice ID:</span>
+                  <span className="font-mono text-[11px] text-zinc-700 bg-white px-1.5 py-0.5 border border-zinc-200 rounded">
+                    {invoiceToDelete.squareInvoiceId || invoiceToDelete.id}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pt-1.5 border-t border-zinc-200">
+                  <span className="text-zinc-700 font-semibold">Total Amount:</span>
+                  <span className="font-mono font-bold text-sm text-zinc-900">${invoiceToDelete.totalAmount.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md text-[11px] text-amber-800 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  This will permanently remove the invoice record from local storage and your cloud database ledger.
+                </span>
+              </div>
+            </div>
+
+            <div className="p-4 bg-zinc-50 border-t border-zinc-100 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setInvoiceToDelete(null)}
+                disabled={isDeletingInvoice}
+                className="px-3.5 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-200 rounded-md transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteInvoice}
+                disabled={isDeletingInvoice}
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-md shadow-xs transition"
+              >
+                {isDeletingInvoice ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Invoice</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Cloudflare Pages Secrets Setup Guide Modal */}
       <CloudflareSecretsModal
         isOpen={isCloudflareModalOpen}
@@ -2168,11 +2458,20 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       <SquareDiagnosticModal
         isOpen={isDiagnosticModalOpen}
         onClose={() => setIsDiagnosticModalOpen(false)}
-        initialLocationId={selectedProperty?.squareLocationId || 'LN4WBHANNNZ2Y'}
+        initialLocationId={activeSquareLocationId || selectedProperty?.squareLocationId || 'LN4WBHANNNZ2Y'}
         initialEnvironment={squareStatus?.environment === 'production' ? 'production' : 'sandbox'}
         selectedPropertyName={selectedProperty?.name}
         selectedPropertyId={selectedProperty?.id}
         onAssignLocationToProperty={handleAssignLocationToProperty}
+        onDiagnosticReport={(report) => {
+          if (report.locations && report.locations.length > 0) {
+            setDiagnosticLocations(report.locations);
+            try {
+              localStorage.setItem('moyer_square_diagnostic_locations_cache', JSON.stringify(report.locations));
+            } catch {}
+          }
+        }}
+        onSelectActiveLocation={(locId) => handleSwitchSquareLocation(locId)}
       />
     </div>
   );

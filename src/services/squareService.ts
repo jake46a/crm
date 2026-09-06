@@ -209,6 +209,9 @@ export function setSavedSquareApplicationId(appId: string) {
 
 export function getSavedSquareLocationId(): string {
   try {
+    if (typeof window !== 'undefined' && (window as any).VITE_SQUARE_DEFAULT_LOCATION_ID) {
+      return ((window as any).VITE_SQUARE_DEFAULT_LOCATION_ID as string).trim();
+    }
     const locId = localStorage.getItem('moyer_square_location_id');
     if (locId && locId.trim()) return locId.trim();
   } catch {}
@@ -218,9 +221,28 @@ export function getSavedSquareLocationId(): string {
 export function setSavedSquareLocationId(locId: string) {
   try {
     if (locId && locId.trim()) {
-      localStorage.setItem('moyer_square_location_id', locId.trim());
+      const cleanId = locId.trim();
+      localStorage.setItem('moyer_square_location_id', cleanId);
+      try {
+        if ((import.meta as any).env) {
+          (import.meta as any).env.VITE_SQUARE_DEFAULT_LOCATION_ID = cleanId;
+        }
+      } catch {}
+      try {
+        if (typeof window !== 'undefined') {
+          (window as any).VITE_SQUARE_DEFAULT_LOCATION_ID = cleanId;
+          (window as any).__VITE_SQUARE_DEFAULT_LOCATION_ID = cleanId;
+          window.dispatchEvent(new CustomEvent('square-location-changed', { detail: { locationId: cleanId } }));
+        }
+      } catch {}
     } else {
       localStorage.removeItem('moyer_square_location_id');
+      try {
+        if (typeof window !== 'undefined') {
+          delete (window as any).VITE_SQUARE_DEFAULT_LOCATION_ID;
+          delete (window as any).__VITE_SQUARE_DEFAULT_LOCATION_ID;
+        }
+      } catch {}
     }
   } catch {}
 }
@@ -550,7 +572,9 @@ export const SquareService = {
       const rand = Math.random().toString(36).substring(2, 7);
       const squareOrderId = `sq_ord_${ts}_${rand}_${idx}`;
       const squareInvoiceId = `sq_inv_${ts}_${rand}_${idx}`;
-      const locationId = (inv.squareLocationId && !inv.squareLocationId.startsWith('LOC_SPEER')) ? inv.squareLocationId : 'LN4WBHANNNZ2Y';
+      const defaultLoc = getSavedSquareLocationId();
+      const isPlaceholder = !inv.squareLocationId || ['LOC_SPEER', 'LOC_CAPHILL', 'LOC_HIGHLANDS', 'LOC_DEMO', 'LOC_SAMPLE'].some(p => inv.squareLocationId?.toUpperCase().startsWith(p));
+      const locationId = isPlaceholder ? defaultLoc : inv.squareLocationId!;
       const customerId = (inv.squareCustomerId && !inv.squareCustomerId.startsWith('sq_cust_')) 
         ? inv.squareCustomerId 
         : ((inv.tenantEmail && inv.tenantEmail.includes('jake@proweb.agency')) ? '5H7TD7HACMVSVZQFSJ557GW5XW' : `sq_cust_${(inv.tenantEmail || 'resident').replace(/[^a-zA-Z0-9]/g, '_')}`);
