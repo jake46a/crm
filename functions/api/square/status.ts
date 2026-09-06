@@ -62,3 +62,6 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     activeLocationsCount: 3,
   });
 }
+
+export const onRequest = onRequestGet;
+export const onRequestPost = onRequestGet;

@@ -195,11 +195,29 @@ export const SquareService = {
     allowFallback?: boolean;
   }): Promise<SyncCustomerResult> {
     try {
-      const res = await fetch('/api/square/customers/search-or-create', {
+      // Primary endpoint
+      let res = await fetch('/api/square/customers/search-or-create', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(params)
       });
+
+      // If Cloudflare Pages or route returned 405 (Method Not Allowed) or 404, retry against alias endpoint
+      if (res.status === 405 || res.status === 404) {
+        console.warn(`Customer endpoint /api/square/customers/search-or-create returned HTTP ${res.status}. Retrying against /api/square/customers...`);
+        try {
+          const alternateRes = await fetch('/api/square/customers', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(params)
+          });
+          if (alternateRes.ok || alternateRes.status !== 405) {
+            res = alternateRes;
+          }
+        } catch {
+          // Keep original response
+        }
+      }
 
       const data = await res.json().catch(() => null);
 
@@ -207,7 +225,14 @@ export const SquareService = {
         return data;
       }
 
-      const errorMsg = data?.error || `API returned HTTP ${res.status}: ${res.statusText}`;
+      let errorMsg = data?.error;
+      if (!errorMsg) {
+        if (res.status === 405) {
+          errorMsg = 'Cloudflare API returned HTTP 405 (Method Not Allowed). Cloudflare Pages edge intercepted the POST request. Deploying the updated functions/ and _routes.json resolves this.';
+        } else {
+          errorMsg = `API returned HTTP ${res.status}: ${res.statusText || 'Error'}`;
+        }
+      }
       console.warn(`Customer lookup error:`, errorMsg);
 
       if (params.allowFallback) {

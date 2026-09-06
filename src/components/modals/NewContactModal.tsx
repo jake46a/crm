@@ -149,6 +149,15 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
     }
   };
 
+  const handleUseOfflineId = () => {
+    const cleanId = `sq_cust_${(email.trim() || 'resident').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}`;
+    setSquareCustomerId(cleanId);
+    setSquareSyncStatus({
+      type: 'warning',
+      message: `Assigned offline tenant ID (${cleanId}). You can save this contact or replace it with an official Square Customer ID manually.`
+    });
+  };
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -469,21 +478,32 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
                   className="w-full p-2 bg-white border border-zinc-300 rounded-md font-mono text-xs text-zinc-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
                 {squareSyncStatus && (
-                  <div className={`mt-1.5 p-2 rounded text-xs flex items-start gap-1.5 ${
+                  <div className={`mt-1.5 p-2 rounded text-xs flex flex-col gap-1.5 ${
                     squareSyncStatus.type === 'success' 
                       ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
                       : squareSyncStatus.type === 'warning'
                       ? 'bg-amber-50 text-amber-800 border border-amber-200'
                       : 'bg-rose-50 text-rose-800 border border-rose-200'
                   }`}>
-                    {squareSyncStatus.type === 'success' ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                    ) : squareSyncStatus.type === 'warning' ? (
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                    ) : (
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-1.5">
+                      {squareSyncStatus.type === 'success' ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                      ) : squareSyncStatus.type === 'warning' ? (
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                      )}
+                      <span className="leading-tight">{squareSyncStatus.message}</span>
+                    </div>
+                    {squareSyncStatus.type === 'error' && !squareCustomerId && (
+                      <button
+                        type="button"
+                        onClick={handleUseOfflineId}
+                        className="self-start text-[11px] font-semibold text-rose-800 underline hover:text-rose-950 mt-0.5 cursor-pointer"
+                      >
+                        Click here to assign a temporary offline tenant ID instead
+                      </button>
                     )}
-                    <span className="leading-tight">{squareSyncStatus.message}</span>
                   </div>
                 )}
                 <p className="text-[10px] text-zinc-500 mt-1">

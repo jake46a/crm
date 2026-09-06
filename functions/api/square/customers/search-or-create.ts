@@ -30,6 +30,15 @@ export async function onRequestOptions(): Promise<Response> {
   return new Response(null, { status: 204, headers: corsHeaders });
 }
 
+export async function onRequestGet(): Promise<Response> {
+  return jsonResponse({
+    status: 'online',
+    endpoint: '/api/square/customers/search-or-create',
+    method: 'POST',
+    description: 'Searches Square customer by email or creates a new customer.'
+  });
+}
+
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
 
@@ -172,3 +181,5 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }, 502);
   }
 }
+
+export const onRequest = onRequestPost;

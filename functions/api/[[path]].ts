@@ -470,3 +470,12 @@ export async function onRequest(context: { request: Request; env: Env; params: a
   // 404 for other API routes
   return jsonResponse({ error: 'Endpoint not found on Cloudflare Pages API', pathname }, 404);
 }
+
+// Explicit method handler exports required by Cloudflare Pages Functions to avoid 405 Method Not Allowed
+export const onRequestPost = onRequest;
+export const onRequestGet = onRequest;
+export const onRequestOptions = onRequest;
+export const onRequestPut = onRequest;
+export const onRequestPatch = onRequest;
+export const onRequestDelete = onRequest;
+export const onRequestHead = onRequest;
