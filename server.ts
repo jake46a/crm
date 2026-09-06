@@ -491,8 +491,7 @@ app.post(['/api/square/invoices/create-batch', '/api/square/invoices/create-batc
       // Simulated Square Creation
       const mockOrderId = `sq_ord_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
       const mockInvoiceId = `sq_inv_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
-      const mockPaymentSlug = Math.random().toString(36).substring(2, 10);
-      const paymentUrl = `https://checkout.square.site/merchant/MOYERPM/pay/${mockPaymentSlug}`;
+      const paymentUrl = `https://squareup.com/pay-invoice/${mockInvoiceId}`;
       const viewUrl = `https://squareup.com/pay-invoice/${mockInvoiceId}`;
 
       simulatedSquareStore.orders.set(mockOrderId, {

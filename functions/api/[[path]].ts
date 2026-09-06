@@ -8,9 +8,13 @@
 
 interface Env {
   SQUARE_ACCESS_TOKEN?: string;
-  SQUARE_ENVIRONMENT?: string;
   VITE_SQUARE_ACCESS_TOKEN?: string;
+  SQUARE_APPLICATION_ID?: string;
+  VITE_SQUARE_APPLICATION_ID?: string;
+  SQUARE_ENVIRONMENT?: string;
   VITE_SQUARE_ENVIRONMENT?: string;
+  SQUARE_DEFAULT_LOCATION_ID?: string;
+  VITE_SQUARE_DEFAULT_LOCATION_ID?: string;
   [key: string]: any;
 }
 
@@ -48,7 +52,9 @@ export async function onRequest(context: { request: Request; env: Env; params: a
   const authHeader = request.headers.get('Authorization') || '';
   const bearerToken = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.substring(7).trim() : '';
   const accessToken = (env.SQUARE_ACCESS_TOKEN || env.VITE_SQUARE_ACCESS_TOKEN || bearerToken || '').trim();
+  const applicationId = (env.SQUARE_APPLICATION_ID || env.VITE_SQUARE_APPLICATION_ID || '').trim();
   const squareEnv = (env.SQUARE_ENVIRONMENT || env.VITE_SQUARE_ENVIRONMENT || 'production').toLowerCase();
+  const defaultLocationId = (env.SQUARE_DEFAULT_LOCATION_ID || env.VITE_SQUARE_DEFAULT_LOCATION_ID || 'LN4WBHANNNZ2Y').trim();
   const isProduction = squareEnv === 'production' || squareEnv === 'prod';
   const baseUrl = isProduction ? 'https://connect.squareup.com' : 'https://connect.squareupsandbox.com';
 
@@ -71,6 +77,8 @@ export async function onRequest(context: { request: Request; env: Env; params: a
 
     return jsonResponse({
       hasToken,
+      applicationId: applicationId || null,
+      defaultLocationId,
       environment: isProduction ? 'production' : 'sandbox',
       baseUrl,
       version: SQUARE_VERSION,
@@ -310,10 +318,10 @@ export async function onRequest(context: { request: Request; env: Env; params: a
 
     for (const inv of invoices) {
       try {
-        // Resolve valid location (default to merchant's real 1070 location if unset or sample)
+        // Resolve valid location (default to merchant's configured location or 1070 location)
         let locationId = (inv.squareLocationId || '').trim();
         if (!locationId || locationId.startsWith('LOC_SPEER') || locationId.startsWith('LOC_CAPHILL') || locationId.startsWith('LOC_HIGHLANDS')) {
-          locationId = 'LN4WBHANNNZ2Y'; // Real 1070 Yank St location
+          locationId = defaultLocationId;
         }
 
         // Resolve valid customer (auto-match real Square customer if simulated or missing)
@@ -463,12 +471,12 @@ export async function onRequest(context: { request: Request; env: Env; params: a
           }
         }
 
-        // Fallback simulated generation
+        // Fallback simulated generation (using valid square pay-invoice link pattern instead of 404 checkout slug)
         const ts = Date.now().toString(36);
         const rand = Math.random().toString(36).substring(2, 7);
         const squareOrderId = `sq_ord_${ts}_${rand}`;
         const squareInvoiceId = `sq_inv_${ts}_${rand}`;
-        const paymentSlug = Math.random().toString(36).substring(2, 10);
+        const invoiceLink = `https://squareup.com/pay-invoice/${squareInvoiceId}`;
 
         results.push({
           clientReferenceId: inv.id,
@@ -477,9 +485,9 @@ export async function onRequest(context: { request: Request; env: Env; params: a
           squareLocationId: locationId,
           squareCustomerId: customerId,
           status: 'UNPAID',
-          paymentUrl: `https://checkout.square.site/merchant/MOYERPM/pay/${paymentSlug}`,
-          viewUrl: `https://squareup.com/pay-invoice/${squareInvoiceId}`,
-          source: 'simulated'
+          paymentUrl: invoiceLink,
+          viewUrl: invoiceLink,
+          source: accessToken ? 'square_api_fallback' : 'simulated'
         });
       } catch (err: any) {
         errors.push({ id: inv.id, error: err.message || 'Unknown error' });
@@ -557,3 +565,16 @@ export const onRequestPut = onRequest;
 export const onRequestPatch = onRequest;
 export const onRequestDelete = onRequest;
 export const onRequestHead = onRequest;
+
+export default {
+  async fetch(request: Request, env: Env, context: any) {
+    const url = new URL(request.url);
+    if (url.pathname.startsWith('/api')) {
+      return onRequest({ request, env, params: {} });
+    }
+    if (env.ASSETS && typeof env.ASSETS.fetch === 'function') {
+      return env.ASSETS.fetch(request);
+    }
+    return new Response('Not Found', { status: 404 });
+  }
+};

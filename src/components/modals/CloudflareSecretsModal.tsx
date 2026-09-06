@@ -104,8 +104,13 @@ export const CloudflareSecretsModal: React.FC<CloudflareSecretsModalProps> = ({
       exampleValue: 'production'
     },
     {
+      name: 'VITE_SQUARE_DEFAULT_LOCATION_ID',
+      desc: 'Your Square Merchant Location ID for the frontend build (e.g. LN4WBHANNNZ2Y for 1070 Yank St).',
+      exampleValue: 'LN4WBHANNNZ2Y'
+    },
+    {
       name: 'SQUARE_DEFAULT_LOCATION_ID',
-      desc: 'Your Square Merchant Location ID (e.g. LN4WBHANNNZ2Y for 1070 Yank St).',
+      desc: 'Your Square Merchant Location ID for Cloudflare Functions (e.g. LN4WBHANNNZ2Y for 1070 Yank St).',
       exampleValue: 'LN4WBHANNNZ2Y'
     }
   ];

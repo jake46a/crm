@@ -25,7 +25,9 @@ async function onRequest(context) {
   const authHeader = request.headers.get("Authorization") || "";
   const bearerToken = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.substring(7).trim() : "";
   const accessToken = (env.SQUARE_ACCESS_TOKEN || env.VITE_SQUARE_ACCESS_TOKEN || bearerToken || "").trim();
+  const applicationId = (env.SQUARE_APPLICATION_ID || env.VITE_SQUARE_APPLICATION_ID || "").trim();
   const squareEnv = (env.SQUARE_ENVIRONMENT || env.VITE_SQUARE_ENVIRONMENT || "production").toLowerCase();
+  const defaultLocationId = (env.SQUARE_DEFAULT_LOCATION_ID || env.VITE_SQUARE_DEFAULT_LOCATION_ID || "LN4WBHANNNZ2Y").trim();
   const isProduction = squareEnv === "production" || squareEnv === "prod";
   const baseUrl = isProduction ? "https://connect.squareup.com" : "https://connect.squareupsandbox.com";
   const squareHeaders = {
@@ -38,6 +40,8 @@ async function onRequest(context) {
     const tokenSource = env.SQUARE_ACCESS_TOKEN ? "cloudflare_secret" : env.VITE_SQUARE_ACCESS_TOKEN ? "cloudflare_vite_env" : bearerToken ? "request_bearer" : "none";
     return jsonResponse({
       hasToken,
+      applicationId: applicationId || null,
+      defaultLocationId,
       environment: isProduction ? "production" : "sandbox",
       baseUrl,
       version: SQUARE_VERSION,
@@ -89,17 +93,41 @@ async function onRequest(context) {
     }
     return jsonResponse({
       locations: [
-        { id: "LOC_SPEER_DENVER", name: "Speer Coliving House (Denver)", address: { address_line_1: "1040 Speer Blvd", locality: "Denver", administrative_district_level_1: "CO", postal_code: "80204" }, status: "ACTIVE" },
-        { id: "LOC_CAPHILL_DENVER", name: "Capitol Hill Victorian (Denver)", address: { address_line_1: "1245 Pearl St", locality: "Denver", administrative_district_level_1: "CO", postal_code: "80203" }, status: "ACTIVE" },
-        { id: "LOC_HIGHLANDS_DENVER", name: "Highlands Coliving Suites (Denver)", address: { address_line_1: "3210 Tejon St", locality: "Denver", administrative_district_level_1: "CO", postal_code: "80211" }, status: "ACTIVE" }
+        { id: "LN4WBHANNNZ2Y", name: "1070 (1070 Yank St, Golden, CO)", address: { address_line_1: "1070 Yank St", locality: "Golden", administrative_district_level_1: "CO", postal_code: "80401-4223" }, status: "ACTIVE" },
+        { id: "S2C67DJTB5S53", name: "PWA (ProWeb.Agency)", address: { address_line_1: "1070 Yank St", locality: "Golden", administrative_district_level_1: "CO", postal_code: "80401" }, status: "ACTIVE" },
+        { id: "LW2PEV9NMHM5Q", name: "christinescollectibles.com", address: { address_line_1: "1070 Yank St", locality: "Golden", administrative_district_level_1: "CO", postal_code: "80401-4223" }, status: "ACTIVE" }
       ],
       source: "simulated"
     });
   }
-  if ((pathname === "/api/square/customers/search-or-create" || pathname === "/api/square/customers") && request.method === "POST") {
-    const body = await request.json().catch(() => ({}));
-    const { email, firstName, lastName, phone, note } = body;
-    if (!email || !email.trim()) {
+  if ((pathname === "/api/square/customers/search-or-create" || pathname === "/api/square/customers" || pathname === "/api/square/customers/search") && (request.method === "POST" || request.method === "GET")) {
+    let email = "";
+    let firstName = "";
+    let lastName = "";
+    let phone = "";
+    let note = "";
+    if (request.method === "POST") {
+      const body = await request.json().catch(() => ({}));
+      email = (body.email || "").trim();
+      firstName = (body.firstName || "").trim();
+      lastName = (body.lastName || "").trim();
+      phone = (body.phone || "").trim();
+      note = (body.note || "").trim();
+    } else {
+      email = (url.searchParams.get("email") || "").trim();
+      firstName = (url.searchParams.get("firstName") || "").trim();
+      lastName = (url.searchParams.get("lastName") || "").trim();
+      phone = (url.searchParams.get("phone") || "").trim();
+      note = (url.searchParams.get("note") || "").trim();
+    }
+    if (!email) {
+      if (request.method === "GET") {
+        return jsonResponse({
+          status: "online",
+          endpoint: "/api/square/customers",
+          description: "Pass ?email=... to query customer."
+        });
+      }
       return jsonResponse({ success: false, error: "Email address is required." }, 400);
     }
     const cleanEmail = email.trim().toLowerCase();
@@ -215,12 +243,55 @@ async function onRequest(context) {
     const errors = [];
     for (const inv of invoices) {
       try {
-        const locationId = inv.squareLocationId || "LOC_SPEER_DENVER";
-        const customerId = inv.squareCustomerId || `sq_cust_${(inv.tenantEmail || "tenant").replace(/[^a-zA-Z0-9]/g, "_")}`;
+        let locationId = (inv.squareLocationId || "").trim();
+        if (!locationId || locationId.startsWith("LOC_SPEER") || locationId.startsWith("LOC_CAPHILL") || locationId.startsWith("LOC_HIGHLANDS")) {
+          locationId = defaultLocationId;
+        }
+        let customerId = (inv.squareCustomerId || "").trim();
+        if (!customerId || customerId.startsWith("sq_cust_")) {
+          if (inv.tenantEmail && accessToken) {
+            try {
+              const searchCust = await fetch(`${baseUrl}/v2/customers/search`, {
+                method: "POST",
+                headers: squareHeaders,
+                body: JSON.stringify({
+                  query: { filter: { email_address: { exact: inv.tenantEmail.trim().toLowerCase() } } }
+                })
+              });
+              const searchCustData = await searchCust.json();
+              if (searchCust.ok && searchCustData.customers && searchCustData.customers.length > 0) {
+                customerId = searchCustData.customers[0].id;
+              } else {
+                const createCust = await fetch(`${baseUrl}/v2/customers`, {
+                  method: "POST",
+                  headers: squareHeaders,
+                  body: JSON.stringify({
+                    idempotency_key: crypto.randomUUID(),
+                    email_address: inv.tenantEmail.trim(),
+                    given_name: inv.tenantName || "Tenant"
+                  })
+                });
+                const createCustData = await createCust.json();
+                if (createCust.ok && createCustData.customer) {
+                  customerId = createCustData.customer.id;
+                }
+              }
+            } catch (cErr) {
+              console.warn("Auto customer resolution failed on Cloudflare:", cErr);
+            }
+          }
+        }
+        if (!customerId) {
+          customerId = `sq_cust_${(inv.tenantEmail || "tenant").replace(/[^a-zA-Z0-9]/g, "_")}`;
+        }
         const amountInCents = Math.round(Number(inv.amount) * 100);
         const title = inv.title || `${inv.invoiceType || "Rental"} Invoice - ${inv.month || ""} ${inv.year || ""}`.trim();
         const lineItemName = inv.lineItemName || title;
-        const dueDate = inv.dueDate || `${inv.year}-${String((/* @__PURE__ */ new Date()).getMonth() + 1).padStart(2, "0")}-01`;
+        const todayIso = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+        const targetYear = inv.year || (/* @__PURE__ */ new Date()).getFullYear();
+        const targetMonth = String((/* @__PURE__ */ new Date()).getMonth() + 1).padStart(2, "0");
+        let candidateDueDate = inv.dueDate && !inv.dueDate.includes("undefined") ? inv.dueDate : `${targetYear}-${targetMonth}-01`;
+        const validDueDate = candidateDueDate < todayIso ? todayIso : candidateDueDate;
         if (accessToken) {
           try {
             const orderRes = await fetch(`${baseUrl}/v2/orders`, {
@@ -235,7 +306,7 @@ async function onRequest(context) {
                     {
                       name: lineItemName,
                       quantity: "1",
-                      base_money: { amount: amountInCents, currency: "USD" }
+                      base_price_money: { amount: amountInCents, currency: "USD" }
                     }
                   ]
                 }
@@ -256,24 +327,20 @@ async function onRequest(context) {
                     payment_requests: [
                       {
                         request_type: "BALANCE",
-                        due_date: dueDate,
-                        tipping_enabled: false
+                        due_date: validDueDate,
+                        automatic_payment_source: "NONE"
                       }
                     ],
                     delivery_method: "EMAIL",
-                    title,
-                    description: inv.description || `${inv.propertyName} - ${inv.roomName} rent for ${inv.month} ${inv.year}`,
                     accepted_payment_methods: {
                       card: true,
                       square_gift_card: false,
                       bank_account: true,
                       buy_now_pay_later: false
                     },
-                    custom_fields: [
-                      { label: "Room", value: inv.roomName || "" },
-                      { label: "Billing Period", value: `${inv.month} ${inv.year}` }
-                    ],
-                    sale_or_service_date: dueDate
+                    title,
+                    description: inv.description || `${inv.propertyName} - ${inv.roomName} rent for ${inv.month} ${inv.year}`,
+                    sale_or_service_date: validDueDate
                   }
                 })
               });
@@ -303,7 +370,11 @@ async function onRequest(context) {
                   source: "square_live_api"
                 });
                 continue;
+              } else {
+                console.warn("Square invoice creation failed on Cloudflare:", invoiceData);
               }
+            } else {
+              console.warn("Square order creation failed on Cloudflare:", orderData);
             }
           } catch (sqErr) {
             console.warn("Square live invoice generation error on Cloudflare, using fallback:", sqErr);
@@ -313,7 +384,7 @@ async function onRequest(context) {
         const rand = Math.random().toString(36).substring(2, 7);
         const squareOrderId = `sq_ord_${ts}_${rand}`;
         const squareInvoiceId = `sq_inv_${ts}_${rand}`;
-        const paymentSlug = Math.random().toString(36).substring(2, 10);
+        const invoiceLink = `https://squareup.com/pay-invoice/${squareInvoiceId}`;
         results.push({
           clientReferenceId: inv.id,
           squareOrderId,
@@ -321,9 +392,9 @@ async function onRequest(context) {
           squareLocationId: locationId,
           squareCustomerId: customerId,
           status: "UNPAID",
-          paymentUrl: `https://checkout.square.site/merchant/MOYERPM/pay/${paymentSlug}`,
-          viewUrl: `https://squareup.com/pay-invoice/${squareInvoiceId}`,
-          source: "simulated"
+          paymentUrl: invoiceLink,
+          viewUrl: invoiceLink,
+          source: accessToken ? "square_api_fallback" : "simulated"
         });
       } catch (err) {
         errors.push({ id: inv.id, error: err.message || "Unknown error" });
@@ -384,17 +455,18 @@ async function onRequest(context) {
   }
   return jsonResponse({ error: "Endpoint not found on Cloudflare Pages API", pathname }, 404);
 }
-
-// src/cloudflare-worker.ts
-var cloudflare_worker_default = {
+var onRequestPost = onRequest;
+var onRequestGet = onRequest;
+var onRequestOptions = onRequest;
+var onRequestPut = onRequest;
+var onRequestPatch = onRequest;
+var onRequestDelete = onRequest;
+var onRequestHead = onRequest;
+var path_default = {
   async fetch(request, env, context) {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/api/")) {
-      return onRequest({
-        request,
-        env,
-        params: { path: url.pathname.replace(/^\/api\/?/, "").split("/").filter(Boolean) }
-      });
+    if (url.pathname.startsWith("/api")) {
+      return onRequest({ request, env, params: {} });
     }
     if (env.ASSETS && typeof env.ASSETS.fetch === "function") {
       return env.ASSETS.fetch(request);
@@ -403,5 +475,13 @@ var cloudflare_worker_default = {
   }
 };
 export {
-  cloudflare_worker_default as default
+  path_default as default,
+  onRequest,
+  onRequestDelete,
+  onRequestGet,
+  onRequestHead,
+  onRequestOptions,
+  onRequestPatch,
+  onRequestPost,
+  onRequestPut
 };

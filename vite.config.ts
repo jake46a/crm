@@ -6,15 +6,21 @@ import {defineConfig, loadEnv} from 'vite';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const squareToken = env.SQUARE_ACCESS_TOKEN || env.VITE_SQUARE_ACCESS_TOKEN || process.env.SQUARE_ACCESS_TOKEN || process.env.VITE_SQUARE_ACCESS_TOKEN || '';
+  const squareAppId = env.SQUARE_APPLICATION_ID || env.VITE_SQUARE_APPLICATION_ID || process.env.SQUARE_APPLICATION_ID || process.env.VITE_SQUARE_APPLICATION_ID || '';
   const squareEnv = env.SQUARE_ENVIRONMENT || env.VITE_SQUARE_ENVIRONMENT || process.env.SQUARE_ENVIRONMENT || process.env.VITE_SQUARE_ENVIRONMENT || 'production';
+  const squareLocId = env.SQUARE_DEFAULT_LOCATION_ID || env.VITE_SQUARE_DEFAULT_LOCATION_ID || process.env.SQUARE_DEFAULT_LOCATION_ID || process.env.VITE_SQUARE_DEFAULT_LOCATION_ID || 'LN4WBHANNNZ2Y';
 
   return {
     plugins: [react(), tailwindcss()],
     define: {
       'import.meta.env.VITE_SQUARE_ACCESS_TOKEN': JSON.stringify(squareToken),
+      'import.meta.env.VITE_SQUARE_APPLICATION_ID': JSON.stringify(squareAppId),
       'import.meta.env.VITE_SQUARE_ENVIRONMENT': JSON.stringify(squareEnv),
+      'import.meta.env.VITE_SQUARE_DEFAULT_LOCATION_ID': JSON.stringify(squareLocId),
       'process.env.SQUARE_ACCESS_TOKEN': JSON.stringify(squareToken),
+      'process.env.SQUARE_APPLICATION_ID': JSON.stringify(squareAppId),
       'process.env.SQUARE_ENVIRONMENT': JSON.stringify(squareEnv),
+      'process.env.SQUARE_DEFAULT_LOCATION_ID': JSON.stringify(squareLocId),
     },
     resolve: {
       alias: {

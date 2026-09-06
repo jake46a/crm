@@ -111,7 +111,7 @@ export function getSavedSquareLocationId(): string {
     const locId = localStorage.getItem('moyer_square_location_id');
     if (locId && locId.trim()) return locId.trim();
   } catch {}
-  return 'LN4WBHANNNZ2Y'; // Real 1070 Yank St location
+  return (((import.meta as any).env?.VITE_SQUARE_DEFAULT_LOCATION_ID || (process as any)?.env?.SQUARE_DEFAULT_LOCATION_ID) || 'LN4WBHANNNZ2Y').trim();
 }
 
 export function setSavedSquareLocationId(locId: string) {
@@ -122,6 +122,14 @@ export function setSavedSquareLocationId(locId: string) {
       localStorage.removeItem('moyer_square_location_id');
     }
   } catch {}
+}
+
+export function getSavedSquareEnvironment(): string {
+  try {
+    const env = localStorage.getItem('moyer_square_environment');
+    if (env && env.trim()) return env.trim();
+  } catch {}
+  return (((import.meta as any).env?.VITE_SQUARE_ENVIRONMENT || (process as any)?.env?.SQUARE_ENVIRONMENT) || 'production').trim();
 }
 
 function getAuthHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
