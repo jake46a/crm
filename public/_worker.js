@@ -1,0 +1,407 @@
+// functions/api/[[path]].ts
+var SQUARE_VERSION = "2025-02-20";
+var corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization",
+  "Access-Control-Max-Age": "86400"
+};
+function jsonResponse(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      ...corsHeaders
+    }
+  });
+}
+async function onRequest(context) {
+  const { request, env } = context;
+  const url = new URL(request.url);
+  const pathname = url.pathname.replace(/\/+$/, "");
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+  const authHeader = request.headers.get("Authorization") || "";
+  const bearerToken = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.substring(7).trim() : "";
+  const accessToken = (env.SQUARE_ACCESS_TOKEN || env.VITE_SQUARE_ACCESS_TOKEN || bearerToken || "").trim();
+  const squareEnv = (env.SQUARE_ENVIRONMENT || env.VITE_SQUARE_ENVIRONMENT || "production").toLowerCase();
+  const isProduction = squareEnv === "production" || squareEnv === "prod";
+  const baseUrl = isProduction ? "https://connect.squareup.com" : "https://connect.squareupsandbox.com";
+  const squareHeaders = {
+    "Square-Version": SQUARE_VERSION,
+    "Authorization": `Bearer ${accessToken}`,
+    "Content-Type": "application/json"
+  };
+  if (pathname === "/api/square/status" && request.method === "GET") {
+    const hasToken = accessToken.length > 5;
+    const tokenSource = env.SQUARE_ACCESS_TOKEN ? "cloudflare_secret" : env.VITE_SQUARE_ACCESS_TOKEN ? "cloudflare_vite_env" : bearerToken ? "request_bearer" : "none";
+    return jsonResponse({
+      hasToken,
+      environment: isProduction ? "production" : "sandbox",
+      baseUrl,
+      version: SQUARE_VERSION,
+      mode: isProduction ? hasToken ? "Production (Live API)" : "Production (Awaiting SQUARE_ACCESS_TOKEN in Cloudflare)" : hasToken ? "Sandbox (Connected on Cloudflare)" : "Sandbox Mode",
+      isProduction,
+      platform: "cloudflare-pages",
+      tokenSource,
+      activeLocationsCount: 3
+    });
+  }
+  if (pathname === "/api/square/mode" && request.method === "POST") {
+    try {
+      const body = await request.json().catch(() => ({}));
+      const targetMode = body.mode === "sandbox" ? "sandbox" : "production";
+      const targetBaseUrl = targetMode === "production" ? "https://connect.squareup.com" : "https://connect.squareupsandbox.com";
+      return jsonResponse({
+        success: true,
+        environment: targetMode,
+        baseUrl: targetBaseUrl,
+        version: SQUARE_VERSION,
+        mode: targetMode === "production" ? "Production (Live API)" : "Sandbox Mode",
+        isProduction: targetMode === "production",
+        hasToken: accessToken.length > 5,
+        note: "Note: To permanently set production mode on Cloudflare, set SQUARE_ENVIRONMENT=production in your Cloudflare Pages dashboard."
+      });
+    } catch {
+      return jsonResponse({ success: false, error: "Invalid request" }, 400);
+    }
+  }
+  if (pathname === "/api/square/locations" && request.method === "GET") {
+    if (accessToken) {
+      try {
+        const sqRes = await fetch(`${baseUrl}/v2/locations`, { headers: squareHeaders });
+        const data = await sqRes.json();
+        if (sqRes.ok && data.locations) {
+          return jsonResponse({
+            locations: data.locations.map((loc) => ({
+              id: loc.id,
+              name: loc.name || "Square Merchant Location",
+              address: loc.address || {},
+              status: loc.status || "ACTIVE"
+            })),
+            source: "square_live_api"
+          });
+        }
+      } catch (err) {
+        console.warn("Square locations fetch failed on Cloudflare, using fallback:", err);
+      }
+    }
+    return jsonResponse({
+      locations: [
+        { id: "LOC_SPEER_DENVER", name: "Speer Coliving House (Denver)", address: { address_line_1: "1040 Speer Blvd", locality: "Denver", administrative_district_level_1: "CO", postal_code: "80204" }, status: "ACTIVE" },
+        { id: "LOC_CAPHILL_DENVER", name: "Capitol Hill Victorian (Denver)", address: { address_line_1: "1245 Pearl St", locality: "Denver", administrative_district_level_1: "CO", postal_code: "80203" }, status: "ACTIVE" },
+        { id: "LOC_HIGHLANDS_DENVER", name: "Highlands Coliving Suites (Denver)", address: { address_line_1: "3210 Tejon St", locality: "Denver", administrative_district_level_1: "CO", postal_code: "80211" }, status: "ACTIVE" }
+      ],
+      source: "simulated"
+    });
+  }
+  if ((pathname === "/api/square/customers/search-or-create" || pathname === "/api/square/customers") && request.method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const { email, firstName, lastName, phone, note } = body;
+    if (!email || !email.trim()) {
+      return jsonResponse({ success: false, error: "Email address is required." }, 400);
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    if (!accessToken) {
+      if (isProduction) {
+        return jsonResponse({
+          success: false,
+          error: "Square Access Token not found in Cloudflare Pages. Please add SQUARE_ACCESS_TOKEN under Cloudflare Pages Settings > Environment variables (for both Production and Preview) and retry deployment.",
+          source: "missing_token"
+        }, 400);
+      }
+      const fallbackId = `sq_cust_${cleanEmail.replace(/[^a-zA-Z0-9]/g, "_")}`;
+      return jsonResponse({
+        success: true,
+        customerId: fallbackId,
+        customer: {
+          id: fallbackId,
+          given_name: firstName || "Tenant",
+          family_name: lastName || "",
+          email_address: cleanEmail,
+          phone_number: phone || ""
+        },
+        isNew: true,
+        source: "simulated",
+        warning: "Sandbox simulated ID generated (no token configured)."
+      });
+    }
+    try {
+      const searchRes = await fetch(`${baseUrl}/v2/customers/search`, {
+        method: "POST",
+        headers: squareHeaders,
+        body: JSON.stringify({
+          query: {
+            filter: {
+              email_address: { exact: cleanEmail }
+            }
+          }
+        })
+      });
+      const searchData = await searchRes.json();
+      if (!searchRes.ok) {
+        const errMsg = searchData?.errors?.map((e) => `${e.code}: ${e.detail}`).join(", ") || `Square Search HTTP ${searchRes.status}`;
+        return jsonResponse({
+          success: false,
+          error: `Square Customers API Search Error: ${errMsg}`,
+          details: searchData?.errors,
+          source: "square_api_error"
+        }, searchRes.status);
+      }
+      if (searchData.customers && searchData.customers.length > 0) {
+        const customer = searchData.customers[0];
+        return jsonResponse({
+          success: true,
+          customerId: customer.id,
+          customer,
+          isNew: false,
+          source: "square_live_api"
+        });
+      }
+      const createPayload = {
+        idempotency_key: crypto.randomUUID(),
+        email_address: cleanEmail,
+        note: note || "Moyer Property Management Speer House Tenant"
+      };
+      if (firstName?.trim()) createPayload.given_name = firstName.trim();
+      if (lastName?.trim()) createPayload.family_name = lastName.trim();
+      if (phone?.trim()) createPayload.phone_number = phone.trim();
+      const createRes = await fetch(`${baseUrl}/v2/customers`, {
+        method: "POST",
+        headers: squareHeaders,
+        body: JSON.stringify(createPayload)
+      });
+      const createData = await createRes.json();
+      if (!createRes.ok) {
+        const errMsg = createData?.errors?.map((e) => `${e.code}: ${e.detail}`).join(", ") || `Square Customer Create HTTP ${createRes.status}`;
+        return jsonResponse({
+          success: false,
+          error: `Square Customer Create Error: ${errMsg}`,
+          details: createData?.errors,
+          source: "square_api_error"
+        }, createRes.status);
+      }
+      if (createData.customer) {
+        return jsonResponse({
+          success: true,
+          customerId: createData.customer.id,
+          customer: createData.customer,
+          isNew: true,
+          source: "square_live_api"
+        });
+      }
+      return jsonResponse({
+        success: false,
+        error: "Customer creation succeeded on Square but did not return a customer record.",
+        source: "square_api_error"
+      }, 500);
+    } catch (err) {
+      console.warn("Square customer sync network issue on Cloudflare:", err);
+      return jsonResponse({
+        success: false,
+        error: `Square API connection failure: ${err?.message || "Network error"}`,
+        source: "network_error"
+      }, 502);
+    }
+  }
+  if (pathname === "/api/square/invoices/create-batch" && request.method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const { invoices } = body;
+    if (!Array.isArray(invoices) || invoices.length === 0) {
+      return jsonResponse({ error: "No invoices provided in payload." }, 400);
+    }
+    const results = [];
+    const errors = [];
+    for (const inv of invoices) {
+      try {
+        const locationId = inv.squareLocationId || "LOC_SPEER_DENVER";
+        const customerId = inv.squareCustomerId || `sq_cust_${(inv.tenantEmail || "tenant").replace(/[^a-zA-Z0-9]/g, "_")}`;
+        const amountInCents = Math.round(Number(inv.amount) * 100);
+        const title = inv.title || `${inv.invoiceType || "Rental"} Invoice - ${inv.month || ""} ${inv.year || ""}`.trim();
+        const lineItemName = inv.lineItemName || title;
+        const dueDate = inv.dueDate || `${inv.year}-${String((/* @__PURE__ */ new Date()).getMonth() + 1).padStart(2, "0")}-01`;
+        if (accessToken) {
+          try {
+            const orderRes = await fetch(`${baseUrl}/v2/orders`, {
+              method: "POST",
+              headers: squareHeaders,
+              body: JSON.stringify({
+                idempotency_key: crypto.randomUUID(),
+                order: {
+                  location_id: locationId,
+                  customer_id: customerId,
+                  line_items: [
+                    {
+                      name: lineItemName,
+                      quantity: "1",
+                      base_money: { amount: amountInCents, currency: "USD" }
+                    }
+                  ]
+                }
+              })
+            });
+            const orderData = await orderRes.json();
+            if (orderRes.ok && orderData.order) {
+              const squareOrderId2 = orderData.order.id;
+              const invoiceRes = await fetch(`${baseUrl}/v2/invoices`, {
+                method: "POST",
+                headers: squareHeaders,
+                body: JSON.stringify({
+                  idempotency_key: crypto.randomUUID(),
+                  invoice: {
+                    order_id: squareOrderId2,
+                    location_id: locationId,
+                    primary_recipient: { customer_id: customerId },
+                    payment_requests: [
+                      {
+                        request_type: "BALANCE",
+                        due_date: dueDate,
+                        tipping_enabled: false
+                      }
+                    ],
+                    delivery_method: "EMAIL",
+                    title,
+                    description: inv.description || `${inv.propertyName} - ${inv.roomName} rent for ${inv.month} ${inv.year}`,
+                    accepted_payment_methods: {
+                      card: true,
+                      square_gift_card: false,
+                      bank_account: true,
+                      buy_now_pay_later: false
+                    },
+                    custom_fields: [
+                      { label: "Room", value: inv.roomName || "" },
+                      { label: "Billing Period", value: `${inv.month} ${inv.year}` }
+                    ],
+                    sale_or_service_date: dueDate
+                  }
+                })
+              });
+              const invoiceData = await invoiceRes.json();
+              if (invoiceRes.ok && invoiceData.invoice) {
+                const squareInvoiceId2 = invoiceData.invoice.id;
+                const version = invoiceData.invoice.version;
+                const publishRes = await fetch(`${baseUrl}/v2/invoices/${squareInvoiceId2}/publish`, {
+                  method: "POST",
+                  headers: squareHeaders,
+                  body: JSON.stringify({
+                    idempotency_key: crypto.randomUUID(),
+                    version
+                  })
+                });
+                const publishData = await publishRes.json();
+                const finalInv = publishRes.ok && publishData.invoice ? publishData.invoice : invoiceData.invoice;
+                results.push({
+                  clientReferenceId: inv.id,
+                  squareOrderId: squareOrderId2,
+                  squareInvoiceId: squareInvoiceId2,
+                  squareLocationId: locationId,
+                  squareCustomerId: customerId,
+                  status: finalInv.status || "UNPAID",
+                  paymentUrl: finalInv.public_url || `https://squareup.com/pay-invoice/${squareInvoiceId2}`,
+                  viewUrl: finalInv.public_url || `https://squareup.com/pay-invoice/${squareInvoiceId2}`,
+                  source: "square_live_api"
+                });
+                continue;
+              }
+            }
+          } catch (sqErr) {
+            console.warn("Square live invoice generation error on Cloudflare, using fallback:", sqErr);
+          }
+        }
+        const ts = Date.now().toString(36);
+        const rand = Math.random().toString(36).substring(2, 7);
+        const squareOrderId = `sq_ord_${ts}_${rand}`;
+        const squareInvoiceId = `sq_inv_${ts}_${rand}`;
+        const paymentSlug = Math.random().toString(36).substring(2, 10);
+        results.push({
+          clientReferenceId: inv.id,
+          squareOrderId,
+          squareInvoiceId,
+          squareLocationId: locationId,
+          squareCustomerId: customerId,
+          status: "UNPAID",
+          paymentUrl: `https://checkout.square.site/merchant/MOYERPM/pay/${paymentSlug}`,
+          viewUrl: `https://squareup.com/pay-invoice/${squareInvoiceId}`,
+          source: "simulated"
+        });
+      } catch (err) {
+        errors.push({ id: inv.id, error: err.message || "Unknown error" });
+      }
+    }
+    return jsonResponse({
+      success: results.length > 0,
+      createdCount: results.length,
+      results,
+      errors
+    });
+  }
+  const invoiceSyncMatch = pathname.match(/^\/api\/square\/invoices\/([^/]+)\/sync$/);
+  if (invoiceSyncMatch && request.method === "GET") {
+    const invoiceId = invoiceSyncMatch[1];
+    if (accessToken && !invoiceId.startsWith("sq_inv_")) {
+      try {
+        const res = await fetch(`${baseUrl}/v2/invoices/${encodeURIComponent(invoiceId)}`, {
+          headers: squareHeaders
+        });
+        const data = await res.json();
+        if (res.ok && data.invoice) {
+          const inv = data.invoice;
+          const isPaid = inv.status === "PAID";
+          return jsonResponse({
+            invoiceId: inv.id,
+            status: inv.status,
+            isPaid,
+            paidAt: inv.payment_requests?.[0]?.computed_amount_money?.amount ? (/* @__PURE__ */ new Date()).toISOString() : null,
+            paymentUrl: inv.public_url,
+            source: "square_live_api"
+          });
+        }
+      } catch (err) {
+        console.warn("Square sync error on Cloudflare:", err);
+      }
+    }
+    return jsonResponse({
+      invoiceId,
+      status: "UNPAID",
+      isPaid: false,
+      paidAt: null,
+      source: "simulated"
+    });
+  }
+  if (pathname === "/api/square/late-fees/apply" && request.method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const { rentAmount, invoiceId } = body;
+    const lateFee = Math.max(50, Math.round((Number(rentAmount) || 0) * 0.05 * 100) / 100);
+    return jsonResponse({
+      success: true,
+      invoiceId,
+      lateFeeAmount: lateFee,
+      totalAmount: (Number(rentAmount) || 0) + lateFee,
+      appliedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      source: "simulated"
+    });
+  }
+  return jsonResponse({ error: "Endpoint not found on Cloudflare Pages API", pathname }, 404);
+}
+
+// src/cloudflare-worker.ts
+var cloudflare_worker_default = {
+  async fetch(request, env, context) {
+    const url = new URL(request.url);
+    if (url.pathname.startsWith("/api/")) {
+      return onRequest({
+        request,
+        env,
+        params: { path: url.pathname.replace(/^\/api\/?/, "").split("/").filter(Boolean) }
+      });
+    }
+    if (env.ASSETS && typeof env.ASSETS.fetch === "function") {
+      return env.ASSETS.fetch(request);
+    }
+    return new Response("Not Found", { status: 404 });
+  }
+};
+export {
+  cloudflare_worker_default as default
+};

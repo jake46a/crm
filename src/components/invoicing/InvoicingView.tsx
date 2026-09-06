@@ -527,7 +527,8 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
               firstName: item.contact?.firstName || item.tenantName.split(' ')[0],
               lastName: item.contact?.lastName || item.tenantName.split(' ').slice(1).join(' '),
               phone: item.tenantPhone,
-              note: `Coliving Tenant at ${selectedProperty.name} - Room ${item.room.name}`
+              note: `Coliving Tenant at ${selectedProperty.name} - Room ${item.room.name}`,
+              allowFallback: true
             });
             customerId = customerRes.customerId;
             if (item.contact) {

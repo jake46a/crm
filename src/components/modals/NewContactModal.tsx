@@ -194,7 +194,8 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
             firstName: fName || undefined,
             lastName: lName || undefined,
             phone: phone.trim() || undefined,
-            note: 'Coliving Tenant in Moyer PM CRM'
+            note: 'Coliving Tenant in Moyer PM CRM',
+            allowFallback: true
           });
           if (res.customerId) {
             finalSquareId = res.customerId;
