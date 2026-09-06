@@ -520,43 +520,88 @@ export async function onRequest(context: { request: Request; env: Env; params: a
           locationId = defaultLocationId;
         }
 
-        // Resolve valid customer (auto-match real Square customer if simulated or missing)
+        const cleanEmail = (inv.tenantEmail || '').trim().toLowerCase();
+
+        // Resolve valid customer (auto-match or create real Square customer)
         let customerId = (inv.squareCustomerId || '').trim();
-        if (!customerId || customerId.startsWith('sq_cust_')) {
-          if (inv.tenantEmail && accessToken) {
-            try {
-              const searchCust = await fetch(`${baseUrl}/v2/customers/search`, {
-                method: 'POST',
-                headers: squareHeaders,
-                body: JSON.stringify({
-                  query: { filter: { email_address: { exact: inv.tenantEmail.trim().toLowerCase() } } }
-                })
-              });
-              const searchCustData = (await searchCust.json()) as any;
-              if (searchCust.ok && searchCustData.customers && searchCustData.customers.length > 0) {
-                customerId = searchCustData.customers[0].id;
-              } else {
+        const isRealSquareCustomerId = customerId && /^[A-Z0-9]{20,32}$/.test(customerId) && !customerId.startsWith('CUST_') && !customerId.startsWith('LOC_') && !customerId.startsWith('PROP_') && !customerId.startsWith('sq_');
+
+        if (!isRealSquareCustomerId) {
+          const KNOWN_RESIDENT_MAP: Record<string, string> = {
+            'jake@proweb.agency': '5H7TD7HACMVSVZQFSJ557GW5XW',
+            'carlosrea@live.com': 'AKJ2CWZ97H76E6XG95WP3J35G8',
+            'jordanbends@yahoo.com': 'BS5346WC6GYXYR7KP7V5QKV2ZG',
+            'bacaliam28@gmail.com': 'NVKKA892W8959GTGYWKJ3F2NZ8',
+            'marcus.vance@gmail.com': '36F258ZG1M87CWK3TT9RCQHCS0'
+          };
+
+          if (cleanEmail && KNOWN_RESIDENT_MAP[cleanEmail]) {
+            customerId = KNOWN_RESIDENT_MAP[cleanEmail];
+          } else if (accessToken) {
+            // Search customer in Square by email
+            if (cleanEmail) {
+              try {
+                const searchCust = await fetch(`${baseUrl}/v2/customers/search`, {
+                  method: 'POST',
+                  headers: squareHeaders,
+                  body: JSON.stringify({
+                    query: { filter: { email_address: { exact: cleanEmail } } }
+                  })
+                });
+                const searchCustData = (await searchCust.json()) as any;
+                if (searchCust.ok && searchCustData.customers && searchCustData.customers.length > 0) {
+                  customerId = searchCustData.customers[0].id;
+                }
+              } catch (cErr) {
+                console.warn('[Cloudflare API] Customer search failed:', cErr);
+              }
+            }
+
+            // Create new customer on Square if not found
+            if (!customerId) {
+              try {
+                const nameParts = (inv.tenantName || 'Resident').trim().split(/\s+/);
                 const createCust = await fetch(`${baseUrl}/v2/customers`, {
                   method: 'POST',
                   headers: squareHeaders,
                   body: JSON.stringify({
                     idempotency_key: crypto.randomUUID(),
-                    email_address: inv.tenantEmail.trim(),
-                    given_name: inv.tenantName || 'Tenant'
+                    email_address: cleanEmail || undefined,
+                    given_name: nameParts[0] || 'Resident',
+                    family_name: nameParts.slice(1).join(' ') || '',
+                    phone_number: inv.tenantPhone ? inv.tenantPhone.replace(/[^+\d]/g, '') : undefined,
+                    note: `Coliving tenant at ${inv.propertyName || '1070 Yank St'} - ${inv.roomName || 'Bedroom'}`
                   })
                 });
                 const createCustData = (await createCust.json()) as any;
-                if (createCust.ok && createCustData.customer) {
+                if (createCust.ok && createCustData.customer?.id) {
                   customerId = createCustData.customer.id;
+                  console.log(`[Cloudflare API] Created new Square customer for ${inv.tenantName}: ${customerId}`);
+                } else {
+                  console.error('[Cloudflare API] Customer creation failed on Square:', createCustData);
+                  errors.push({
+                    id: inv.id,
+                    tenant: inv.tenantName,
+                    error: `Square Customer creation failed: ${createCustData?.errors?.map((e: any) => e.detail || e.code).join(', ') || 'Unknown error'}`
+                  });
+                  continue;
                 }
+              } catch (cErr: any) {
+                console.error('[Cloudflare API] Error creating customer:', cErr);
+                errors.push({ id: inv.id, tenant: inv.tenantName, error: `Customer creation error: ${cErr.message}` });
+                continue;
               }
-            } catch (cErr) {
-              console.warn('Auto customer resolution failed on Cloudflare:', cErr);
             }
           }
         }
+
         if (!customerId) {
-          customerId = `sq_cust_${(inv.tenantEmail || 'tenant').replace(/[^a-zA-Z0-9]/g, '_')}`;
+          errors.push({
+            id: inv.id,
+            tenant: inv.tenantName,
+            error: `Could not resolve a valid Square customer for ${inv.tenantName || cleanEmail || 'resident'}.`
+          });
+          continue;
         }
 
         const amountInCents = Math.round(Number(inv.amount) * 100);
@@ -611,102 +656,107 @@ export async function onRequest(context: { request: Request; env: Env; params: a
             });
 
             const orderData = (await orderRes.json()) as any;
-            if (orderRes.ok && orderData.order) {
-              const squareOrderId = orderData.order.id;
-
-              // Step 2: Create Invoice (strict partial-payment prevention)
-              const invoiceRes = await fetch(`${baseUrl}/v2/invoices`, {
-                method: 'POST',
-                headers: squareHeaders,
-                body: JSON.stringify({
-                  idempotency_key: crypto.randomUUID(),
-                  invoice: {
-                    order_id: squareOrderId,
-                    location_id: locationId,
-                    primary_recipient: { customer_id: customerId },
-                    payment_requests: [
-                      {
-                        request_type: 'BALANCE',
-                        due_date: validDueDate,
-                        automatic_payment_source: 'NONE'
-                      }
-                    ],
-                    delivery_method: 'EMAIL',
-                    accepted_payment_methods: {
-                      card: true,
-                      square_gift_card: false,
-                      bank_account: true,
-                      buy_now_pay_later: false
-                    },
-                    title,
-                    description: inv.description || `${inv.propertyName} - ${inv.roomName} rent for ${inv.month} ${inv.year}`,
-                    sale_or_service_date: validDueDate
-                  }
-                })
-              });
-
-              const invoiceData = (await invoiceRes.json()) as any;
-              if (invoiceRes.ok && invoiceData.invoice) {
-                const squareInvoiceId = invoiceData.invoice.id;
-                const version = invoiceData.invoice.version;
-
-                // Step 3: Publish Invoice
-                const publishRes = await fetch(`${baseUrl}/v2/invoices/${squareInvoiceId}/publish`, {
-                  method: 'POST',
-                  headers: squareHeaders,
-                  body: JSON.stringify({
-                    idempotency_key: crypto.randomUUID(),
-                    version
-                  })
-                });
-
-                const publishData = (await publishRes.json()) as any;
-                const finalInv = publishRes.ok && publishData.invoice ? publishData.invoice : invoiceData.invoice;
-
-                results.push({
-                  clientReferenceId: inv.id,
-                  squareOrderId,
-                  squareInvoiceId,
-                  squareLocationId: locationId,
-                  squareCustomerId: customerId,
-                  status: finalInv.status || 'UNPAID',
-                  paymentUrl: finalInv.public_url || `https://squareup.com/pay-invoice/${squareInvoiceId}`,
-                  viewUrl: finalInv.public_url || `https://squareup.com/pay-invoice/${squareInvoiceId}`,
-                  source: 'square_live_api'
-                });
-                continue;
-              } else {
-                console.warn('Square invoice creation failed on Cloudflare:', invoiceData);
-              }
-            } else {
-              console.warn('Square order creation failed on Cloudflare:', orderData);
+            if (!orderRes.ok || !orderData.order) {
+              const errDetail = orderData?.errors?.map((e: any) => `${e.code}: ${e.detail}`).join(', ') || `HTTP ${orderRes.status}`;
+              console.error(`[Cloudflare API] Order creation rejected:`, errDetail);
+              errors.push({ id: inv.id, tenant: inv.tenantName, error: `Square Order failed: ${errDetail}` });
+              continue;
             }
-          } catch (sqErr) {
-            console.warn('Square live invoice generation error on Cloudflare, using fallback:', sqErr);
+
+            const squareOrderId = orderData.order.id;
+
+            // Step 2: Create Invoice (strict partial-payment prevention)
+            const invoiceRes = await fetch(`${baseUrl}/v2/invoices`, {
+              method: 'POST',
+              headers: squareHeaders,
+              body: JSON.stringify({
+                idempotency_key: crypto.randomUUID(),
+                invoice: {
+                  order_id: squareOrderId,
+                  location_id: locationId,
+                  primary_recipient: { customer_id: customerId },
+                  payment_requests: [
+                    {
+                      request_type: 'BALANCE',
+                      due_date: validDueDate,
+                      automatic_payment_source: 'NONE'
+                    }
+                  ],
+                  delivery_method: 'EMAIL',
+                  accepted_payment_methods: {
+                    card: true,
+                    square_gift_card: false,
+                    bank_account: true,
+                    buy_now_pay_later: false
+                  },
+                  title,
+                  description: inv.description || `${inv.propertyName} - ${inv.roomName} rent for ${inv.month} ${inv.year}`,
+                  sale_or_service_date: validDueDate
+                }
+              })
+            });
+
+            const invoiceData = (await invoiceRes.json()) as any;
+            if (!invoiceRes.ok || !invoiceData.invoice) {
+              const errDetail = invoiceData?.errors?.map((e: any) => `${e.code}: ${e.detail}`).join(', ') || `HTTP ${invoiceRes.status}`;
+              console.error(`[Cloudflare API] Invoice creation rejected:`, errDetail);
+              errors.push({ id: inv.id, tenant: inv.tenantName, error: `Square Invoice failed: ${errDetail}` });
+              continue;
+            }
+
+            const squareInvoiceId = invoiceData.invoice.id;
+            const version = invoiceData.invoice.version;
+
+            // Step 3: Publish Invoice
+            const publishRes = await fetch(`${baseUrl}/v2/invoices/${squareInvoiceId}/publish`, {
+              method: 'POST',
+              headers: squareHeaders,
+              body: JSON.stringify({
+                idempotency_key: crypto.randomUUID(),
+                version
+              })
+            });
+
+            const publishData = (await publishRes.json()) as any;
+            const finalInv = publishRes.ok && publishData.invoice ? publishData.invoice : invoiceData.invoice;
+
+            results.push({
+              clientReferenceId: inv.id,
+              squareOrderId,
+              squareInvoiceId,
+              squareLocationId: locationId,
+              squareCustomerId: customerId,
+              status: finalInv.status || 'UNPAID',
+              paymentUrl: finalInv.public_url || `https://squareup.com/pay-invoice/${squareInvoiceId}`,
+              viewUrl: finalInv.public_url || `https://squareup.com/pay-invoice/${squareInvoiceId}`,
+              source: 'square_live_api'
+            });
+            continue;
+          } catch (sqErr: any) {
+            console.error('[Cloudflare API] Square live API network error:', sqErr);
+            errors.push({ id: inv.id, tenant: inv.tenantName, error: `Square API error: ${sqErr.message}` });
+            continue;
           }
         }
 
-        // Fallback simulated generation (using valid square pay-invoice link pattern instead of 404 checkout slug)
-        const ts = Date.now().toString(36);
-        const rand = Math.random().toString(36).substring(2, 7);
-        const squareOrderId = `sq_ord_${ts}_${rand}`;
-        const squareInvoiceId = `sq_inv_${ts}_${rand}`;
-        const invoiceLink = `https://squareup.com/pay-invoice/${squareInvoiceId}`;
-
-        results.push({
-          clientReferenceId: inv.id,
-          squareOrderId,
-          squareInvoiceId,
-          squareLocationId: locationId,
-          squareCustomerId: customerId,
-          status: 'UNPAID',
-          paymentUrl: invoiceLink,
-          viewUrl: invoiceLink,
-          source: accessToken ? 'square_api_fallback' : 'simulated'
+        // If no accessToken is present
+        errors.push({
+          id: inv.id,
+          tenant: inv.tenantName,
+          error: 'SQUARE_ACCESS_TOKEN is not configured on Cloudflare Pages.'
         });
       } catch (err: any) {
-        errors.push({ id: inv.id, error: err.message || 'Unknown error' });
+        errors.push({ id: inv.id, tenant: inv.tenantName, error: err.message || 'Unknown error' });
       }
+    }
+
+    if (results.length === 0 && errors.length > 0) {
+      return jsonResponse({
+        success: false,
+        error: errors.map(e => `${e.tenant || e.id}: ${e.error}`).join(' | '),
+        results: [],
+        errors
+      }, 400);
     }
 
     return jsonResponse({

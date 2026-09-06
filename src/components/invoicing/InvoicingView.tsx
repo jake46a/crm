@@ -708,7 +708,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           finalValidatedRent: authoritativeRent,
           tenantName: item.tenantName,
           tenantEmail: item.tenantEmail,
-          squareCustomerId: customerId || `CUST_SANDBOX_${specificRoom.id}`,
+          squareCustomerId: (customerId && !customerId.startsWith('CUST_') && !customerId.startsWith('sq_cust_')) ? customerId : '',
           lineItems
         });
 
@@ -727,7 +727,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           tenantEmail: item.tenantEmail,
           tenantPhone: item.tenantPhone,
           squareLocationId: effectiveLocationId,
-          squareCustomerId: customerId || `CUST_SANDBOX_${specificRoom.id}`,
+          squareCustomerId: (customerId && !customerId.startsWith('CUST_') && !customerId.startsWith('sq_cust_')) ? customerId : '',
           month: selectedMonth,
           year: selectedYear,
           billingMonth: selectedMonth,
@@ -759,14 +759,19 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       // Call Square backend service
       const squareBatchRes = await SquareService.createInvoiceBatch(invoicesToCreate);
 
+      if (!squareBatchRes.success || !squareBatchRes.results || squareBatchRes.results.length === 0) {
+        const errDetail = squareBatchRes.error || squareBatchRes.errors?.map((e: any) => e.error).join(', ') || 'Square invoice generation failed.';
+        throw new Error(errDetail);
+      }
+
       // Map results and prepare full Invoice models
       const finalInvoices: Invoice[] = invoicesToCreate.map((inv, idx) => {
         const sqRes = squareBatchRes.results?.[idx];
-        const paymentUrl = sqRes?.paymentUrl || `https://square.link/u/moyer-pm-${inv.id}`;
+        const paymentUrl = sqRes?.paymentUrl || `https://squareup.com/pay-invoice/${sqRes?.squareInvoiceId || inv.id}`;
         return {
           ...inv,
-          squareOrderId: sqRes?.squareOrderId || `sq-order-${Date.now()}-${idx}`,
-          squareInvoiceId: sqRes?.squareInvoiceId || `sq-inv-${Date.now()}-${idx}`,
+          squareOrderId: sqRes?.squareOrderId,
+          squareInvoiceId: sqRes?.squareInvoiceId,
           paymentUrl,
           squarePaymentUrl: paymentUrl,
           viewUrl: sqRes?.viewUrl || paymentUrl,
@@ -781,7 +786,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       setBatchResult({
         success: true,
         count: finalInvoices.length,
-        message: `Successfully generated and emailed ${finalInvoices.length} Square rental invoices for ${selectedProperty.name} (${selectedMonth} ${selectedYear}). Partial payments are strictly disabled per policy.`
+        message: `Successfully generated and published ${finalInvoices.length} authentic Square rental invoices for ${selectedProperty.name} (${selectedMonth} ${selectedYear}). Visible in Square Developer API Log.`
       });
     } catch (err: any) {
       setBatchResult({
@@ -835,7 +840,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           tenantEmail: item.tenantEmail,
           tenantPhone: item.tenantPhone,
           squareLocationId: effectiveLocationId,
-          squareCustomerId: item.squareCustomerId || `CUST_SANDBOX_${item.room.id}`,
+          squareCustomerId: (item.squareCustomerId && !item.squareCustomerId.startsWith('CUST_') && !item.squareCustomerId.startsWith('sq_cust_')) ? item.squareCustomerId : '',
           month: selectedMonth,
           year: selectedYear,
           billingMonth: selectedMonth,
@@ -856,15 +861,20 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       });
 
       const res = await SquareService.createInvoiceBatch(utilityInvoices);
+      if (!res.success || !res.results || res.results.length === 0) {
+        throw new Error(res.error || res.errors?.map((e: any) => e.error).join(', ') || 'Square utility invoice generation failed.');
+      }
+
       const savedInvoices: Invoice[] = utilityInvoices.map((inv, idx) => {
-        const paymentUrl = res.results?.[idx]?.paymentUrl || `https://square.link/u/moyer-pm-${inv.id}`;
+        const sqRes = res.results?.[idx];
+        const paymentUrl = sqRes?.paymentUrl || `https://squareup.com/pay-invoice/${sqRes?.squareInvoiceId || inv.id}`;
         return {
           ...inv,
-          squareOrderId: res.results?.[idx]?.squareOrderId || `sq-order-util-${Date.now()}-${idx}`,
-          squareInvoiceId: res.results?.[idx]?.squareInvoiceId || `sq-inv-util-${Date.now()}-${idx}`,
+          squareOrderId: sqRes?.squareOrderId,
+          squareInvoiceId: sqRes?.squareInvoiceId,
           paymentUrl,
           squarePaymentUrl: paymentUrl,
-          viewUrl: res.results?.[idx]?.viewUrl || paymentUrl,
+          viewUrl: sqRes?.viewUrl || paymentUrl,
           status: 'SENT' as InvoiceStatus
         } as unknown as Invoice;
       });
@@ -927,7 +937,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           tenantEmail: item.tenantEmail,
           tenantPhone: item.tenantPhone,
           squareLocationId: effectiveLocationId,
-          squareCustomerId: item.squareCustomerId || `CUST_SANDBOX_${item.room.id}`,
+          squareCustomerId: (item.squareCustomerId && !item.squareCustomerId.startsWith('CUST_') && !item.squareCustomerId.startsWith('sq_cust_')) ? item.squareCustomerId : '',
           month: selectedMonth,
           year: selectedYear,
           billingMonth: selectedMonth,
@@ -948,15 +958,20 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       });
 
       const res = await SquareService.createInvoiceBatch(suppliesInvoices);
+      if (!res.success || !res.results || res.results.length === 0) {
+        throw new Error(res.error || res.errors?.map((e: any) => e.error).join(', ') || 'Square supplies invoice generation failed.');
+      }
+
       const savedInvoices: Invoice[] = suppliesInvoices.map((inv, idx) => {
-        const paymentUrl = res.results?.[idx]?.paymentUrl || `https://square.link/u/moyer-pm-${inv.id}`;
+        const sqRes = res.results?.[idx];
+        const paymentUrl = sqRes?.paymentUrl || `https://squareup.com/pay-invoice/${sqRes?.squareInvoiceId || inv.id}`;
         return {
           ...inv,
-          squareOrderId: res.results?.[idx]?.squareOrderId || `sq-order-supplies-${Date.now()}-${idx}`,
-          squareInvoiceId: res.results?.[idx]?.squareInvoiceId || `sq-inv-supplies-${Date.now()}-${idx}`,
+          squareOrderId: sqRes?.squareOrderId,
+          squareInvoiceId: sqRes?.squareInvoiceId,
           paymentUrl,
           squarePaymentUrl: paymentUrl,
-          viewUrl: res.results?.[idx]?.viewUrl || paymentUrl,
+          viewUrl: sqRes?.viewUrl || paymentUrl,
           status: 'SENT' as InvoiceStatus
         } as unknown as Invoice;
       });

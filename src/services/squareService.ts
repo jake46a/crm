@@ -48,7 +48,8 @@ export interface CreateBatchResult {
     viewUrl: string;
     source: string;
   }>;
-  errors: Array<{ id: string; error: string }>;
+  errors: Array<{ id?: string; error: string }>;
+  error?: string;
 }
 
 export interface SyncInvoiceResult {
@@ -605,55 +606,27 @@ export const SquareService = {
       rawPayload: invoices
     });
 
-    try {
-      const res = await fetchSquareApi('/api/square/invoices/create-batch', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ invoices })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.success && Array.isArray(data.results) && data.results.length > 0) {
-          return data;
-        }
-      }
-      console.warn(`Square batch endpoint returned HTTP ${res.status}, using resilient fallback.`);
-    } catch (err) {
-      console.warn('Network issue during Square batch invoice generation, using resilient fallback:', err);
-    }
-
-    // Resilient Fallback: Create valid Square orders and invoices
-    const results = invoices.map((inv, idx) => {
-      const ts = Date.now().toString(36);
-      const rand = Math.random().toString(36).substring(2, 7);
-      const squareOrderId = `sq_ord_${ts}_${rand}_${idx}`;
-      const squareInvoiceId = `sq_inv_${ts}_${rand}_${idx}`;
-      const defaultLoc = getSavedSquareLocationId();
-      const isPlaceholder = !inv.squareLocationId || ['LOC_SPEER', 'LOC_CAPHILL', 'LOC_HIGHLANDS', 'LOC_DEMO', 'LOC_SAMPLE'].some(p => inv.squareLocationId?.toUpperCase().startsWith(p));
-      const locationId = isPlaceholder ? defaultLoc : inv.squareLocationId!;
-      const customerId = (inv.squareCustomerId && !inv.squareCustomerId.startsWith('sq_cust_')) 
-        ? inv.squareCustomerId 
-        : ((inv.tenantEmail && inv.tenantEmail.includes('jake@proweb.agency')) ? '5H7TD7HACMVSVZQFSJ557GW5XW' : `sq_cust_${(inv.tenantEmail || 'resident').replace(/[^a-zA-Z0-9]/g, '_')}`);
-
-      return {
-        clientReferenceId: inv.id,
-        squareOrderId,
-        squareInvoiceId,
-        squareLocationId: locationId,
-        squareCustomerId: customerId,
-        status: 'UNPAID',
-        paymentUrl: `https://squareup.com/pay-invoice/${squareInvoiceId}`,
-        viewUrl: `https://squareup.com/pay-invoice/${squareInvoiceId}`,
-        source: 'resilient_fallback'
-      };
+    const res = await fetchSquareApi('/api/square/invoices/create-batch', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ invoices })
     });
 
+    const data = await res.json().catch(() => null);
+
+    if (res.ok && data?.success && Array.isArray(data?.results) && data.results.length > 0) {
+      return data;
+    }
+
+    const errMessage = data?.error || data?.errors?.map((e: any) => e.error || e.detail).join(' | ') || `HTTP ${res.status}: ${res.statusText || 'Square Batch Error'}`;
+    console.error('[SquareService.createInvoiceBatch] Batch invoice creation failed:', errMessage, data);
+    
     return {
-      success: true,
-      createdCount: results.length,
-      results,
-      errors: []
+      success: false,
+      createdCount: data?.results?.length || 0,
+      results: data?.results || [],
+      errors: data?.errors || [{ error: errMessage }],
+      error: errMessage
     };
   },
 
