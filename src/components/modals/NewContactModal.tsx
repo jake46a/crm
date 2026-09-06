@@ -38,7 +38,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
   const [emergencyContactPhone, setEmergencyContactPhone] = useState<string>('');
   const [squareCustomerId, setSquareCustomerId] = useState<string>('');
   const [isSyncingSquare, setIsSyncingSquare] = useState<boolean>(false);
-  const [squareSyncStatus, setSquareSyncStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [squareSyncStatus, setSquareSyncStatus] = useState<{ type: 'success' | 'warning' | 'error' | 'info'; message: string } | null>(null);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState<boolean>(false);
 
   useEffect(() => {
@@ -110,13 +110,33 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         note: `Coliving Tenant in Moyer PM CRM`
       });
 
-      if (result.customerId) {
+      if (result.success && result.customerId) {
         setSquareCustomerId(result.customerId);
+        if (result.source === 'square_live_api' || result.source === 'square_api') {
+          const matchedName = result.customer?.given_name || result.customer?.family_name
+            ? ` (${[result.customer?.given_name, result.customer?.family_name].filter(Boolean).join(' ')})`
+            : '';
+          setSquareSyncStatus({
+            type: 'success',
+            message: result.isNew 
+              ? `Live Square customer created: ${result.customerId}${matchedName}` 
+              : `Live Square customer matched: ${result.customerId}${matchedName}`
+          });
+        } else if (result.source === 'simulated') {
+          setSquareSyncStatus({
+            type: 'warning',
+            message: `Using simulated fallback ID (${result.customerId}). Live Square API was not reached. Ensure SQUARE_ACCESS_TOKEN is configured in Cloudflare Pages.`
+          });
+        } else {
+          setSquareSyncStatus({
+            type: 'success',
+            message: `Square customer ID: ${result.customerId}`
+          });
+        }
+      } else {
         setSquareSyncStatus({
-          type: 'success',
-          message: result.isNew 
-            ? `New Square customer created: ${result.customerId}` 
-            : `Existing Square customer matched: ${result.customerId}`
+          type: 'error',
+          message: result.error || 'Failed to match or create Square customer record.'
         });
       }
     } catch (err: any) {
@@ -449,15 +469,19 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
                   className="w-full p-2 bg-white border border-zinc-300 rounded-md font-mono text-xs text-zinc-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
                 {squareSyncStatus && (
-                  <div className={`mt-1.5 p-2 rounded text-xs flex items-center gap-1.5 ${
+                  <div className={`mt-1.5 p-2 rounded text-xs flex items-start gap-1.5 ${
                     squareSyncStatus.type === 'success' 
                       ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                      : squareSyncStatus.type === 'warning'
+                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
                       : 'bg-rose-50 text-rose-800 border border-rose-200'
                   }`}>
                     {squareSyncStatus.type === 'success' ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : squareSyncStatus.type === 'warning' ? (
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                     ) : (
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
                     )}
                     <span className="leading-tight">{squareSyncStatus.message}</span>
                   </div>

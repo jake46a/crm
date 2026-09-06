@@ -43,12 +43,22 @@ function getSquareBaseUrl() {
     : 'https://connect.squareupsandbox.com';
 }
 
-function getSquareHeaders() {
+function getSquareHeaders(tokenOverride?: string) {
+  const token = tokenOverride || SQUARE_ACCESS_TOKEN;
   return {
     'Square-Version': SQUARE_VERSION,
-    'Authorization': `Bearer ${SQUARE_ACCESS_TOKEN}`,
+    'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json'
   };
+}
+
+function resolveSquareToken(req: Request): string {
+  const auth = (req.headers['authorization'] || '') as string;
+  if (auth.toLowerCase().startsWith('bearer ')) {
+    const bearer = auth.substring(7).trim();
+    if (bearer.length > 5) return bearer;
+  }
+  return SQUARE_ACCESS_TOKEN || '';
 }
 
 // In-memory store for simulated Square data when no live token is provided
@@ -107,8 +117,9 @@ initialSeedEmails.forEach(c => {
 
 // 1. Square Connection & Health Status
 app.get('/api/square/status', (req: Request, res: Response) => {
+  const token = resolveSquareToken(req);
   const baseUrl = getSquareBaseUrl();
-  const hasToken = Boolean(SQUARE_ACCESS_TOKEN && SQUARE_ACCESS_TOKEN.trim().length > 5);
+  const hasToken = Boolean(token && token.trim().length > 5);
   res.json({
     hasToken,
     environment: currentSquareEnvironment,
@@ -169,18 +180,19 @@ app.post(['/api/square/customers/search-or-create', '/api/square/customers', '/a
   const { email, firstName, lastName, phone, note } = req.body;
 
   if (!email || !email.trim()) {
-    return res.status(400).json({ error: 'Email address is required to sync Square Customer ID.' });
+    return res.status(400).json({ success: false, error: 'Email address is required to sync Square Customer ID.' });
   }
 
   const cleanEmail = email.trim().toLowerCase();
+  const activeToken = resolveSquareToken(req);
 
   // If live token is present, execute against Square API
-  if (SQUARE_ACCESS_TOKEN) {
+  if (activeToken) {
     try {
       // Step A: Search Customers by exact email
       const searchRes = await fetch(`${getSquareBaseUrl()}/v2/customers/search`, {
         method: 'POST',
-        headers: getSquareHeaders(),
+        headers: getSquareHeaders(activeToken),
         body: JSON.stringify({
           query: {
             filter: {
@@ -192,9 +204,19 @@ app.post(['/api/square/customers/search-or-create', '/api/square/customers', '/a
         })
       });
 
-      const searchData = await searchRes.json();
+      const searchData = await searchRes.json() as any;
 
-      if (searchRes.ok && searchData.customers && searchData.customers.length > 0) {
+      if (!searchRes.ok) {
+        const errMsg = searchData?.errors?.map((e: any) => `${e.code}: ${e.detail}`).join(', ') || `Square Search HTTP ${searchRes.status}`;
+        return res.status(searchRes.status).json({
+          success: false,
+          error: `Square API Search Error: ${errMsg}`,
+          details: searchData?.errors,
+          source: 'square_api'
+        });
+      }
+
+      if (searchData.customers && searchData.customers.length > 0) {
         const existingCustomer = searchData.customers[0];
         return res.json({
           success: true,
@@ -206,20 +228,22 @@ app.post(['/api/square/customers/search-or-create', '/api/square/customers', '/a
       }
 
       // Step B: Customer does not exist, call createCustomer
+      const createPayload: any = {
+        idempotency_key: randomUUID(),
+        email_address: cleanEmail,
+        note: note || 'Moyer Property Management Speer House Tenant'
+      };
+      if (firstName?.trim()) createPayload.given_name = firstName.trim();
+      if (lastName?.trim()) createPayload.family_name = lastName.trim();
+      if (phone?.trim()) createPayload.phone_number = phone.trim();
+
       const createRes = await fetch(`${getSquareBaseUrl()}/v2/customers`, {
         method: 'POST',
-        headers: getSquareHeaders(),
-        body: JSON.stringify({
-          idempotency_key: randomUUID(),
-          given_name: firstName || undefined,
-          family_name: lastName || undefined,
-          email_address: cleanEmail,
-          phone_number: phone || undefined,
-          note: note || 'Moyer Property Management Tenant'
-        })
+        headers: getSquareHeaders(activeToken),
+        body: JSON.stringify(createPayload)
       });
 
-      const createData = await createRes.json();
+      const createData = await createRes.json() as any;
       if (createRes.ok && createData.customer) {
         return res.json({
           success: true,
@@ -230,10 +254,30 @@ app.post(['/api/square/customers/search-or-create', '/api/square/customers', '/a
         });
       }
 
-      console.warn('Square create customer error, using fallback:', createData);
+      const errMsg = createData?.errors?.map((e: any) => `${e.code}: ${e.detail}`).join(', ') || `Square Create HTTP ${createRes.status}`;
+      return res.status(createRes.status).json({
+        success: false,
+        error: `Square Customer Create Error: ${errMsg}`,
+        details: createData?.errors,
+        source: 'square_api'
+      });
     } catch (err: any) {
       console.warn('Square API error:', err);
+      return res.status(502).json({
+        success: false,
+        error: `Square API connection failure: ${err?.message || 'Network error'}`,
+        source: 'network_error'
+      });
     }
+  }
+
+  // If in Production and no access token is available, return informative error
+  if (currentSquareEnvironment === 'production') {
+    return res.status(400).json({
+      success: false,
+      error: 'Square Access Token is missing. Configure SQUARE_ACCESS_TOKEN in your environment variables.',
+      source: 'missing_token'
+    });
   }
 
   // Simulated Square Sandbox Mode

@@ -44,7 +44,10 @@ export async function onRequest(context: { request: Request; env: Env; params: a
   }
 
   // Resolve Square credentials from Cloudflare Environment Variables & Secrets
-  const accessToken = (env.SQUARE_ACCESS_TOKEN || env.VITE_SQUARE_ACCESS_TOKEN || '').trim();
+  // Also accept Authorization header from client if passed
+  const authHeader = request.headers.get('Authorization') || '';
+  const bearerToken = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.substring(7).trim() : '';
+  const accessToken = (env.SQUARE_ACCESS_TOKEN || env.VITE_SQUARE_ACCESS_TOKEN || bearerToken || '').trim();
   const squareEnv = (env.SQUARE_ENVIRONMENT || env.VITE_SQUARE_ENVIRONMENT || 'production').toLowerCase();
   const isProduction = squareEnv === 'production' || squareEnv === 'prod';
   const baseUrl = isProduction ? 'https://connect.squareup.com' : 'https://connect.squareupsandbox.com';
@@ -58,16 +61,25 @@ export async function onRequest(context: { request: Request; env: Env; params: a
   // 1. Square Connection & Health Status
   if (pathname === '/api/square/status' && request.method === 'GET') {
     const hasToken = accessToken.length > 5;
+    const tokenSource = env.SQUARE_ACCESS_TOKEN
+      ? 'cloudflare_secret'
+      : env.VITE_SQUARE_ACCESS_TOKEN
+      ? 'cloudflare_vite_env'
+      : bearerToken
+      ? 'request_bearer'
+      : 'none';
+
     return jsonResponse({
       hasToken,
       environment: isProduction ? 'production' : 'sandbox',
       baseUrl,
       version: SQUARE_VERSION,
       mode: isProduction
-        ? (hasToken ? 'Production (Live API on Cloudflare)' : 'Production (Awaiting Live Token in Cloudflare Secrets)')
+        ? (hasToken ? 'Production (Live API)' : 'Production (Awaiting SQUARE_ACCESS_TOKEN in Cloudflare)')
         : (hasToken ? 'Sandbox (Connected on Cloudflare)' : 'Sandbox Mode'),
       isProduction,
       platform: 'cloudflare-pages',
+      tokenSource,
       activeLocationsCount: 3,
     });
   }
@@ -131,81 +143,127 @@ export async function onRequest(context: { request: Request; env: Env; params: a
     const { email, firstName, lastName, phone, note } = body;
 
     if (!email || !email.trim()) {
-      return jsonResponse({ error: 'Email address is required.' }, 400);
+      return jsonResponse({ success: false, error: 'Email address is required.' }, 400);
     }
 
     const cleanEmail = email.trim().toLowerCase();
 
-    if (accessToken) {
-      try {
-        // Search by email
-        const searchRes = await fetch(`${baseUrl}/v2/customers/search`, {
-          method: 'POST',
-          headers: squareHeaders,
-          body: JSON.stringify({
-            query: {
-              filter: {
-                email_address: { exact: cleanEmail }
-              }
-            }
-          })
-        });
-
-        const searchData = (await searchRes.json()) as any;
-        if (searchRes.ok && searchData.customers && searchData.customers.length > 0) {
-          const customer = searchData.customers[0];
-          return jsonResponse({
-            success: true,
-            customerId: customer.id,
-            customer,
-            isNew: false,
-            source: 'square_live_api'
-          });
-        }
-
-        // Customer not found, create new customer
-        const createRes = await fetch(`${baseUrl}/v2/customers`, {
-          method: 'POST',
-          headers: squareHeaders,
-          body: JSON.stringify({
-            idempotency_key: crypto.randomUUID(),
-            given_name: firstName || 'Tenant',
-            family_name: lastName || '',
-            email_address: cleanEmail,
-            phone_number: phone || '',
-            note: note || 'Moyer Property Management Speer House Tenant'
-          })
-        });
-
-        const createData = (await createRes.json()) as any;
-        if (createRes.ok && createData.customer) {
-          return jsonResponse({
-            success: true,
-            customerId: createData.customer.id,
-            customer: createData.customer,
-            isNew: true,
-            source: 'square_live_api'
-          });
-        }
-      } catch (err) {
-        console.warn('Square customer sync issue on Cloudflare, using fallback:', err);
+    // If in Production and no access token is available, return informative error
+    if (!accessToken) {
+      if (isProduction) {
+        return jsonResponse({
+          success: false,
+          error: 'Square Access Token not found in Cloudflare Pages. Please add SQUARE_ACCESS_TOKEN under Cloudflare Pages Settings > Environment variables (for both Production and Preview) and retry deployment.',
+          source: 'missing_token'
+        }, 400);
       }
+
+      const fallbackId = `sq_cust_${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      return jsonResponse({
+        success: true,
+        customerId: fallbackId,
+        customer: {
+          id: fallbackId,
+          given_name: firstName || 'Tenant',
+          family_name: lastName || '',
+          email_address: cleanEmail,
+          phone_number: phone || ''
+        },
+        isNew: true,
+        source: 'simulated',
+        warning: 'Sandbox simulated ID generated (no token configured).'
+      });
     }
 
-    const fallbackId = `sq_cust_${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    return jsonResponse({
-      success: true,
-      customerId: fallbackId,
-      customer: {
-        id: fallbackId,
-        given_name: firstName || 'Tenant',
-        family_name: lastName || '',
+    try {
+      // Step A: Search by exact email
+      const searchRes = await fetch(`${baseUrl}/v2/customers/search`, {
+        method: 'POST',
+        headers: squareHeaders,
+        body: JSON.stringify({
+          query: {
+            filter: {
+              email_address: { exact: cleanEmail }
+            }
+          }
+        })
+      });
+
+      const searchData = (await searchRes.json()) as any;
+
+      if (!searchRes.ok) {
+        const errMsg = searchData?.errors?.map((e: any) => `${e.code}: ${e.detail}`).join(', ') || `Square Search HTTP ${searchRes.status}`;
+        return jsonResponse({
+          success: false,
+          error: `Square Customers API Search Error: ${errMsg}`,
+          details: searchData?.errors,
+          source: 'square_api_error'
+        }, searchRes.status);
+      }
+
+      if (searchData.customers && searchData.customers.length > 0) {
+        const customer = searchData.customers[0];
+        return jsonResponse({
+          success: true,
+          customerId: customer.id,
+          customer,
+          isNew: false,
+          source: 'square_live_api'
+        });
+      }
+
+      // Step B: Customer not found, create new customer in Square
+      const createPayload: any = {
+        idempotency_key: crypto.randomUUID(),
         email_address: cleanEmail,
-        phone_number: phone || ''
-      },
-      isNew: true,
-      source: 'simulated'
-    });
+        note: note || 'Moyer Property Management Speer House Tenant'
+      };
+      if (firstName?.trim()) createPayload.given_name = firstName.trim();
+      if (lastName?.trim()) createPayload.family_name = lastName.trim();
+      if (phone?.trim()) createPayload.phone_number = phone.trim();
+
+      const createRes = await fetch(`${baseUrl}/v2/customers`, {
+        method: 'POST',
+        headers: squareHeaders,
+        body: JSON.stringify(createPayload)
+      });
+
+      const createData = (await createRes.json()) as any;
+
+      if (!createRes.ok) {
+        const errMsg = createData?.errors?.map((e: any) => `${e.code}: ${e.detail}`).join(', ') || `Square Customer Create HTTP ${createRes.status}`;
+        return jsonResponse({
+          success: false,
+          error: `Square Customer Create Error: ${errMsg}`,
+          details: createData?.errors,
+          source: 'square_api_error'
+        }, createRes.status);
+      }
+
+      if (createData.customer) {
+        return jsonResponse({
+          success: true,
+          customerId: createData.customer.id,
+          customer: createData.customer,
+          isNew: true,
+          source: 'square_live_api'
+        });
+      }
+
+      return jsonResponse({
+        success: false,
+        error: 'Customer creation succeeded on Square but did not return a customer record.',
+        source: 'square_api_error'
+      }, 500);
+
+    } catch (err: any) {
+      console.warn('Square customer sync network issue on Cloudflare:', err);
+      return jsonResponse({
+        success: false,
+        error: `Square API connection failure: ${err?.message || 'Network error'}`,
+        source: 'network_error'
+      }, 502);
+    }
   }
 
   // 5. Batch Create Invoices (createOrder -> createInvoice -> publish)

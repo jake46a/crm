@@ -70,6 +70,18 @@ export interface ApplyLateFeeResult {
   source: string;
 }
 
+function getAuthHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
+  const buildTimeToken = ((import.meta as any).env?.VITE_SQUARE_ACCESS_TOKEN || (process as any)?.env?.SQUARE_ACCESS_TOKEN || '').trim();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...extraHeaders
+  };
+  if (buildTimeToken && buildTimeToken.length > 5) {
+    headers['Authorization'] = `Bearer ${buildTimeToken}`;
+  }
+  return headers;
+}
+
 export const SquareService = {
   async getStatus(): Promise<SquareStatusResponse> {
     const buildTimeToken = ((import.meta as any).env?.VITE_SQUARE_ACCESS_TOKEN || (process as any)?.env?.SQUARE_ACCESS_TOKEN || '').trim();
@@ -78,7 +90,9 @@ export const SquareService = {
     const defaultBaseUrl = isProd ? 'https://connect.squareup.com' : 'https://connect.squareupsandbox.com';
 
     try {
-      const res = await fetch('/api/square/status');
+      const res = await fetch('/api/square/status', {
+        headers: getAuthHeaders()
+      });
       if (!res.ok) {
         const hasBuildToken = buildTimeToken.length > 5;
         return {
@@ -87,7 +101,7 @@ export const SquareService = {
           baseUrl: defaultBaseUrl,
           version: '2025-02-20',
           mode: isProd
-            ? (hasBuildToken ? 'Production (Build Token Active)' : 'Production (Live)')
+            ? (hasBuildToken ? 'Production (Build Token Forwarded)' : 'Production (Awaiting Token in Cloudflare)')
             : (hasBuildToken ? 'Sandbox (Connected)' : 'Sandbox Mode'),
           isProduction: isProd,
           activeLocationsCount: 3,
@@ -97,11 +111,17 @@ export const SquareService = {
       }
       const data = await res.json();
       const hasToken = Boolean(data.hasToken || buildTimeToken.length > 5);
+      const diagnostics = data.hasToken 
+        ? 'Live Square API token active in Cloudflare Functions backend'
+        : buildTimeToken.length > 5 
+        ? 'Token detected in Frontend bundle (forwarded via Bearer header)' 
+        : 'Square API connected (awaiting SQUARE_ACCESS_TOKEN in Cloudflare)';
+
       return {
         ...data,
         hasToken,
         apiConnected: true,
-        diagnostics: hasToken ? 'Square API live token active' : 'Square API connected (no token in environment)'
+        diagnostics
       };
     } catch (e: any) {
       const hasBuildToken = buildTimeToken.length > 5;
@@ -111,7 +131,7 @@ export const SquareService = {
         baseUrl: defaultBaseUrl,
         version: '2025-02-20',
         mode: isProd
-          ? (hasBuildToken ? 'Production (Build Token Active)' : 'Production (Live)')
+          ? (hasBuildToken ? 'Production (Build Token Forwarded)' : 'Production (Awaiting Token in Cloudflare)')
           : (hasBuildToken ? 'Sandbox (Connected)' : 'Sandbox Mode'),
         isProduction: isProd,
         activeLocationsCount: 3,
@@ -147,7 +167,9 @@ export const SquareService = {
 
   async getLocations(): Promise<SquareLocation[]> {
     try {
-      const res = await fetch('/api/square/locations');
+      const res = await fetch('/api/square/locations', {
+        headers: getAuthHeaders()
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       return data.locations || [];
@@ -170,37 +192,74 @@ export const SquareService = {
     lastName?: string;
     phone?: string;
     note?: string;
+    allowFallback?: boolean;
   }): Promise<SyncCustomerResult> {
     try {
       const res = await fetch('/api/square/customers/search-or-create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(params)
       });
 
-      if (res.ok) {
-        return await res.json();
-      }
-      console.warn(`Customer lookup endpoint returned HTTP ${res.status}, using client fallback.`);
-    } catch (err) {
-      console.warn('Network issue during Square customer sync, using fallback:', err);
-    }
+      const data = await res.json().catch(() => null);
 
-    // Resilient Fallback: Generate valid Square customer identifier
-    const cleanId = `sq_cust_${(params.email || 'resident').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}`;
-    return {
-      success: true,
-      customerId: cleanId,
-      customer: {
-        id: cleanId,
-        email_address: params.email,
-        given_name: params.firstName || 'Resident',
-        family_name: params.lastName || '',
-        phone_number: params.phone || ''
-      },
-      isNew: true,
-      source: 'simulated'
-    };
+      if (res.ok && data?.success) {
+        return data;
+      }
+
+      const errorMsg = data?.error || `API returned HTTP ${res.status}: ${res.statusText}`;
+      console.warn(`Customer lookup error:`, errorMsg);
+
+      if (params.allowFallback) {
+        const cleanId = `sq_cust_${(params.email || 'resident').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}`;
+        return {
+          success: true,
+          customerId: cleanId,
+          customer: {
+            id: cleanId,
+            email_address: params.email,
+            given_name: params.firstName || 'Resident',
+            family_name: params.lastName || '',
+            phone_number: params.phone || ''
+          },
+          isNew: true,
+          source: 'simulated',
+          error: errorMsg
+        };
+      }
+
+      return {
+        success: false,
+        customerId: '',
+        error: errorMsg,
+        source: data?.source || 'square_api_error'
+      };
+    } catch (err: any) {
+      console.warn('Network issue during Square customer sync:', err);
+      if (params.allowFallback) {
+        const cleanId = `sq_cust_${(params.email || 'resident').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}`;
+        return {
+          success: true,
+          customerId: cleanId,
+          customer: {
+            id: cleanId,
+            email_address: params.email,
+            given_name: params.firstName || 'Resident',
+            family_name: params.lastName || '',
+            phone_number: params.phone || ''
+          },
+          isNew: true,
+          source: 'simulated',
+          error: err?.message || 'Network error'
+        };
+      }
+      return {
+        success: false,
+        customerId: '',
+        error: `Could not reach Square endpoint: ${err?.message || 'Network error'}`,
+        source: 'network_error'
+      };
+    }
   },
 
   /**
@@ -213,7 +272,7 @@ export const SquareService = {
     try {
       const res = await fetch('/api/square/invoices/create-batch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ invoices })
       });
 
@@ -293,7 +352,7 @@ export const SquareService = {
     try {
       const res = await fetch('/api/square/late-fees/apply', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(params)
       });
 
