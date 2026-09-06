@@ -26,6 +26,9 @@ import {
   Loader2
 } from 'lucide-react';
 import { Invoice, Property, InvoiceStatus } from '../../types';
+import { SquareService } from '../../services/squareService';
+import { StorageService } from '../../services/storage';
+import { FirebaseService } from '../../services/firebase';
 
 interface PaymentHistoryTabProps {
   invoices: Invoice[];
@@ -70,11 +73,28 @@ export const PaymentHistoryTab: React.FC<PaymentHistoryTabProps> = ({
     const targetId = invoiceToDelete.id;
     setIsDeletingInvoice(true);
     try {
-      if (onDeleteInvoice) {
-        onDeleteInvoice(targetId);
-      } else if (onSaveInvoices) {
-        onSaveInvoices(invoices.filter(i => i.id !== targetId));
+      if (invoiceToDelete.squareInvoiceId && invoiceToDelete.squareInvoiceId.startsWith('inv:')) {
+        try {
+          await SquareService.cancelInvoice(invoiceToDelete.squareInvoiceId);
+        } catch (sqErr) {
+          console.warn('Square cancellation warning:', sqErr);
+        }
       }
+
+      const remaining = invoices.filter(i => i.id !== targetId);
+      if (onDeleteInvoice) {
+        await onDeleteInvoice(targetId);
+      }
+      if (onSaveInvoices) {
+        onSaveInvoices(remaining);
+      }
+      StorageService.deleteInvoice(targetId);
+      try {
+        await FirebaseService.deleteInvoice(targetId);
+      } catch (fbErr) {
+        console.error('Failed to delete invoice from Firebase:', fbErr);
+      }
+
       showToast(`Invoice record for ${invoiceToDelete.tenantName || 'Resident'} was deleted.`);
       setInvoiceToDelete(null);
     } catch (err) {

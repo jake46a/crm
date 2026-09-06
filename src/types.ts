@@ -357,6 +357,8 @@ export interface Invoice {
   suppliesAmount?: number;
   specialAmount?: number;
   squarePaymentUrl?: string;
+  lineItems?: InvoiceLineItem[];
+  lineItemName?: string;
 }
 
 export interface SquareCustomerSearchResult {

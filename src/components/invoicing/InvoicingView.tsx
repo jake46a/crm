@@ -500,19 +500,8 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
     // 4. Square customer ID
     const squareCustomerId = matchedContact?.squareCustomerId || '';
 
-    // 5. Monthly rent: resolve current rent accurately
+    // 5. Monthly rent: pull authoritative rent directly from specific room record
     let rent: number | undefined = customRentOverrides[room.id];
-    if (rent === undefined || rent === null || isNaN(rent) || rent <= 0) {
-      if (renewals && renewals.length > 0) {
-        const renewal = renewals.find(r => 
-          r.roomId === room.id || 
-          getSimilarityScore(r.tenantName || `${r.tenantFirstName || ''} ${r.tenantLastName || ''}`, rawName) >= 0.75
-        );
-        if (renewal && typeof renewal.currentMonthlyRent === 'number' && renewal.currentMonthlyRent > 0) {
-          rent = renewal.currentMonthlyRent;
-        }
-      }
-    }
     if (rent === undefined || rent === null || isNaN(rent) || rent <= 0) {
       const parsedRoomRent = Number(room.monthlyRent);
       if (!isNaN(parsedRoomRent) && parsedRoomRent > 0) {
@@ -520,18 +509,27 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       }
     }
     if (rent === undefined || rent === null || isNaN(rent) || rent <= 0) {
-      const initialMatch = INITIAL_ROOMS.find(r => r.id === room.id || r.name === room.name);
+      const parsedAlt = Number((room as any).rent);
+      if (!isNaN(parsedAlt) && parsedAlt > 0) {
+        rent = parsedAlt;
+      }
+    }
+    if (rent === undefined || rent === null || isNaN(rent) || rent <= 0) {
+      if (renewals && renewals.length > 0) {
+        const renewal = renewals.find(r => r.roomId === room.id);
+        if (renewal && typeof renewal.currentMonthlyRent === 'number' && renewal.currentMonthlyRent > 0) {
+          rent = renewal.currentMonthlyRent;
+        }
+      }
+    }
+    if (rent === undefined || rent === null || isNaN(rent) || rent <= 0) {
+      const initialMatch = INITIAL_ROOMS.find(r => r.id === room.id);
       if (initialMatch && typeof initialMatch.monthlyRent === 'number' && initialMatch.monthlyRent > 0) {
         rent = initialMatch.monthlyRent;
       }
     }
     if (rent === undefined || rent === null || isNaN(rent) || rent <= 0) {
-      const parsedAlt = Number((room as any).rent);
-      if (!isNaN(parsedAlt) && parsedAlt > 0) {
-        rent = parsedAlt;
-      } else {
-        rent = 895;
-      }
+      rent = 895;
     }
 
     return {
@@ -614,8 +612,51 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       const invoicesToCreate: Partial<Invoice>[] = [];
       const dueDate = getDueDate(selectedMonth, selectedYear);
 
+      console.log(`[Square Invoicing] Initiating rent invoice generation for ${itemsToInvoice.length} resident(s) at property "${selectedProperty.name}" (ID: ${selectedProperty.id})`);
+
       for (const item of itemsToInvoice) {
-        // Fallback or auto-generate Square Customer ID if not assigned
+        // 1. Explicitly validate the associated bedroom ID
+        const bedroomId = item.room?.id?.trim();
+        if (!bedroomId) {
+          console.error('[Square Invoicing] Validation failure: Missing bedroom ID on invoice item:', item);
+          throw new Error(`Invoice generation aborted: Missing bedroom ID for resident "${item.tenantName}". Every invoice must link to a valid bedroom.`);
+        }
+
+        // Validate existence in master rooms array
+        const specificRoom = rooms.find(r => r.id === bedroomId);
+        if (!specificRoom) {
+          console.error(`[Square Invoicing] Validation failure: Bedroom ID "${bedroomId}" could not be located in master room list:`, {
+            attemptedBedroomId: bedroomId,
+            resident: item.tenantName,
+            availableRoomIds: rooms.map(r => r.id)
+          });
+          throw new Error(`Validation failure: Bedroom ID "${bedroomId}" for resident "${item.tenantName}" could not be found in active room records.`);
+        }
+
+        // Validate that bedroom belongs to the active property
+        if (specificRoom.propertyId !== selectedProperty.id) {
+          console.error(`[Square Invoicing] Validation failure: Bedroom "${specificRoom.name}" (ID: ${bedroomId}) belongs to property "${specificRoom.propertyId}", not active property "${selectedProperty.id}"`);
+          throw new Error(`Validation failure: Bedroom "${specificRoom.name}" is assigned to property ID "${specificRoom.propertyId}", which does not match active property "${selectedProperty.name}".`);
+        }
+
+        // 2. Authoritative rent extraction from the specific room record
+        let roomRecordRent = Number(specificRoom.monthlyRent);
+        if (isNaN(roomRecordRent) || roomRecordRent <= 0) {
+          roomRecordRent = Number((specificRoom as any).rent);
+        }
+
+        // Honor manual session override if set by user for this specific room, otherwise use the specific room record
+        const sessionOverride = customRentOverrides[specificRoom.id];
+        const authoritativeRent = (sessionOverride !== undefined && !isNaN(sessionOverride) && sessionOverride > 0)
+          ? sessionOverride
+          : roomRecordRent;
+
+        if (isNaN(authoritativeRent) || authoritativeRent <= 0) {
+          console.error(`[Square Invoicing] Validation failure: No valid rent amount on room record for bedroom "${specificRoom.name}" (ID: ${specificRoom.id}):`, specificRoom);
+          throw new Error(`Validation failure: Bedroom "${specificRoom.name}" (ID: ${specificRoom.id}) does not have a valid monthly rent amount configured on its room record.`);
+        }
+
+        // 3. Fallback or auto-generate Square Customer ID if not assigned
         let customerId = item.squareCustomerId;
         if (!customerId && item.tenantEmail) {
           try {
@@ -624,7 +665,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
               firstName: item.contact?.firstName || item.tenantName.split(' ')[0],
               lastName: item.contact?.lastName || item.tenantName.split(' ').slice(1).join(' '),
               phone: item.tenantPhone,
-              note: `Coliving Tenant at ${selectedProperty.name} - Room ${item.room.name}`,
+              note: `Coliving Tenant at ${selectedProperty.name} - Room ${specificRoom.name}`,
               allowFallback: true
             });
             customerId = customerRes.customerId;
@@ -639,8 +680,37 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           }
         }
 
-        const invoiceId = `inv-rent-${selectedProperty.id}-${item.room.id}-${selectedYear}-${MONTHS.indexOf(selectedMonth) + 1}`;
+        const invoiceId = `inv-rent-${selectedProperty.id}-${specificRoom.id}-${selectedYear}-${MONTHS.indexOf(selectedMonth) + 1}`;
         const invoiceNum = `INV-RENT-${selectedYear}-${String(MONTHS.indexOf(selectedMonth) + 1).padStart(2, '0')}-${String(invoicesToCreate.length + 101)}`;
+
+        const lineItemTitle = `Room Rental - ${selectedMonth} ${selectedYear}`;
+        const lineItemDescription = `${selectedProperty.name} - ${specificRoom.name} rent for ${selectedMonth} ${selectedYear}`;
+        const invoiceDescription = `Moyer PM Rental invoice for ${item.tenantName} (${specificRoom.name})`;
+
+        const lineItems = [
+          {
+            id: `line-${specificRoom.id}`,
+            name: `${lineItemTitle} (${specificRoom.name})`,
+            quantity: 1,
+            amount: authoritativeRent,
+            description: lineItemDescription
+          }
+        ];
+
+        // Trace bedroom validation details
+        console.log(`[Square Invoicing] [Bedroom Verified] Bedroom "${specificRoom.name}" (ID: ${specificRoom.id}):`, {
+          bedroomId: specificRoom.id,
+          roomName: specificRoom.name,
+          roomNumber: specificRoom.roomNumber,
+          propertyId: specificRoom.propertyId,
+          propertyName: selectedProperty.name,
+          roomRecordMonthlyRent: specificRoom.monthlyRent,
+          finalValidatedRent: authoritativeRent,
+          tenantName: item.tenantName,
+          tenantEmail: item.tenantEmail,
+          squareCustomerId: customerId || `CUST_SANDBOX_${specificRoom.id}`,
+          lineItems
+        });
 
         invoicesToCreate.push({
           id: invoiceId,
@@ -649,32 +719,42 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           subtask: 'monthly-rental',
           propertyId: selectedProperty.id,
           propertyName: selectedProperty.name,
-          roomId: item.room.id,
-          roomName: item.room.name,
-          tenantId: item.contact?.id || item.room.currentTenantId || '',
+          roomId: specificRoom.id,
+          roomName: specificRoom.name,
+          roomNumber: specificRoom.roomNumber,
+          tenantId: item.contact?.id || specificRoom.currentTenantId || '',
           tenantName: item.tenantName,
           tenantEmail: item.tenantEmail,
           tenantPhone: item.tenantPhone,
           squareLocationId: effectiveLocationId,
-          squareCustomerId: customerId || `CUST_SANDBOX_${item.room.id}`,
+          squareCustomerId: customerId || `CUST_SANDBOX_${specificRoom.id}`,
           month: selectedMonth,
           year: selectedYear,
           billingMonth: selectedMonth,
           billingYear: selectedYear,
-          amount: item.rent,
-          rentAmount: item.rent,
+          amount: authoritativeRent,
+          rentAmount: authoritativeRent,
           utilityAmount: 0,
           suppliesAmount: 0,
           lateFeeAmount: 0,
           specialAmount: 0,
-          totalAmount: item.rent,
+          totalAmount: authoritativeRent,
           dueDate,
           createdAt: new Date().toISOString(),
-          description: `Monthly Coliving Room Rent - ${item.room.name} (${selectedMonth} ${selectedYear})`,
+          description: invoiceDescription,
+          lineItemName: `${lineItemTitle} (${specificRoom.name})`,
+          lineItems,
           allowPartialPayments: false,
           status: 'SENT' as InvoiceStatus
         });
       }
+
+      // 4. Debug logging: Trace full payload before dispatching to Square API
+      console.log('==================== [Square Invoicing] OUTGOING PAYLOAD TRACE ====================');
+      console.log(`[Square Invoicing] Dispatching ${invoicesToCreate.length} invoice(s) to Square API:`);
+      console.log('[Square Invoicing] Active Location ID:', effectiveLocationId);
+      console.log('[Square Invoicing] Invoices Payload JSON:', JSON.stringify(invoicesToCreate, null, 2));
+      console.log('===================================================================================');
 
       // Call Square backend service
       const squareBatchRes = await SquareService.createInvoiceBatch(invoicesToCreate);
@@ -1099,17 +1179,25 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
 
     setIsDeletingInvoice(true);
     try {
-      if (onDeleteInvoice) {
-        onDeleteInvoice(targetId);
-      } else {
-        const remaining = invoices.filter(inv => inv.id !== targetId);
-        onSaveInvoices(remaining);
-        StorageService.deleteInvoice(targetId);
+      // If live Square invoice, cancel/void it in Square as well
+      if (invoiceToDelete.squareInvoiceId && invoiceToDelete.squareInvoiceId.startsWith('inv:')) {
         try {
-          await FirebaseService.deleteInvoice(targetId);
-        } catch (fbErr) {
-          console.error('Failed to delete invoice from Firebase:', fbErr);
+          await SquareService.cancelInvoice(invoiceToDelete.squareInvoiceId);
+        } catch (sqErr) {
+          console.warn('Square cancellation warning:', sqErr);
         }
+      }
+
+      const remaining = invoices.filter(inv => inv.id !== targetId);
+      if (onDeleteInvoice) {
+        await onDeleteInvoice(targetId);
+      }
+      onSaveInvoices(remaining);
+      StorageService.deleteInvoice(targetId);
+      try {
+        await FirebaseService.deleteInvoice(targetId);
+      } catch (fbErr) {
+        console.error('Failed to delete invoice from Firebase:', fbErr);
       }
 
       setBatchResult({
