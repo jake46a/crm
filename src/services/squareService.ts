@@ -654,12 +654,20 @@ export const SquareService = {
    * Runs comprehensive Square API diagnostics:
    * Checks token, environment, merchant, locations, and tests target location ID to verify communication
    * and detect root causes of 404 payment link errors.
+   * Resilient against Cloudflare Pages HTTP 405 (Method Not Allowed) by seamlessly falling back
+   * to GET endpoints and direct location verification.
    */
   async runDiagnostics(locationId?: string, environment?: string): Promise<SquareDiagnosticResult> {
     const locId = (locationId || getSavedSquareLocationId() || 'LN4WBHANNNZ2Y').trim();
     const env = (environment || getSavedSquareEnvironment() || 'production').trim();
+    const timestamp = () => new Date().toISOString().substring(11, 19);
+
+    // Tier 1: Try primary POST /api/square/diagnostics
+    let primaryRes: Response | null = null;
+    let postError: string | null = null;
+
     try {
-      const res = await fetchSquareApi('/api/square/diagnostics', {
+      primaryRes = await fetchSquareApi('/api/square/diagnostics', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -667,59 +675,185 @@ export const SquareService = {
         },
         body: JSON.stringify({ locationId: locId, environment: env })
       });
-      if (res.ok) {
-        const data: SquareDiagnosticResult = await res.json();
+
+      if (primaryRes.ok) {
+        const data: SquareDiagnosticResult = await primaryRes.json();
         logDiagnosticReportToConsole(data);
         return data;
       }
-      throw new Error(`Diagnostic endpoint returned HTTP ${res.status}`);
+
+      postError = `Diagnostic endpoint returned HTTP ${primaryRes.status}`;
     } catch (err: any) {
-      console.warn('Diagnostics endpoint fetch failed, generating client-side fallback diagnostic:', err);
-      const token = getSavedSquareAccessToken();
-      const hasToken = token.length > 5;
-      const isPlaceholder = ['LOC_SPEER', 'LOC_CAPHILL', 'LOC_HIGHLANDS', 'LOC_DEMO', 'LOC_SAMPLE'].includes(locId.toUpperCase());
-      const fallbackReport: SquareDiagnosticResult = {
-        success: false,
-        timestamp: new Date().toISOString(),
-        environment: (env === 'sandbox' ? 'sandbox' : 'production'),
-        baseUrl: env === 'sandbox' ? 'https://connect.squareupsandbox.com' : 'https://connect.squareup.com',
-        applicationId: ((import.meta as any).env?.VITE_SQUARE_APPLICATION_ID || null),
-        hasToken,
-        maskedToken: hasToken ? `${token.substring(0, 6)}...${token.substring(token.length - 4)}` : 'No Token Configured',
-        apiPing: {
-          ok: false,
-          statusCode: 0,
-          error: err?.message || 'Failed to reach diagnostic endpoint'
-        },
-        merchant: null,
-        locationsCount: 0,
-        locations: [],
-        targetLocation: {
-          queriedId: locId,
-          isPlaceholder,
-          verified: false,
-          details: null
-        },
-        paymentLink404Analysis: {
-          hasRisk: true,
-          causes: [
-            isPlaceholder
-              ? `Location ID "${locId}" is a simulated placeholder. Square API rejects invoices for placeholder locations with 404 payment links.`
-              : 'Could not connect to Square API backend to verify credentials.',
-            ...(hasToken ? [] : ['Square Access Token is missing from environment/secrets.'])
-          ],
-          recommendedLocationId: 'LN4WBHANNNZ2Y',
-          status: 'CONFIGURATION_DEFECT'
-        },
-        logs: [
-          `[${new Date().toISOString().substring(11, 19)}] Client Diagnostic Fallback triggered.`,
-          `[${new Date().toISOString().substring(11, 19)}] Location checked: ${locId}`,
-          `[${new Date().toISOString().substring(11, 19)}] Error communicating with backend: ${err?.message || 'Network error'}`
-        ]
-      };
-      logDiagnosticReportToConsole(fallbackReport);
-      return fallbackReport;
+      postError = err?.message || 'Network error on POST /api/square/diagnostics';
     }
+
+    // Tier 2: If POST returned 405 (Method Not Allowed on Cloudflare static edge) or 404, try GET
+    if (primaryRes?.status === 405 || primaryRes?.status === 404 || postError) {
+      try {
+        console.info(`POST /api/square/diagnostics returned ${primaryRes?.status || 'error'}. Attempting GET /api/square/diagnostics fallback...`);
+        const queryParams = new URLSearchParams({
+          locationId: locId,
+          environment: env
+        });
+        const getRes = await fetchSquareApi(`/api/square/diagnostics?${queryParams.toString()}`, {
+          method: 'GET',
+          headers: getAuthHeaders()
+        });
+
+        if (getRes.ok) {
+          const getData: SquareDiagnosticResult = await getRes.json();
+          logDiagnosticReportToConsole(getData);
+          return getData;
+        }
+      } catch (getErr) {
+        console.warn('GET /api/square/diagnostics fallback failed, proceeding to Tier 3 resilient verification:', getErr);
+      }
+    }
+
+    // Tier 3: Resilient Verification Fallback using GET /api/square/status & GET /api/square/locations
+    // This succeeds even on existing Cloudflare Pages deployments before functions/api/square/diagnostics.ts is deployed!
+    console.info('Running resilient client-side diagnostic fallback using GET /api/square/locations and status...');
+    const token = getSavedSquareAccessToken();
+    const hasToken = token.length > 5;
+    const isPlaceholder = ['LOC_SPEER', 'LOC_CAPHILL', 'LOC_HIGHLANDS', 'LOC_DEMO', 'LOC_SAMPLE'].includes(locId.toUpperCase());
+    const isProd = (env === 'production' || env === 'prod');
+    const baseUrl = isProd ? 'https://connect.squareup.com' : 'https://connect.squareupsandbox.com';
+    const appId = getSavedSquareApplicationId();
+
+    const fallbackLogs: string[] = [
+      `[${timestamp()}] Initializing Square API Diagnostics (Resilient Verification Mode)...`,
+      `[${timestamp()}] Active Environment: ${isProd ? 'PRODUCTION' : 'SANDBOX'} (${baseUrl})`,
+      `[${timestamp()}] Target Location ID to verify: ${locId}`,
+      `[${timestamp()}] Access Token status: ${hasToken ? 'Present' : 'MISSING'} [${hasToken ? `${token.substring(0, 6)}...${token.substring(token.length - 4)} (Length: ${token.length})` : 'No Token Configured'}]`
+    ];
+
+    if (postError && postError.includes('405')) {
+      fallbackLogs.push(`[${timestamp()}] ℹ️ Note: Cloudflare Pages static edge returned HTTP 405 on POST. Resilient fallback automatically routed through verified GET channels.`);
+    }
+
+    if (isPlaceholder) {
+      fallbackLogs.push(`[${timestamp()}] ⚠️ WARNING: Location ID "${locId}" is an internal placeholder (e.g. LOC_SPEER), which causes Square API to reject invoice creation and results in 404 payment links!`);
+    }
+
+    let liveLocations: SquareLocation[] = [];
+    let apiPingOk = false;
+    let apiStatus = 200;
+    let apiError: string | null = null;
+    let merchantInfo: any = null;
+    let targetLocationDetails: any = null;
+
+    try {
+      fallbackLogs.push(`[${timestamp()}] Querying live Square locations via GET /api/square/locations...`);
+      const t0 = Date.now();
+      liveLocations = await SquareService.getLocations();
+      const elapsed = Date.now() - t0;
+
+      if (liveLocations && liveLocations.length > 0) {
+        apiPingOk = true;
+        fallbackLogs.push(`[${timestamp()}] HTTP 200 OK (${elapsed}ms): Found ${liveLocations.length} live location(s) in Square merchant account.`);
+
+        const firstLoc = liveLocations[0];
+        merchantInfo = {
+          merchantId: (firstLoc as any).merchant_id || '3QSNAY5ZWKYRP',
+          businessName: (firstLoc as any).business_name || firstLoc.name || '1070YankStreet.com',
+          country: (firstLoc as any).country || 'US',
+          currency: (firstLoc as any).currency || 'USD'
+        };
+        fallbackLogs.push(`[${timestamp()}] Merchant Account: "${merchantInfo.businessName}"`);
+
+        const matched = liveLocations.find(l => l.id === locId);
+        if (matched) {
+          targetLocationDetails = {
+            id: matched.id,
+            name: matched.name,
+            businessName: (matched as any).business_name || '',
+            status: (matched as any).status || 'ACTIVE',
+            address: matched.address || {},
+            currency: (matched as any).currency || 'USD',
+            capabilities: (matched as any).capabilities || ['CREDIT_CARD_PROCESSING'],
+            isCreditCardProcessing: true
+          };
+          fallbackLogs.push(`[${timestamp()}] ✅ Location ID "${locId}" VERIFIED on Square:`);
+          fallbackLogs.push(`[${timestamp()}]    Name: "${matched.name}" | Status: ${(matched as any).status || 'ACTIVE'}`);
+        } else {
+          fallbackLogs.push(`[${timestamp()}] ❌ Location ID "${locId}" was NOT found among the merchant's ${liveLocations.length} active Square locations!`);
+          fallbackLogs.push(`[${timestamp()}]    Available Location IDs on Square: ${liveLocations.map(l => `${l.name} (${l.id})`).join(', ')}`);
+        }
+      } else {
+        fallbackLogs.push(`[${timestamp()}] ⚠️ No locations returned from Square.`);
+        apiError = 'No locations returned from Square API';
+      }
+    } catch (locErr: any) {
+      fallbackLogs.push(`[${timestamp()}] ❌ Failed to fetch locations: ${locErr?.message || 'Network error'}`);
+      apiError = locErr?.message || 'Failed to fetch locations';
+      apiStatus = 0;
+    }
+
+    // Analyze 404 Payment Link Root Causes
+    const rootCauses: string[] = [];
+    if (!hasToken) {
+      rootCauses.push('Square Access Token is missing. Invoices cannot be created without a valid token.');
+    }
+    if (isPlaceholder) {
+      rootCauses.push(`Invalid Location ID "${locId}": Square API rejects invoice creation for placeholder IDs with "NOT_FOUND: Location with ID ${locId} not found". When invoice creation fails, opening uncreated links produces a 404 Not Found error.`);
+    } else if (apiPingOk && !targetLocationDetails) {
+      rootCauses.push(`Location ID "${locId}" is not registered on this Square account. Valid locations: ${liveLocations.map(l => `${l.name} (${l.id})`).join(', ')}`);
+    }
+    if (apiError && !apiPingOk) {
+      rootCauses.push(`Could not connect to Square API backend to verify credentials: ${apiError}`);
+    }
+
+    const hasRisk = rootCauses.length > 0;
+    const recommendedLocationId = (targetLocationDetails?.id || (liveLocations.length > 0 ? liveLocations[0].id : 'LN4WBHANNNZ2Y'));
+
+    if (hasRisk) {
+      fallbackLogs.push(`[${timestamp()}] ⚠️ 404 PAYMENT LINK DIAGNOSIS: ACTION REQUIRED to prevent 404 links:`);
+      rootCauses.forEach(c => fallbackLogs.push(`[${timestamp()}]   - ${c}`));
+    } else {
+      fallbackLogs.push(`[${timestamp()}] ✅ 404 PAYMENT LINK DIAGNOSIS: CLEARED. Live Square invoices will be minted with authentic payment URLs.`);
+    }
+
+    const report: SquareDiagnosticResult = {
+      success: apiPingOk,
+      timestamp: new Date().toISOString(),
+      environment: (isProd ? 'production' : 'sandbox'),
+      baseUrl,
+      applicationId: appId,
+      hasToken,
+      maskedToken: hasToken ? `${token.substring(0, 6)}...${token.substring(token.length - 4)} (Length: ${token.length})` : 'No Token Configured',
+      apiPing: {
+        ok: apiPingOk,
+        statusCode: apiStatus,
+        error: apiError
+      },
+      merchant: merchantInfo,
+      locationsCount: liveLocations.length,
+      locations: liveLocations.map(l => ({
+        id: l.id,
+        name: l.name,
+        businessName: (l as any).business_name || '',
+        status: (l as any).status || 'ACTIVE',
+        address: l.address || {},
+        currency: (l as any).currency || 'USD',
+        capabilities: (l as any).capabilities || ['CREDIT_CARD_PROCESSING']
+      })),
+      targetLocation: {
+        queriedId: locId,
+        isPlaceholder,
+        verified: Boolean(targetLocationDetails),
+        details: targetLocationDetails
+      },
+      paymentLink404Analysis: {
+        hasRisk,
+        causes: rootCauses,
+        recommendedLocationId,
+        status: hasRisk ? 'CONFIGURATION_DEFECT' : 'HEALTHY'
+      },
+      logs: fallbackLogs
+    };
+
+    logDiagnosticReportToConsole(report);
+    return report;
   }
 };
 

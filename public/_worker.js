@@ -604,18 +604,17 @@ async function onRequest(context) {
   }
   return jsonResponse({ error: "Endpoint not found on Cloudflare Pages API", pathname }, 404);
 }
-var onRequestPost = onRequest;
-var onRequestGet = onRequest;
-var onRequestOptions = onRequest;
-var onRequestPut = onRequest;
-var onRequestPatch = onRequest;
-var onRequestDelete = onRequest;
-var onRequestHead = onRequest;
-var path_default = {
+
+// src/cloudflare-worker.ts
+var cloudflare_worker_default = {
   async fetch(request, env, context) {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/api")) {
-      return onRequest({ request, env, params: {} });
+    if (url.pathname.startsWith("/api/")) {
+      return onRequest({
+        request,
+        env,
+        params: { path: url.pathname.replace(/^\/api\/?/, "").split("/").filter(Boolean) }
+      });
     }
     if (env.ASSETS && typeof env.ASSETS.fetch === "function") {
       return env.ASSETS.fetch(request);
@@ -624,13 +623,5 @@ var path_default = {
   }
 };
 export {
-  path_default as default,
-  onRequest,
-  onRequestDelete,
-  onRequestGet,
-  onRequestHead,
-  onRequestOptions,
-  onRequestPatch,
-  onRequestPost,
-  onRequestPut
+  cloudflare_worker_default as default
 };
