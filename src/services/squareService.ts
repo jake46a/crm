@@ -70,14 +70,68 @@ export interface ApplyLateFeeResult {
   source: string;
 }
 
+export function getSavedSquareAccessToken(): string {
+  try {
+    const token = localStorage.getItem('moyer_square_access_token');
+    if (token && token.trim()) return token.trim();
+  } catch {}
+  return (((import.meta as any).env?.VITE_SQUARE_ACCESS_TOKEN || (process as any)?.env?.SQUARE_ACCESS_TOKEN) || '').trim();
+}
+
+export function setSavedSquareAccessToken(token: string) {
+  try {
+    if (token && token.trim()) {
+      localStorage.setItem('moyer_square_access_token', token.trim());
+    } else {
+      localStorage.removeItem('moyer_square_access_token');
+    }
+  } catch {}
+}
+
+export function getSavedSquareApplicationId(): string {
+  try {
+    const appId = localStorage.getItem('moyer_square_app_id');
+    if (appId && appId.trim()) return appId.trim();
+  } catch {}
+  return (((import.meta as any).env?.VITE_SQUARE_APPLICATION_ID || (process as any)?.env?.SQUARE_APPLICATION_ID) || '').trim();
+}
+
+export function setSavedSquareApplicationId(appId: string) {
+  try {
+    if (appId && appId.trim()) {
+      localStorage.setItem('moyer_square_app_id', appId.trim());
+    } else {
+      localStorage.removeItem('moyer_square_app_id');
+    }
+  } catch {}
+}
+
+export function getSavedSquareLocationId(): string {
+  try {
+    const locId = localStorage.getItem('moyer_square_location_id');
+    if (locId && locId.trim()) return locId.trim();
+  } catch {}
+  return 'LN4WBHANNNZ2Y'; // Real 1070 Yank St location
+}
+
+export function setSavedSquareLocationId(locId: string) {
+  try {
+    if (locId && locId.trim()) {
+      localStorage.setItem('moyer_square_location_id', locId.trim());
+    } else {
+      localStorage.removeItem('moyer_square_location_id');
+    }
+  } catch {}
+}
+
 function getAuthHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
-  const buildTimeToken = ((import.meta as any).env?.VITE_SQUARE_ACCESS_TOKEN || (process as any)?.env?.SQUARE_ACCESS_TOKEN || '').trim();
+  const token = getSavedSquareAccessToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...extraHeaders
   };
-  if (buildTimeToken && buildTimeToken.length > 5) {
-    headers['Authorization'] = `Bearer ${buildTimeToken}`;
+  if (token && token.length > 5) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
   return headers;
 }
@@ -241,9 +295,9 @@ export const SquareService = {
     } catch (e) {
       console.warn('Failed to load Square locations:', e);
       return [
-        { id: 'LOC_SPEER_DENVER', name: 'Speer Coliving House (Denver)' },
-        { id: 'LOC_CAPHILL_DENVER', name: 'Capitol Hill Victorian (Denver)' },
-        { id: 'LOC_HIGHLANDS_DENVER', name: 'Highlands Coliving Suites (Denver)' }
+        { id: 'LN4WBHANNNZ2Y', name: '1070 (1070 Yank St, Golden, CO)' },
+        { id: 'S2C67DJTB5S53', name: 'PWA (ProWeb.Agency)' },
+        { id: 'LW2PEV9NMHM5Q', name: 'christinescollectibles.com' }
       ];
     }
   },
@@ -387,9 +441,10 @@ export const SquareService = {
       const rand = Math.random().toString(36).substring(2, 7);
       const squareOrderId = `sq_ord_${ts}_${rand}_${idx}`;
       const squareInvoiceId = `sq_inv_${ts}_${rand}_${idx}`;
-      const paymentSlug = Math.random().toString(36).substring(2, 10);
-      const locationId = inv.squareLocationId || 'LOC_SPEER_DENVER';
-      const customerId = inv.squareCustomerId || `sq_cust_${(inv.tenantEmail || 'resident').replace(/[^a-zA-Z0-9]/g, '_')}`;
+      const locationId = (inv.squareLocationId && !inv.squareLocationId.startsWith('LOC_SPEER')) ? inv.squareLocationId : 'LN4WBHANNNZ2Y';
+      const customerId = (inv.squareCustomerId && !inv.squareCustomerId.startsWith('sq_cust_')) 
+        ? inv.squareCustomerId 
+        : ((inv.tenantEmail && inv.tenantEmail.includes('jake@proweb.agency')) ? '5H7TD7HACMVSVZQFSJ557GW5XW' : `sq_cust_${(inv.tenantEmail || 'resident').replace(/[^a-zA-Z0-9]/g, '_')}`);
 
       return {
         clientReferenceId: inv.id,
@@ -398,7 +453,7 @@ export const SquareService = {
         squareLocationId: locationId,
         squareCustomerId: customerId,
         status: 'UNPAID',
-        paymentUrl: `https://checkout.square.site/merchant/MOYERPM/pay/${paymentSlug}`,
+        paymentUrl: `https://squareup.com/pay-invoice/${squareInvoiceId}`,
         viewUrl: `https://squareup.com/pay-invoice/${squareInvoiceId}`,
         source: 'resilient_fallback'
       };

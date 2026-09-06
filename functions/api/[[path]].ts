@@ -129,9 +129,9 @@ export async function onRequest(context: { request: Request; env: Env; params: a
 
     return jsonResponse({
       locations: [
-        { id: 'LOC_SPEER_DENVER', name: 'Speer Coliving House (Denver)', address: { address_line_1: '1040 Speer Blvd', locality: 'Denver', administrative_district_level_1: 'CO', postal_code: '80204' }, status: 'ACTIVE' },
-        { id: 'LOC_CAPHILL_DENVER', name: 'Capitol Hill Victorian (Denver)', address: { address_line_1: '1245 Pearl St', locality: 'Denver', administrative_district_level_1: 'CO', postal_code: '80203' }, status: 'ACTIVE' },
-        { id: 'LOC_HIGHLANDS_DENVER', name: 'Highlands Coliving Suites (Denver)', address: { address_line_1: '3210 Tejon St', locality: 'Denver', administrative_district_level_1: 'CO', postal_code: '80211' }, status: 'ACTIVE' }
+        { id: 'LN4WBHANNNZ2Y', name: '1070 (1070 Yank St, Golden, CO)', address: { address_line_1: '1070 Yank St', locality: 'Golden', administrative_district_level_1: 'CO', postal_code: '80401-4223' }, status: 'ACTIVE' },
+        { id: 'S2C67DJTB5S53', name: 'PWA (ProWeb.Agency)', address: { address_line_1: '1070 Yank St', locality: 'Golden', administrative_district_level_1: 'CO', postal_code: '80401' }, status: 'ACTIVE' },
+        { id: 'LW2PEV9NMHM5Q', name: 'christinescollectibles.com', address: { address_line_1: '1070 Yank St', locality: 'Golden', administrative_district_level_1: 'CO', postal_code: '80401-4223' }, status: 'ACTIVE' }
       ],
       source: 'simulated'
     });
@@ -310,16 +310,64 @@ export async function onRequest(context: { request: Request; env: Env; params: a
 
     for (const inv of invoices) {
       try {
-        const locationId = inv.squareLocationId || 'LOC_SPEER_DENVER';
-        const customerId = inv.squareCustomerId || `sq_cust_${(inv.tenantEmail || 'tenant').replace(/[^a-zA-Z0-9]/g, '_')}`;
+        // Resolve valid location (default to merchant's real 1070 location if unset or sample)
+        let locationId = (inv.squareLocationId || '').trim();
+        if (!locationId || locationId.startsWith('LOC_SPEER') || locationId.startsWith('LOC_CAPHILL') || locationId.startsWith('LOC_HIGHLANDS')) {
+          locationId = 'LN4WBHANNNZ2Y'; // Real 1070 Yank St location
+        }
+
+        // Resolve valid customer (auto-match real Square customer if simulated or missing)
+        let customerId = (inv.squareCustomerId || '').trim();
+        if (!customerId || customerId.startsWith('sq_cust_')) {
+          if (inv.tenantEmail && accessToken) {
+            try {
+              const searchCust = await fetch(`${baseUrl}/v2/customers/search`, {
+                method: 'POST',
+                headers: squareHeaders,
+                body: JSON.stringify({
+                  query: { filter: { email_address: { exact: inv.tenantEmail.trim().toLowerCase() } } }
+                })
+              });
+              const searchCustData = (await searchCust.json()) as any;
+              if (searchCust.ok && searchCustData.customers && searchCustData.customers.length > 0) {
+                customerId = searchCustData.customers[0].id;
+              } else {
+                const createCust = await fetch(`${baseUrl}/v2/customers`, {
+                  method: 'POST',
+                  headers: squareHeaders,
+                  body: JSON.stringify({
+                    idempotency_key: crypto.randomUUID(),
+                    email_address: inv.tenantEmail.trim(),
+                    given_name: inv.tenantName || 'Tenant'
+                  })
+                });
+                const createCustData = (await createCust.json()) as any;
+                if (createCust.ok && createCustData.customer) {
+                  customerId = createCustData.customer.id;
+                }
+              }
+            } catch (cErr) {
+              console.warn('Auto customer resolution failed on Cloudflare:', cErr);
+            }
+          }
+        }
+        if (!customerId) {
+          customerId = `sq_cust_${(inv.tenantEmail || 'tenant').replace(/[^a-zA-Z0-9]/g, '_')}`;
+        }
+
         const amountInCents = Math.round(Number(inv.amount) * 100);
         const title = inv.title || `${inv.invoiceType || 'Rental'} Invoice - ${inv.month || ''} ${inv.year || ''}`.trim();
         const lineItemName = inv.lineItemName || title;
-        const dueDate = inv.dueDate || `${inv.year}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`;
+        const todayIso = new Date().toISOString().split('T')[0];
+        const targetYear = inv.year || new Date().getFullYear();
+        const targetMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+        let candidateDueDate = (inv.dueDate && !inv.dueDate.includes('undefined')) ? inv.dueDate : `${targetYear}-${targetMonth}-01`;
+        // Square strictly requires invoice due_date to be on or after today
+        const validDueDate = candidateDueDate < todayIso ? todayIso : candidateDueDate;
 
         if (accessToken) {
           try {
-            // Step 1: Create Order
+            // Step 1: Create Order (requires base_price_money)
             const orderRes = await fetch(`${baseUrl}/v2/orders`, {
               method: 'POST',
               headers: squareHeaders,
@@ -332,7 +380,7 @@ export async function onRequest(context: { request: Request; env: Env; params: a
                     {
                       name: lineItemName,
                       quantity: '1',
-                      base_money: { amount: amountInCents, currency: 'USD' }
+                      base_price_money: { amount: amountInCents, currency: 'USD' }
                     }
                   ]
                 }
@@ -356,24 +404,20 @@ export async function onRequest(context: { request: Request; env: Env; params: a
                     payment_requests: [
                       {
                         request_type: 'BALANCE',
-                        due_date: dueDate,
-                        tipping_enabled: false
+                        due_date: validDueDate,
+                        automatic_payment_source: 'NONE'
                       }
                     ],
                     delivery_method: 'EMAIL',
-                    title,
-                    description: inv.description || `${inv.propertyName} - ${inv.roomName} rent for ${inv.month} ${inv.year}`,
                     accepted_payment_methods: {
                       card: true,
                       square_gift_card: false,
                       bank_account: true,
                       buy_now_pay_later: false
                     },
-                    custom_fields: [
-                      { label: 'Room', value: inv.roomName || '' },
-                      { label: 'Billing Period', value: `${inv.month} ${inv.year}` }
-                    ],
-                    sale_or_service_date: dueDate
+                    title,
+                    description: inv.description || `${inv.propertyName} - ${inv.roomName} rent for ${inv.month} ${inv.year}`,
+                    sale_or_service_date: validDueDate
                   }
                 })
               });
@@ -408,7 +452,11 @@ export async function onRequest(context: { request: Request; env: Env; params: a
                   source: 'square_live_api'
                 });
                 continue;
+              } else {
+                console.warn('Square invoice creation failed on Cloudflare:', invoiceData);
               }
+            } else {
+              console.warn('Square order creation failed on Cloudflare:', orderData);
             }
           } catch (sqErr) {
             console.warn('Square live invoice generation error on Cloudflare, using fallback:', sqErr);

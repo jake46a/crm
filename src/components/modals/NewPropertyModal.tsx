@@ -86,6 +86,16 @@ export const NewPropertyModal: React.FC<NewPropertyModalProps> = ({
         setSharedAmenities('Chef Kitchen, High-Speed Fiber Wi-Fi, Bi-Weekly Commons Cleaning, In-unit Laundry');
         setHouseRules('Quiet hours 10 PM - 7 AM, No indoor smoking, Clean kitchen after cooking');
       }
+
+      // Automatically prefetch Square locations on open
+      SquareService.getLocations()
+        .then(locs => {
+          if (locs && locs.length > 0) {
+            setAvailableLocations(locs);
+            setIsEditingSquareLocation(true);
+          }
+        })
+        .catch(err => console.warn('Pre-loading Square locations failed:', err));
     }
   }, [isOpen, editingProperty]);
 
@@ -288,7 +298,7 @@ export const NewPropertyModal: React.FC<NewPropertyModalProps> = ({
                 type="text"
                 value={squareLocationId}
                 onChange={(e) => setSquareLocationId(e.target.value)}
-                placeholder="e.g. LOC_SPEER_DENVER or L0CATION_ID..."
+                placeholder="e.g. LN4WBHANNNZ2Y (1070 Yank St)..."
                 className="w-full p-2 bg-white border border-zinc-300 rounded-md font-mono text-xs text-zinc-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
             </div>

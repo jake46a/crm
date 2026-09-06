@@ -74,8 +74,23 @@ export const CloudflareSecretsModal: React.FC<CloudflareSecretsModalProps> = ({
 
   const variables = [
     {
+      name: 'SQUARE_APPLICATION_ID',
+      desc: 'Your Square Production Application ID (e.g. sq0idp-...) from Square Developer Dashboard > Credentials.',
+      exampleValue: 'sq0idp-...'
+    },
+    {
+      name: 'VITE_SQUARE_APPLICATION_ID',
+      desc: 'Client-side variable for Square Web Payments SDK and frontend components.',
+      exampleValue: 'sq0idp-...'
+    },
+    {
       name: 'SQUARE_ACCESS_TOKEN',
       desc: 'Your Square Production Personal Access Token (starts with EAAA...) for backend Cloudflare Pages Functions.',
+      exampleValue: 'EAAA...'
+    },
+    {
+      name: 'VITE_SQUARE_ACCESS_TOKEN',
+      desc: 'Passed during Vite build in Cloudflare so client-side components have access if needed.',
       exampleValue: 'EAAA...'
     },
     {
@@ -84,19 +99,14 @@ export const CloudflareSecretsModal: React.FC<CloudflareSecretsModalProps> = ({
       exampleValue: 'production'
     },
     {
-      name: 'VITE_SQUARE_ACCESS_TOKEN',
-      desc: 'Passed during Vite build in Cloudflare so client-side components have access if needed.',
-      exampleValue: 'EAAA...'
-    },
-    {
       name: 'VITE_SQUARE_ENVIRONMENT',
       desc: 'Frontend environment indicator for Vite build.',
       exampleValue: 'production'
     },
     {
       name: 'SQUARE_DEFAULT_LOCATION_ID',
-      desc: 'Your Square Merchant Location ID (e.g. LOC_SPEER_DENVER or your real Square location ID).',
-      exampleValue: 'LOC_SPEER_DENVER'
+      desc: 'Your Square Merchant Location ID (e.g. LN4WBHANNNZ2Y for 1070 Yank St).',
+      exampleValue: 'LN4WBHANNNZ2Y'
     }
   ];
 

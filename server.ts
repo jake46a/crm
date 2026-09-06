@@ -68,21 +68,21 @@ const simulatedSquareStore = {
   invoices: new Map<string, any>(),
   locations: [
     {
-      id: 'LOC_SPEER_DENVER',
-      name: 'Speer Coliving House (Denver)',
-      address: { address_line_1: '1040 Speer Blvd', locality: 'Denver', administrative_district_level_1: 'CO', postal_code: '80204' },
+      id: 'LN4WBHANNNZ2Y',
+      name: '1070 (1070 Yank St, Golden, CO)',
+      address: { address_line_1: '1070 Yank St', locality: 'Golden', administrative_district_level_1: 'CO', postal_code: '80401-4223' },
       status: 'ACTIVE'
     },
     {
-      id: 'LOC_CAPHILL_DENVER',
-      name: 'Capitol Hill Victorian (Denver)',
-      address: { address_line_1: '1245 Pearl St', locality: 'Denver', administrative_district_level_1: 'CO', postal_code: '80203' },
+      id: 'S2C67DJTB5S53',
+      name: 'PWA (ProWeb.Agency)',
+      address: { address_line_1: '1070 Yank St', locality: 'Golden', administrative_district_level_1: 'CO', postal_code: '80401' },
       status: 'ACTIVE'
     },
     {
-      id: 'LOC_HIGHLANDS_DENVER',
-      name: 'Highlands Coliving Suites (Denver)',
-      address: { address_line_1: '3210 Tejon St', locality: 'Denver', administrative_district_level_1: 'CO', postal_code: '80211' },
+      id: 'LW2PEV9NMHM5Q',
+      name: 'christinescollectibles.com',
+      address: { address_line_1: '1070 Yank St', locality: 'Golden', administrative_district_level_1: 'CO', postal_code: '80401-4223' },
       status: 'ACTIVE'
     }
   ]
@@ -319,6 +319,7 @@ app.all(['/api/square/customers/search-or-create', '/api/square/customers', '/ap
 // Rule: allow_partial_payments: false, delivery_method: 'EMAIL'
 app.post(['/api/square/invoices/create-batch', '/api/square/invoices/create-batch/'], async (req: Request, res: Response) => {
   const { invoices } = req.body;
+  const activeToken = resolveSquareToken(req);
 
   if (!Array.isArray(invoices) || invoices.length === 0) {
     return res.status(400).json({ error: 'No invoices provided in payload.' });
@@ -329,19 +330,67 @@ app.post(['/api/square/invoices/create-batch', '/api/square/invoices/create-batc
 
   for (const inv of invoices) {
     try {
-      const locationId = inv.squareLocationId || 'LOC_SPEER_DENVER';
-      const customerId = inv.squareCustomerId || `sq_cust_${(inv.tenantEmail || 'guest').replace(/[^a-zA-Z0-9]/g, '_')}`;
+      // Resolve valid location (default to merchant's real 1070 location if unset or sample)
+      let locationId = (inv.squareLocationId || '').trim();
+      if (!locationId || locationId.startsWith('LOC_SPEER') || locationId.startsWith('LOC_CAPHILL') || locationId.startsWith('LOC_HIGHLANDS')) {
+        locationId = 'LN4WBHANNNZ2Y'; // Real 1070 Yank St location
+      }
+
+      // Resolve valid customer (auto-match real Square customer if simulated or missing)
+      let customerId = (inv.squareCustomerId || '').trim();
+      if (!customerId || customerId.startsWith('sq_cust_')) {
+        if (inv.tenantEmail && activeToken) {
+          try {
+            const searchCust = await fetch(`${getSquareBaseUrl()}/v2/customers/search`, {
+              method: 'POST',
+              headers: getSquareHeaders(activeToken),
+              body: JSON.stringify({
+                query: { filter: { email_address: { exact: inv.tenantEmail.trim().toLowerCase() } } }
+              })
+            });
+            const searchCustData = await searchCust.json();
+            if (searchCust.ok && searchCustData.customers && searchCustData.customers.length > 0) {
+              customerId = searchCustData.customers[0].id;
+            } else {
+              const createCust = await fetch(`${getSquareBaseUrl()}/v2/customers`, {
+                method: 'POST',
+                headers: getSquareHeaders(activeToken),
+                body: JSON.stringify({
+                  idempotency_key: randomUUID(),
+                  email_address: inv.tenantEmail.trim(),
+                  given_name: inv.tenantName || 'Tenant'
+                })
+              });
+              const createCustData = await createCust.json();
+              if (createCust.ok && createCustData.customer) {
+                customerId = createCustData.customer.id;
+              }
+            }
+          } catch (cErr) {
+            console.warn('Auto customer resolution failed in server.ts:', cErr);
+          }
+        }
+      }
+      if (!customerId) {
+        customerId = `sq_cust_${(inv.tenantEmail || 'guest').replace(/[^a-zA-Z0-9]/g, '_')}`;
+      }
+
       const amountInCents = Math.round(Number(inv.amount) * 100);
       const title = inv.title || `${inv.invoiceType || 'Rental'} Invoice - ${inv.month || ''} ${inv.year || ''}`.trim();
       const lineItemName = inv.lineItemName || title;
-      const dueDate = inv.dueDate || `${inv.year}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`;
+      const todayIso = new Date().toISOString().split('T')[0];
+      const targetYear = inv.year || new Date().getFullYear();
+      const targetMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+      let candidateDueDate = (inv.dueDate && !inv.dueDate.includes('undefined')) ? inv.dueDate : `${targetYear}-${targetMonth}-01`;
+      // Square strictly requires invoice due_date to be on or after today
+      const validDueDate = candidateDueDate < todayIso ? todayIso : candidateDueDate;
 
-      if (SQUARE_ACCESS_TOKEN) {
+      if (activeToken) {
         try {
-          // 1. Create Square Order
+          // 1. Create Square Order (requires base_price_money)
           const orderRes = await fetch(`${getSquareBaseUrl()}/v2/orders`, {
             method: 'POST',
-            headers: getSquareHeaders(),
+            headers: getSquareHeaders(activeToken),
             body: JSON.stringify({
               idempotency_key: randomUUID(),
               order: {
@@ -351,7 +400,7 @@ app.post(['/api/square/invoices/create-batch', '/api/square/invoices/create-batc
                   {
                     name: lineItemName,
                     quantity: '1',
-                    base_money: {
+                    base_price_money: {
                       amount: amountInCents,
                       currency: 'USD'
                     },
@@ -369,7 +418,7 @@ app.post(['/api/square/invoices/create-batch', '/api/square/invoices/create-batc
             // 2. Create Square Invoice
             const invoiceRes = await fetch(`${getSquareBaseUrl()}/v2/invoices`, {
               method: 'POST',
-              headers: getSquareHeaders(),
+              headers: getSquareHeaders(activeToken),
               body: JSON.stringify({
                 idempotency_key: randomUUID(),
                 invoice: {
@@ -381,12 +430,17 @@ app.post(['/api/square/invoices/create-batch', '/api/square/invoices/create-batc
                   payment_requests: [
                     {
                       request_type: 'BALANCE',
-                      due_date: dueDate,
-                      automatic_payment_source: 'NONE',
-                      allow_partial_payments: false // Explicitly false per prompt rules
+                      due_date: validDueDate,
+                      automatic_payment_source: 'NONE'
                     }
                   ],
                   delivery_method: 'EMAIL',
+                  accepted_payment_methods: {
+                    card: true,
+                    square_gift_card: false,
+                    bank_account: true,
+                    buy_now_pay_later: false
+                  },
                   title: title,
                   description: inv.description || `Moyer PM ${inv.invoiceType} invoice for ${inv.tenantName} (${inv.roomName || ''})`
                 }
@@ -401,7 +455,7 @@ app.post(['/api/square/invoices/create-batch', '/api/square/invoices/create-batc
               // 3. Publish Invoice so Square emails it to the tenant
               const publishRes = await fetch(`${getSquareBaseUrl()}/v2/invoices/${squareInvoiceId}/publish`, {
                 method: 'POST',
-                headers: getSquareHeaders(),
+                headers: getSquareHeaders(activeToken),
                 body: JSON.stringify({
                   idempotency_key: randomUUID(),
                   version: version
@@ -418,14 +472,17 @@ app.post(['/api/square/invoices/create-batch', '/api/square/invoices/create-batc
                 squareLocationId: locationId,
                 squareCustomerId: customerId,
                 status: publishedInvoice.status || 'UNPAID',
-                paymentUrl: publishedInvoice.public_url || `https://square.link/u/${squareInvoiceId}`,
+                paymentUrl: publishedInvoice.public_url || `https://squareup.com/pay-invoice/${squareInvoiceId}`,
                 viewUrl: publishedInvoice.public_url || `https://squareup.com/pay-invoice/${squareInvoiceId}`,
                 source: 'square_api'
               });
               continue;
+            } else {
+              console.warn('Square invoice creation failed:', invoiceData);
             }
+          } else {
+            console.warn('Square order creation failed:', orderData);
           }
-          console.warn('Square live API order/invoice creation issue, using mock fallback:', orderData);
         } catch (apiErr: any) {
           console.warn('Square live API error:', apiErr);
         }
@@ -452,7 +509,7 @@ app.post(['/api/square/invoices/create-batch', '/api/square/invoices/create-batc
         customer_id: customerId,
         status: 'UNPAID',
         public_url: paymentUrl,
-        due_date: dueDate,
+        due_date: validDueDate,
         amount: Number(inv.amount),
         allow_partial_payments: false
       });
