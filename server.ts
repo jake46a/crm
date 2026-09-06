@@ -156,10 +156,11 @@ app.post('/api/square/mode', (req: Request, res: Response) => {
 
 // 2. Fetch Merchant Locations from Square
 app.get('/api/square/locations', async (req: Request, res: Response) => {
-  if (SQUARE_ACCESS_TOKEN) {
+  const activeToken = resolveSquareToken(req);
+  if (activeToken) {
     try {
       const response = await fetch(`${getSquareBaseUrl()}/v2/locations`, {
-        headers: getSquareHeaders()
+        headers: getSquareHeaders(activeToken)
       });
       const data = await response.json();
       if (response.ok && data.locations) {
@@ -172,6 +173,174 @@ app.get('/api/square/locations', async (req: Request, res: Response) => {
   }
   // Fallback to simulated locations
   return res.json({ locations: simulatedSquareStore.locations, source: 'simulated' });
+});
+
+// 2b. Detailed Square API Diagnostics (Verifies Location ID, Environment, Token, and Payment Link Health)
+app.all(['/api/square/diagnostics', '/api/square/diagnostics/'], async (req: Request, res: Response) => {
+  const activeToken = resolveSquareToken(req);
+  const locationIdToCheck = ((req.body?.locationId || req.query?.locationId || process.env.SQUARE_DEFAULT_LOCATION_ID || 'LN4WBHANNNZ2Y') as string).trim();
+  const envToCheck = ((req.body?.environment || req.query?.environment || currentSquareEnvironment) as string).toLowerCase().trim();
+  const isProduction = envToCheck === 'production' || envToCheck === 'prod';
+  const baseUrl = isProduction ? 'https://connect.squareup.com' : 'https://connect.squareupsandbox.com';
+  const appId = process.env.SQUARE_APPLICATION_ID || process.env.VITE_SQUARE_APPLICATION_ID || null;
+
+  const logs: string[] = [];
+  const timestamp = () => new Date().toISOString().substring(11, 19);
+
+  logs.push(`[${timestamp()}] Initializing Square API Diagnostics...`);
+  logs.push(`[${timestamp()}] Active Environment: ${isProduction ? 'PRODUCTION' : 'SANDBOX'}`);
+  logs.push(`[${timestamp()}] Square Base URL: ${baseUrl}`);
+  logs.push(`[${timestamp()}] Target Location ID to verify: ${locationIdToCheck || '(None specified)'}`);
+
+  const hasToken = Boolean(activeToken && activeToken.length > 5);
+  const maskedToken = hasToken
+    ? `${activeToken.substring(0, 6)}...${activeToken.substring(activeToken.length - 4)} (Length: ${activeToken.length})`
+    : 'No Token Configured';
+
+  logs.push(`[${timestamp()}] Access Token status: ${hasToken ? 'Present' : 'MISSING'} [${maskedToken}]`);
+
+  let merchantInfo: any = null;
+  let locationsList: any[] = [];
+  let targetLocationDetails: any = null;
+  let apiPingOk = false;
+  let apiPingStatus = 0;
+  let apiError: string | null = null;
+  let isPlaceholderLocation = false;
+  const knownPlaceholders = ['LOC_SPEER', 'LOC_CAPHILL', 'LOC_HIGHLANDS', 'LOC_DEMO', 'LOC_SAMPLE'];
+
+  if (knownPlaceholders.includes(locationIdToCheck.toUpperCase())) {
+    isPlaceholderLocation = true;
+    logs.push(`[${timestamp()}] ⚠️ WARNING: Location ID "${locationIdToCheck}" is an internal placeholder, NOT a real Square Merchant Location ID!`);
+  }
+
+  if (hasToken) {
+    const headers = {
+      'Square-Version': SQUARE_VERSION,
+      'Authorization': `Bearer ${activeToken}`,
+      'Content-Type': 'application/json'
+    };
+
+    try {
+      const startTime = Date.now();
+      logs.push(`[${timestamp()}] Sending GET ${baseUrl}/v2/locations to verify connectivity & list merchant locations...`);
+      const locRes = await fetch(`${baseUrl}/v2/locations`, { headers });
+      apiPingStatus = locRes.status;
+      const duration = Date.now() - startTime;
+
+      if (locRes.ok) {
+        apiPingOk = true;
+        const locData = (await locRes.json()) as any;
+        locationsList = locData.locations || [];
+        logs.push(`[${timestamp()}] HTTP 200 OK (${duration}ms): Found ${locationsList.length} live location(s) in Square merchant account.`);
+
+        if (locationsList.length > 0) {
+          const firstLoc = locationsList[0];
+          merchantInfo = {
+            merchantId: firstLoc.merchant_id || 'N/A',
+            businessName: firstLoc.business_name || firstLoc.name || 'Moyer Property Management',
+            country: firstLoc.country || 'US',
+            currency: firstLoc.currency || 'USD'
+          };
+          logs.push(`[${timestamp()}] Merchant Account: "${merchantInfo.businessName}" (ID: ${merchantInfo.merchantId}, Currency: ${merchantInfo.currency})`);
+        }
+
+        const match = locationsList.find((l: any) => l.id === locationIdToCheck);
+        if (match) {
+          targetLocationDetails = {
+            id: match.id,
+            name: match.name,
+            businessName: match.business_name,
+            status: match.status,
+            address: match.address,
+            currency: match.currency,
+            capabilities: match.capabilities || [],
+            isCreditCardProcessing: (match.capabilities || []).includes('CREDIT_CARD_PROCESSING')
+          };
+          logs.push(`[${timestamp()}] ✅ Location ID "${locationIdToCheck}" VERIFIED on Square:`);
+          logs.push(`[${timestamp()}]    Name: "${match.name}" | Status: ${match.status} | Capabilities: ${(match.capabilities || []).join(', ')}`);
+        } else {
+          logs.push(`[${timestamp()}] ❌ Location ID "${locationIdToCheck}" was NOT found among the merchant's ${locationsList.length} active Square locations!`);
+          logs.push(`[${timestamp()}]    Available Location IDs on Square: ${locationsList.map((l: any) => `${l.name} (${l.id})`).join(', ')}`);
+        }
+      } else {
+        const errorData = (await locRes.json().catch(() => ({}))) as any;
+        apiError = errorData?.errors?.map((e: any) => `${e.code}: ${e.detail}`).join('; ') || `HTTP ${locRes.status}`;
+        logs.push(`[${timestamp()}] ❌ Square API Error (HTTP ${locRes.status}): ${apiError}`);
+      }
+    } catch (err: any) {
+      apiError = err?.message || 'Network fetch failed';
+      logs.push(`[${timestamp()}] ❌ Network error while communicating with Square: ${apiError}`);
+    }
+  } else {
+    logs.push(`[${timestamp()}] ⚠️ Cannot test live Square API: No Access Token configured.`);
+  }
+
+  const causesOf404: string[] = [];
+  let is404Risk = false;
+
+  if (!hasToken) {
+    is404Risk = true;
+    causesOf404.push('Missing Access Token: When invoices are generated without a live Square token, authentic payment links cannot be minted.');
+  }
+
+  if (isPlaceholderLocation) {
+    is404Risk = true;
+    causesOf404.push(`Invalid Location ID "${locationIdToCheck}": Square API rejects invoice creation for placeholder IDs with "NOT_FOUND: Location with ID ${locationIdToCheck} not found". When invoice creation fails, opening uncreated links produces a 404 Not Found error.`);
+  } else if (hasToken && apiPingOk && !targetLocationDetails && locationIdToCheck) {
+    is404Risk = true;
+    causesOf404.push(`Location ID "${locationIdToCheck}" does not exist on this Square merchant account. Square rejects invoice orders for non-existent locations.`);
+  }
+
+  if (targetLocationDetails && targetLocationDetails.status !== 'ACTIVE') {
+    is404Risk = true;
+    causesOf404.push(`Location "${targetLocationDetails.name}" (${locationIdToCheck}) is marked as ${targetLocationDetails.status} on Square. Only ACTIVE locations can accept payments.`);
+  }
+
+  if (!is404Risk) {
+    logs.push(`[${timestamp()}] ✅ 404 PAYMENT LINK DIAGNOSIS: CLEARED. Live Square invoices will be minted with authentic payment URLs.`);
+  } else {
+    logs.push(`[${timestamp()}] ⚠️ 404 PAYMENT LINK DIAGNOSIS: ACTION REQUIRED to prevent 404 links:`);
+    causesOf404.forEach(c => logs.push(`[${timestamp()}]   - ${c}`));
+  }
+
+  return res.json({
+    success: true,
+    timestamp: new Date().toISOString(),
+    environment: isProduction ? 'production' : 'sandbox',
+    baseUrl,
+    applicationId: appId,
+    hasToken,
+    maskedToken,
+    apiPing: {
+      ok: apiPingOk,
+      statusCode: apiPingStatus,
+      error: apiError
+    },
+    merchant: merchantInfo,
+    locationsCount: locationsList.length,
+    locations: locationsList.map((loc: any) => ({
+      id: loc.id,
+      name: loc.name,
+      businessName: loc.business_name,
+      status: loc.status,
+      address: loc.address,
+      currency: loc.currency,
+      capabilities: loc.capabilities || []
+    })),
+    targetLocation: {
+      queriedId: locationIdToCheck,
+      isPlaceholder: isPlaceholderLocation,
+      verified: Boolean(targetLocationDetails),
+      details: targetLocationDetails
+    },
+    paymentLink404Analysis: {
+      hasRisk: is404Risk,
+      causes: causesOf404,
+      recommendedLocationId: locationsList.find((l: any) => l.status === 'ACTIVE')?.id || 'LN4WBHANNNZ2Y',
+      status: !is404Risk ? 'HEALTHY' : 'CONFIGURATION_DEFECT'
+    },
+    logs
+  });
 });
 
 // 3. Search or Create Customer in Square

@@ -28,7 +28,8 @@ import {
   Edit2,
   X,
   Loader2,
-  Cloud
+  Cloud,
+  Activity
 } from 'lucide-react';
 import { Property, Room, Contact, Invoice, InvoicingSubtask, InvoiceStatus, LeaseRenewal } from '../../types';
 import { splitFullName, formatFullName } from '../../utils/nameUtils';
@@ -36,6 +37,7 @@ import { SquareService, SquareStatusResponse } from '../../services/squareServic
 import { FirebaseService } from '../../services/firebase';
 import { INITIAL_ROOMS } from '../../data/initialData';
 import { CloudflareSecretsModal } from '../modals/CloudflareSecretsModal';
+import { SquareDiagnosticModal } from './SquareDiagnosticModal';
 
 interface InvoicingViewProps {
   properties: Property[];
@@ -47,6 +49,7 @@ interface InvoicingViewProps {
   onUpdateInvoiceStatus: (invoiceId: string, status: Invoice['status'], details?: Partial<Invoice>) => void;
   onUpdateRoom?: (room: Room) => void;
   onUpdateContact?: (contact: Contact) => void;
+  onUpdateProperty?: (property: Property) => void;
 }
 
 // Robust similarity and fuzzy matching helper
@@ -87,7 +90,8 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
   onSaveInvoices,
   onUpdateInvoiceStatus,
   onUpdateRoom,
-  onUpdateContact
+  onUpdateContact,
+  onUpdateProperty
 }) => {
   // Current active subtask
   const [activeSubtask, setActiveSubtask] = useState<InvoicingSubtask>('rent');
@@ -97,10 +101,25 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
   const [selectedMonth, setSelectedMonth] = useState<string>(MONTHS[new Date().getMonth()]);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
-  // Square API Status
+  // Square API Status & Diagnostics
   const [squareStatus, setSquareStatus] = useState<SquareStatusResponse | null>(null);
   const [isLoadingStatus, setIsLoadingStatus] = useState<boolean>(false);
   const [isCloudflareModalOpen, setIsCloudflareModalOpen] = useState<boolean>(false);
+  const [isDiagnosticModalOpen, setIsDiagnosticModalOpen] = useState<boolean>(false);
+
+  // Quick helper to assign a verified Square Location ID to a property
+  const handleAssignLocationToProperty = async (propertyId: string, newLocationId: string) => {
+    const prop = properties.find(p => p.id === propertyId);
+    if (!prop) return;
+    const updated: Property = {
+      ...prop,
+      squareLocationId: newLocationId
+    };
+    if (onUpdateProperty) {
+      onUpdateProperty(updated);
+    }
+    await FirebaseService.saveProperty(updated);
+  };
 
   // Rental Invoicing state
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -1073,6 +1092,17 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
 
           <div className="h-6 w-px bg-zinc-800" />
 
+          {/* Square API Diagnostics & 404 Resolution Tool Button */}
+          <button
+            id="btn-open-square-diagnostics"
+            onClick={() => setIsDiagnosticModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/80 transition-colors whitespace-nowrap shadow-xs"
+            title="Run live diagnostics to verify location ID, environment, and communication with the Square API to resolve 404 payment link errors"
+          >
+            <Activity className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Square Diagnostics</span>
+          </button>
+
           {/* Cloudflare Pages Secrets Setup Button */}
           <button
             onClick={() => setIsCloudflareModalOpen(true)}
@@ -1229,15 +1259,43 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           <div className="shrink-0 md:text-right border-t md:border-t-0 md:border-l border-zinc-200 pt-3 md:pt-0 md:pl-4">
             <p className="text-[11px] font-semibold text-zinc-500">Property Square Location:</p>
             {selectedProperty?.squareLocationId ? (
-              <span className="inline-flex items-center gap-1 text-xs font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-                <CheckCircle2 className="w-3 h-3 text-indigo-600" />
-                <span>{selectedProperty.squareLocationId}</span>
-              </span>
+              <div className="flex items-center md:justify-end gap-1.5 mt-0.5">
+                <span className={`inline-flex items-center gap-1 text-xs font-mono font-bold px-2 py-0.5 rounded border ${
+                  ['LOC_SPEER', 'LOC_CAPHILL', 'LOC_HIGHLANDS', 'LOC_DEMO'].includes(selectedProperty.squareLocationId.toUpperCase())
+                    ? 'text-amber-800 bg-amber-50 border-amber-300'
+                    : 'text-indigo-700 bg-indigo-50 border-indigo-200'
+                }`}>
+                  {['LOC_SPEER', 'LOC_CAPHILL', 'LOC_HIGHLANDS', 'LOC_DEMO'].includes(selectedProperty.squareLocationId.toUpperCase()) ? (
+                    <AlertTriangle className="w-3 h-3 text-amber-600" />
+                  ) : (
+                    <CheckCircle2 className="w-3 h-3 text-indigo-600" />
+                  )}
+                  <span>{selectedProperty.squareLocationId}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsDiagnosticModalOpen(true)}
+                  className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold underline flex items-center gap-0.5"
+                  title="Run Square API Diagnostics on this location ID"
+                >
+                  <Activity className="w-3 h-3 text-indigo-600" />
+                  <span>Diagnose</span>
+                </button>
+              </div>
             ) : (
-              <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                <AlertTriangle className="w-3 h-3 text-amber-600" />
-                <span>SquareLocationID Missing</span>
-              </span>
+              <div className="flex items-center md:justify-end gap-1.5 mt-0.5">
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                  <AlertTriangle className="w-3 h-3 text-amber-600" />
+                  <span>SquareLocationID Missing</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsDiagnosticModalOpen(true)}
+                  className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold underline"
+                >
+                  Assign
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -2104,6 +2162,17 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
         isOpen={isCloudflareModalOpen}
         onClose={() => setIsCloudflareModalOpen(false)}
         squareStatus={squareStatus}
+      />
+
+      {/* Square API Diagnostic & 404 Verification Modal */}
+      <SquareDiagnosticModal
+        isOpen={isDiagnosticModalOpen}
+        onClose={() => setIsDiagnosticModalOpen(false)}
+        initialLocationId={selectedProperty?.squareLocationId || 'LN4WBHANNNZ2Y'}
+        initialEnvironment={squareStatus?.environment === 'production' ? 'production' : 'sandbox'}
+        selectedPropertyName={selectedProperty?.name}
+        selectedPropertyId={selectedProperty?.id}
+        onAssignLocationToProperty={handleAssignLocationToProperty}
       />
     </div>
   );

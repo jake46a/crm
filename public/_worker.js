@@ -100,6 +100,155 @@ async function onRequest(context) {
       source: "simulated"
     });
   }
+  if (pathname === "/api/square/diagnostics") {
+    let body = {};
+    if (request.method === "POST") {
+      body = await request.json().catch(() => ({}));
+    }
+    const locationIdToCheck = (body.locationId || url.searchParams.get("locationId") || defaultLocationId).trim();
+    const envToCheck = (body.environment || url.searchParams.get("environment") || squareEnv).toLowerCase().trim();
+    const isTargetProd = envToCheck === "production" || envToCheck === "prod";
+    const targetBaseUrl = isTargetProd ? "https://connect.squareup.com" : "https://connect.squareupsandbox.com";
+    const logs = [];
+    const timestamp = () => (/* @__PURE__ */ new Date()).toISOString().substring(11, 19);
+    logs.push(`[${timestamp()}] Initializing Square API Diagnostics on Cloudflare Pages...`);
+    logs.push(`[${timestamp()}] Active Environment: ${isTargetProd ? "PRODUCTION" : "SANDBOX"}`);
+    logs.push(`[${timestamp()}] Square Base URL: ${targetBaseUrl}`);
+    logs.push(`[${timestamp()}] Target Location ID to verify: ${locationIdToCheck || "(None specified)"}`);
+    const hasToken = accessToken.length > 5;
+    const maskedToken = hasToken ? `${accessToken.substring(0, 6)}...${accessToken.substring(accessToken.length - 4)} (Length: ${accessToken.length})` : "No Token Configured";
+    logs.push(`[${timestamp()}] Access Token status: ${hasToken ? "Present" : "MISSING"} [${maskedToken}]`);
+    let merchantInfo = null;
+    let locationsList = [];
+    let targetLocationDetails = null;
+    let apiPingOk = false;
+    let apiPingStatus = 0;
+    let apiError = null;
+    let isPlaceholderLocation = false;
+    const knownPlaceholders = ["LOC_SPEER", "LOC_CAPHILL", "LOC_HIGHLANDS", "LOC_DEMO", "LOC_SAMPLE"];
+    if (knownPlaceholders.includes(locationIdToCheck.toUpperCase())) {
+      isPlaceholderLocation = true;
+      logs.push(`[${timestamp()}] \u26A0\uFE0F WARNING: Location ID "${locationIdToCheck}" is an internal placeholder, NOT a real Square Merchant Location ID!`);
+    }
+    if (hasToken) {
+      const headers = {
+        "Square-Version": SQUARE_VERSION,
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      };
+      try {
+        const startTime = Date.now();
+        logs.push(`[${timestamp()}] Sending GET ${targetBaseUrl}/v2/locations to verify connectivity & list merchant locations...`);
+        const locRes = await fetch(`${targetBaseUrl}/v2/locations`, { headers });
+        apiPingStatus = locRes.status;
+        const duration = Date.now() - startTime;
+        if (locRes.ok) {
+          apiPingOk = true;
+          const locData = await locRes.json();
+          locationsList = locData.locations || [];
+          logs.push(`[${timestamp()}] HTTP 200 OK (${duration}ms): Found ${locationsList.length} live location(s) on Square.`);
+          if (locationsList.length > 0) {
+            const firstLoc = locationsList[0];
+            merchantInfo = {
+              merchantId: firstLoc.merchant_id || "N/A",
+              businessName: firstLoc.business_name || firstLoc.name || "Moyer Property Management",
+              country: firstLoc.country || "US",
+              currency: firstLoc.currency || "USD"
+            };
+            logs.push(`[${timestamp()}] Merchant Account: "${merchantInfo.businessName}" (ID: ${merchantInfo.merchantId}, Currency: ${merchantInfo.currency})`);
+          }
+          const match = locationsList.find((l) => l.id === locationIdToCheck);
+          if (match) {
+            targetLocationDetails = {
+              id: match.id,
+              name: match.name,
+              businessName: match.business_name,
+              status: match.status,
+              address: match.address,
+              currency: match.currency,
+              capabilities: match.capabilities || [],
+              isCreditCardProcessing: (match.capabilities || []).includes("CREDIT_CARD_PROCESSING")
+            };
+            logs.push(`[${timestamp()}] \u2705 Location ID "${locationIdToCheck}" VERIFIED on Square:`);
+            logs.push(`[${timestamp()}]    Name: "${match.name}" | Status: ${match.status} | Capabilities: ${(match.capabilities || []).join(", ")}`);
+          } else {
+            logs.push(`[${timestamp()}] \u274C Location ID "${locationIdToCheck}" was NOT found among the merchant's ${locationsList.length} active Square locations!`);
+            logs.push(`[${timestamp()}]    Available Location IDs on Square: ${locationsList.map((l) => `${l.name} (${l.id})`).join(", ")}`);
+          }
+        } else {
+          const errorData = await locRes.json().catch(() => ({}));
+          apiError = errorData?.errors?.map((e) => `${e.code}: ${e.detail}`).join("; ") || `HTTP ${locRes.status}`;
+          logs.push(`[${timestamp()}] \u274C Square API Error (HTTP ${locRes.status}): ${apiError}`);
+        }
+      } catch (err) {
+        apiError = err?.message || "Network fetch failed";
+        logs.push(`[${timestamp()}] \u274C Network error while communicating with Square: ${apiError}`);
+      }
+    } else {
+      logs.push(`[${timestamp()}] \u26A0\uFE0F Cannot test live Square API: No Access Token configured.`);
+    }
+    const causesOf404 = [];
+    let is404Risk = false;
+    if (!hasToken) {
+      is404Risk = true;
+      causesOf404.push("Missing Access Token: When invoices are generated without a live Square token, authentic payment links cannot be minted.");
+    }
+    if (isPlaceholderLocation) {
+      is404Risk = true;
+      causesOf404.push(`Invalid Location ID "${locationIdToCheck}": Square API rejects invoice creation for placeholder IDs with "NOT_FOUND: Location with ID ${locationIdToCheck} not found". When invoice creation fails, opening uncreated links produces a 404 Not Found error.`);
+    } else if (hasToken && apiPingOk && !targetLocationDetails && locationIdToCheck) {
+      is404Risk = true;
+      causesOf404.push(`Location ID "${locationIdToCheck}" does not exist on this Square merchant account. Square rejects invoice orders for non-existent locations.`);
+    }
+    if (targetLocationDetails && targetLocationDetails.status !== "ACTIVE") {
+      is404Risk = true;
+      causesOf404.push(`Location "${targetLocationDetails.name}" (${locationIdToCheck}) is marked as ${targetLocationDetails.status} on Square. Only ACTIVE locations can accept payments.`);
+    }
+    if (!is404Risk) {
+      logs.push(`[${timestamp()}] \u2705 404 PAYMENT LINK DIAGNOSIS: CLEARED. Live Square invoices will be minted with authentic payment URLs.`);
+    } else {
+      logs.push(`[${timestamp()}] \u26A0\uFE0F 404 PAYMENT LINK DIAGNOSIS: ACTION REQUIRED to prevent 404 links:`);
+      causesOf404.forEach((c) => logs.push(`[${timestamp()}]   - ${c}`));
+    }
+    return jsonResponse({
+      success: true,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      environment: isTargetProd ? "production" : "sandbox",
+      baseUrl: targetBaseUrl,
+      applicationId: applicationId || null,
+      hasToken,
+      maskedToken,
+      apiPing: {
+        ok: apiPingOk,
+        statusCode: apiPingStatus,
+        error: apiError
+      },
+      merchant: merchantInfo,
+      locationsCount: locationsList.length,
+      locations: locationsList.map((loc) => ({
+        id: loc.id,
+        name: loc.name,
+        businessName: loc.business_name,
+        status: loc.status,
+        address: loc.address,
+        currency: loc.currency,
+        capabilities: loc.capabilities || []
+      })),
+      targetLocation: {
+        queriedId: locationIdToCheck,
+        isPlaceholder: isPlaceholderLocation,
+        verified: Boolean(targetLocationDetails),
+        details: targetLocationDetails
+      },
+      paymentLink404Analysis: {
+        hasRisk: is404Risk,
+        causes: causesOf404,
+        recommendedLocationId: locationsList.find((l) => l.status === "ACTIVE")?.id || "LN4WBHANNNZ2Y",
+        status: !is404Risk ? "HEALTHY" : "CONFIGURATION_DEFECT"
+      },
+      logs
+    });
+  }
   if ((pathname === "/api/square/customers/search-or-create" || pathname === "/api/square/customers" || pathname === "/api/square/customers/search") && (request.method === "POST" || request.method === "GET")) {
     let email = "";
     let firstName = "";

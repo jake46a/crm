@@ -70,6 +70,107 @@ export interface ApplyLateFeeResult {
   source: string;
 }
 
+export interface SquareDiagnosticResult {
+  success: boolean;
+  timestamp: string;
+  environment: 'production' | 'sandbox';
+  baseUrl: string;
+  applicationId?: string | null;
+  hasToken: boolean;
+  maskedToken: string;
+  apiPing: {
+    ok: boolean;
+    statusCode: number;
+    error: string | null;
+  };
+  merchant?: {
+    merchantId: string;
+    businessName: string;
+    country: string;
+    currency: string;
+  } | null;
+  locationsCount: number;
+  locations: Array<{
+    id: string;
+    name: string;
+    businessName?: string;
+    status: string;
+    address?: any;
+    currency?: string;
+    capabilities?: string[];
+  }>;
+  targetLocation: {
+    queriedId: string;
+    isPlaceholder: boolean;
+    verified: boolean;
+    details?: {
+      id: string;
+      name: string;
+      businessName?: string;
+      status: string;
+      address?: any;
+      currency?: string;
+      capabilities?: string[];
+      isCreditCardProcessing?: boolean;
+    } | null;
+  };
+  paymentLink404Analysis: {
+    hasRisk: boolean;
+    causes: string[];
+    recommendedLocationId: string;
+    status: 'HEALTHY' | 'CONFIGURATION_DEFECT';
+  };
+  logs: string[];
+}
+
+export function logDiagnosticReportToConsole(report: SquareDiagnosticResult) {
+  if (typeof console === 'undefined') return;
+  const isHealthy = report.paymentLink404Analysis.status === 'HEALTHY';
+  console.group(`🔍 [Square API Diagnostic Suite] - ${new Date(report.timestamp).toLocaleTimeString()}`);
+  console.info(`Environment: %c${report.environment.toUpperCase()}%c (${report.baseUrl})`, 
+    report.environment === 'production' ? 'color: #10b981; font-weight: bold;' : 'color: #f59e0b; font-weight: bold;',
+    'color: inherit;'
+  );
+  console.info(`Access Token: %c${report.hasToken ? 'ACTIVE' : 'MISSING'}%c [${report.maskedToken}]`,
+    report.hasToken ? 'color: #10b981; font-weight: bold;' : 'color: #ef4444; font-weight: bold;',
+    'color: inherit;'
+  );
+  if (report.applicationId) {
+    console.info(`Square Application ID: ${report.applicationId}`);
+  }
+  if (report.merchant) {
+    console.info(`Square Merchant: "${report.merchant.businessName}" (ID: ${report.merchant.merchantId}, Currency: ${report.merchant.currency})`);
+  }
+  console.info(`Locations found on Square: ${report.locationsCount}`);
+  if (report.locations && report.locations.length > 0) {
+    console.table(report.locations.map(l => ({
+      'Location Name': l.name,
+      'Location ID': l.id,
+      'Status': l.status,
+      'Currency': l.currency || 'USD',
+      'Card Processing': (l.capabilities || []).includes('CREDIT_CARD_PROCESSING') ? 'YES' : 'NO'
+    })));
+  }
+  console.info(`Target Location Verified: %c${report.targetLocation.verified ? 'YES (ACTIVE)' : 'NO / NOT FOUND'}%c [ID: ${report.targetLocation.queriedId}]`,
+    report.targetLocation.verified ? 'color: #10b981; font-weight: bold;' : 'color: #ef4444; font-weight: bold;',
+    'color: inherit;'
+  );
+  if (report.targetLocation.isPlaceholder) {
+    console.warn(`⚠️ WARNING: Location ID "${report.targetLocation.queriedId}" is an internal placeholder (e.g. LOC_SPEER), which causes Square API to reject invoice creation and results in 404 payment links!`);
+  }
+  console.info(`404 Payment Link Status: %c${report.paymentLink404Analysis.status}%c`,
+    isHealthy ? 'color: #10b981; font-weight: bold;' : 'color: #ef4444; font-weight: bold;',
+    'color: inherit;'
+  );
+  if (report.paymentLink404Analysis.causes && report.paymentLink404Analysis.causes.length > 0) {
+    console.warn('Root causes detected:', report.paymentLink404Analysis.causes);
+  }
+  console.groupCollapsed('Execution Log & API Trace');
+  report.logs.forEach(l => console.log(l));
+  console.groupEnd();
+  console.groupEnd();
+}
+
 export function getSavedSquareAccessToken(): string {
   try {
     const token = localStorage.getItem('moyer_square_access_token');
@@ -547,6 +648,78 @@ export const SquareService = {
   async checkLateFeeCron() {
     const res = await fetchSquareApi('/api/square/cron/check-late-fees', { method: 'POST' });
     return await res.json();
+  },
+
+  /**
+   * Runs comprehensive Square API diagnostics:
+   * Checks token, environment, merchant, locations, and tests target location ID to verify communication
+   * and detect root causes of 404 payment link errors.
+   */
+  async runDiagnostics(locationId?: string, environment?: string): Promise<SquareDiagnosticResult> {
+    const locId = (locationId || getSavedSquareLocationId() || 'LN4WBHANNNZ2Y').trim();
+    const env = (environment || getSavedSquareEnvironment() || 'production').trim();
+    try {
+      const res = await fetchSquareApi('/api/square/diagnostics', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        },
+        body: JSON.stringify({ locationId: locId, environment: env })
+      });
+      if (res.ok) {
+        const data: SquareDiagnosticResult = await res.json();
+        logDiagnosticReportToConsole(data);
+        return data;
+      }
+      throw new Error(`Diagnostic endpoint returned HTTP ${res.status}`);
+    } catch (err: any) {
+      console.warn('Diagnostics endpoint fetch failed, generating client-side fallback diagnostic:', err);
+      const token = getSavedSquareAccessToken();
+      const hasToken = token.length > 5;
+      const isPlaceholder = ['LOC_SPEER', 'LOC_CAPHILL', 'LOC_HIGHLANDS', 'LOC_DEMO', 'LOC_SAMPLE'].includes(locId.toUpperCase());
+      const fallbackReport: SquareDiagnosticResult = {
+        success: false,
+        timestamp: new Date().toISOString(),
+        environment: (env === 'sandbox' ? 'sandbox' : 'production'),
+        baseUrl: env === 'sandbox' ? 'https://connect.squareupsandbox.com' : 'https://connect.squareup.com',
+        applicationId: ((import.meta as any).env?.VITE_SQUARE_APPLICATION_ID || null),
+        hasToken,
+        maskedToken: hasToken ? `${token.substring(0, 6)}...${token.substring(token.length - 4)}` : 'No Token Configured',
+        apiPing: {
+          ok: false,
+          statusCode: 0,
+          error: err?.message || 'Failed to reach diagnostic endpoint'
+        },
+        merchant: null,
+        locationsCount: 0,
+        locations: [],
+        targetLocation: {
+          queriedId: locId,
+          isPlaceholder,
+          verified: false,
+          details: null
+        },
+        paymentLink404Analysis: {
+          hasRisk: true,
+          causes: [
+            isPlaceholder
+              ? `Location ID "${locId}" is a simulated placeholder. Square API rejects invoices for placeholder locations with 404 payment links.`
+              : 'Could not connect to Square API backend to verify credentials.',
+            ...(hasToken ? [] : ['Square Access Token is missing from environment/secrets.'])
+          ],
+          recommendedLocationId: 'LN4WBHANNNZ2Y',
+          status: 'CONFIGURATION_DEFECT'
+        },
+        logs: [
+          `[${new Date().toISOString().substring(11, 19)}] Client Diagnostic Fallback triggered.`,
+          `[${new Date().toISOString().substring(11, 19)}] Location checked: ${locId}`,
+          `[${new Date().toISOString().substring(11, 19)}] Error communicating with backend: ${err?.message || 'Network error'}`
+        ]
+      };
+      logDiagnosticReportToConsole(fallbackReport);
+      return fallbackReport;
+    }
   }
 };
 

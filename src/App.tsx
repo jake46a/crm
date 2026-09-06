@@ -797,6 +797,7 @@ export default function App() {
             onUpdateInvoiceStatus={handleUpdateInvoiceStatus}
             onUpdateRoom={handleSaveRoom}
             onUpdateContact={handleSaveContact}
+            onUpdateProperty={handleSaveProperty}
           />
         )}
 
