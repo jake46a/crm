@@ -3,7 +3,7 @@ var SQUARE_VERSION = "2025-02-20";
 var corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization",
+  "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-square-access-token, Square-Version",
   "Access-Control-Max-Age": "86400"
 };
 function jsonResponse(data, status = 200) {
@@ -11,16 +11,26 @@ function jsonResponse(data, status = 200) {
     status,
     headers: {
       "Content-Type": "application/json",
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
       ...corsHeaders
     }
   });
 }
 async function onRequest(context) {
-  const { request, env } = context;
+  const { request, env = {} } = context || {};
+  if (!request) {
+    return jsonResponse({ error: "Invalid request" }, 400);
+  }
   const url = new URL(request.url);
   const pathname = url.pathname.replace(/\/+$/, "");
   if (request.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: {
+        ...corsHeaders,
+        "Cache-Control": "no-store"
+      }
+    });
   }
   const authHeader = request.headers.get("Authorization") || "";
   const customHeaderToken = request.headers.get("x-square-access-token") || "";
@@ -738,12 +748,39 @@ async function onRequest(context) {
 var cloudflare_worker_default = {
   async fetch(request, env, context) {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/api/")) {
-      return onRequest({
-        request,
-        env,
-        params: { path: url.pathname.replace(/^\/api\/?/, "").split("/").filter(Boolean) }
+    if (url.pathname.startsWith("/api/") && request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+          "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-square-access-token, Square-Version",
+          "Access-Control-Max-Age": "86400",
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"
+        }
       });
+    }
+    if (url.pathname.startsWith("/api/")) {
+      try {
+        const response = await onRequest({
+          request,
+          env,
+          params: { path: url.pathname.replace(/^\/api\/?/, "").split("/").filter(Boolean) }
+        });
+        return response;
+      } catch (err) {
+        return new Response(JSON.stringify({
+          error: err?.message || "Internal Edge Worker Error",
+          source: "cloudflare_worker_edge"
+        }), {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"
+          }
+        });
+      }
     }
     if (env.ASSETS && typeof env.ASSETS.fetch === "function") {
       return env.ASSETS.fetch(request);

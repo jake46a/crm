@@ -23,7 +23,7 @@ const SQUARE_VERSION = '2025-02-20';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
+  'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-square-access-token, Square-Version',
   'Access-Control-Max-Age': '86400',
 };
 
@@ -32,19 +32,29 @@ function jsonResponse(data: any, status = 200) {
     status,
     headers: {
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
       ...corsHeaders,
     },
   });
 }
 
 export async function onRequest(context: { request: Request; env: Env; params: any }): Promise<Response> {
-  const { request, env } = context;
+  const { request, env = {} as Env } = context || {};
+  if (!request) {
+    return jsonResponse({ error: 'Invalid request' }, 400);
+  }
   const url = new URL(request.url);
   const pathname = url.pathname.replace(/\/+$/, ''); // Strip trailing slash
 
   // Handle CORS Preflight
   if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: {
+        ...corsHeaders,
+        'Cache-Control': 'no-store',
+      }
+    });
   }
 
   // Resolve Square credentials from Cloudflare Environment Variables & Secrets

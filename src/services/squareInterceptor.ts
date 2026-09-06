@@ -19,6 +19,7 @@ export interface SquareApiActivityRecord {
   responsePayload: any;
   error?: string;
   is405Error: boolean;
+  isHtmlSpaFallback?: boolean;
   diagnostics405?: {
     cause: string;
     explanation: string;
@@ -180,7 +181,18 @@ export function recordApiActivity(data: {
   error?: string;
 }): SquareApiActivityRecord {
   const is405 = data.responseStatus === 405;
+  const isHtmlSpaFallback = (data.responseStatus === 200 || data.responseStatus === 405) &&
+    typeof data.responsePayload === 'string' &&
+    (data.responsePayload.trim().startsWith('<!doctype') || data.responsePayload.includes('<html'));
   const now = new Date();
+
+  const errorMessage = data.error || (
+    is405
+      ? 'Cloudflare Pages edge static 405 Method Not Allowed detected'
+      : isHtmlSpaFallback
+      ? 'Cloudflare Pages served static SPA index.html fallback instead of API function response'
+      : undefined
+  );
 
   const record: SquareApiActivityRecord = {
     id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
@@ -196,9 +208,10 @@ export function recordApiActivity(data: {
     responseStatusText: data.responseStatusText || (is405 ? 'Method Not Allowed' : ''),
     responseHeaders: data.responseHeaders,
     responsePayload: data.responsePayload,
-    error: data.error,
+    error: errorMessage,
     is405Error: is405,
-    ...(is405 ? {
+    isHtmlSpaFallback,
+    ...(is405 || isHtmlSpaFallback ? {
       diagnostics405: analyze405Error(
         data.method,
         data.endpoint,

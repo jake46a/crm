@@ -556,19 +556,31 @@ export const ApiActivityLogModal: React.FC<ApiActivityLogModalProps> = ({
                   </div>
                 </div>
 
-                {/* HTTP 405 Method Not Allowed Troubleshooting Diagnosis Banner */}
-                {(activeLog.is405Error || activeLog.responseStatus === 405) && (
+                {/* HTTP 405 Method Not Allowed / Edge SPA Fallback Troubleshooting Diagnosis Banner */}
+                {(activeLog.is405Error || activeLog.responseStatus === 405 || activeLog.isHtmlSpaFallback) && (
                   <div className="p-3 bg-rose-50 border-b border-rose-200 text-rose-900 text-xs space-y-1.5">
                     <div className="flex items-center gap-1.5 font-bold text-rose-800">
                       <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
-                      <span>405 Troubleshooting Diagnosis: Cloudflare Edge Static Routing</span>
+                      <span>
+                        {activeLog.responseStatus === 405
+                          ? '405 Troubleshooting Diagnosis: Cloudflare Edge Static Routing'
+                          : 'Edge Diagnosis: Cloudflare Pages Single Page App (SPA) HTML Fallback'}
+                      </span>
                     </div>
                     <p className="text-[11px] leading-relaxed text-rose-800">
-                      Cloudflare Pages static edge rejected HTTP <code>{activeLog.method}</code> on <code>{activeLog.endpoint}</code>.
-                      Server Allowed Methods: <code className="font-mono font-bold">{activeLog.responseHeaders['allow'] || activeLog.responseHeaders['Allow'] || 'None specified'}</code>.
+                      {activeLog.responseStatus === 405 ? (
+                        <>
+                          Cloudflare Pages static edge rejected HTTP <code>{activeLog.method}</code> on <code>{activeLog.endpoint}</code>.
+                          Server Allowed Methods: <code className="font-mono font-bold">{activeLog.responseHeaders['allow'] || activeLog.responseHeaders['Allow'] || 'None specified'}</code>.
+                        </>
+                      ) : (
+                        <>
+                          Cloudflare Pages served the frontend SPA <code>index.html</code> (status 200) instead of executing the edge API function for <code>{activeLog.endpoint}</code>.
+                        </>
+                      )}
                     </p>
                     <div className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 p-1.5 rounded border border-emerald-200">
-                      Automated Recovery: The app routes through the live Cloud Run backend gateway or executes the resilient GET query fallback to complete operations seamlessly.
+                      Automated Recovery: The app routes through the live Cloud Run backend gateway or activates resilient edge generation so that invoices, amounts, and tenant records are recorded and processed without interruption.
                     </div>
                   </div>
                 )}
