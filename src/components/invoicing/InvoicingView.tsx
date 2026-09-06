@@ -31,7 +31,8 @@ import {
   Cloud,
   Activity,
   History,
-  Trash2
+  Trash2,
+  Terminal
 } from 'lucide-react';
 import { Property, Room, Contact, Invoice, InvoicingSubtask, InvoiceStatus, LeaseRenewal } from '../../types';
 import { splitFullName, formatFullName } from '../../utils/nameUtils';
@@ -41,6 +42,9 @@ import { StorageService } from '../../services/storage';
 import { INITIAL_ROOMS } from '../../data/initialData';
 import { CloudflareSecretsModal } from '../modals/CloudflareSecretsModal';
 import { SquareDiagnosticModal } from './SquareDiagnosticModal';
+import { SquareApiActivityPanel } from './SquareApiActivityPanel';
+import { ApiActivityLogModal } from './ApiActivityLogModal';
+import { subscribeToApiActivity, SquareApiActivityRecord } from '../../services/squareInterceptor';
 import { PaymentHistoryTab } from './PaymentHistoryTab';
 import { SquareLocationSelector, DiagnosticLocationOption } from './SquareLocationSelector';
 import { getSavedSquareLocationId, setSavedSquareLocationId } from '../../services/squareService';
@@ -114,6 +118,18 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
   const [isLoadingStatus, setIsLoadingStatus] = useState<boolean>(false);
   const [isCloudflareModalOpen, setIsCloudflareModalOpen] = useState<boolean>(false);
   const [isDiagnosticModalOpen, setIsDiagnosticModalOpen] = useState<boolean>(false);
+  const [isApiActivityModalOpen, setIsApiActivityModalOpen] = useState<boolean>(false);
+  const [apiActivityLogs, setApiActivityLogs] = useState<SquareApiActivityRecord[]>([]);
+
+  // Subscribe to real-time Square API activity logs
+  useEffect(() => {
+    const unsub = subscribeToApiActivity((logs) => {
+      setApiActivityLogs(logs);
+    });
+    return unsub;
+  }, []);
+
+  const count405Errors = apiActivityLogs.filter(l => l.is405Error || l.responseStatus === 405).length;
 
   // Dynamic Active Square Location ID state (persisted & bound to VITE_SQUARE_DEFAULT_LOCATION_ID in real-time)
   const [activeSquareLocationId, setActiveSquareLocationId] = useState<string>(() => getSavedSquareLocationId());
@@ -1333,6 +1349,28 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
             <span>Square Diagnostics</span>
           </button>
 
+          {/* Square API Activity Log Modal Button */}
+          <button
+            id="btn-open-api-activity"
+            onClick={() => setIsApiActivityModalOpen(true)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded transition-colors whitespace-nowrap shadow-xs ${
+              count405Errors > 0
+                ? 'bg-rose-950 hover:bg-rose-900 text-rose-200 border border-rose-700 font-bold animate-pulse'
+                : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
+            }`}
+            title="Open real-time Square API Activity Log modal to inspect timestamps, methods, endpoints, status codes, and payloads"
+          >
+            <Terminal className={`w-3.5 h-3.5 ${count405Errors > 0 ? 'text-rose-400' : 'text-indigo-400'}`} />
+            <span>API Activity Log</span>
+            {apiActivityLogs.length > 0 && (
+              <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold ${
+                count405Errors > 0 ? 'bg-rose-600 text-white' : 'bg-zinc-700 text-zinc-300'
+              }`}>
+                {count405Errors > 0 ? `${count405Errors} (405!)` : apiActivityLogs.length}
+              </span>
+            )}
+          </button>
+
           {/* Cloudflare Pages Secrets Setup Button */}
           <button
             onClick={() => setIsCloudflareModalOpen(true)}
@@ -1444,11 +1482,35 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
             {invoices.length}
           </span>
         </button>
+
+        <button
+          id="tab-api-activity"
+          onClick={() => setActiveSubtask('api-activity')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
+            activeSubtask === 'api-activity'
+              ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50'
+              : 'border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
+          }`}
+        >
+          <Terminal className="w-3.5 h-3.5" />
+          <span>API Activity Log</span>
+          {apiActivityLogs.length > 0 && (
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
+              count405Errors > 0
+                ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                : activeSubtask === 'api-activity'
+                ? 'bg-indigo-100 text-indigo-800'
+                : 'bg-zinc-100 text-zinc-600'
+            }`}>
+              {count405Errors > 0 ? `${count405Errors} (405!)` : apiActivityLogs.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Primary Workspace Panel */}
       <div className="bg-white rounded-b-lg border border-t-0 border-zinc-200 p-6 shadow-xs space-y-6">
-        {activeSubtask !== 'payment-history' && (
+        {activeSubtask !== 'payment-history' && activeSubtask !== 'api-activity' && (
           <>
             {/* Global Controls Bar: Property, Month, Year & Dynamic Square Location */}
             <div className="bg-zinc-50 border border-zinc-200 p-4 rounded-lg space-y-3.5">
@@ -2150,10 +2212,17 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
             onSwitchToRentTab={() => setActiveSubtask('rent')}
           />
         )}
+
+        {/* SUBTASK 7: SQUARE API ACTIVITY & 405 TROUBLESHOOTING PANEL */}
+        {activeSubtask === 'api-activity' && (
+          <div className="space-y-4">
+            <SquareApiActivityPanel isEmbedded={true} />
+          </div>
+        )}
       </div>
 
       {/* HISTORICAL SQUARE INVOICES DISPATCH TABLE */}
-      {activeSubtask !== 'payment-history' && (
+      {activeSubtask !== 'payment-history' && activeSubtask !== 'api-activity' && (
         <div className="bg-white rounded-lg border border-zinc-200 shadow-xs overflow-hidden">
         <div className="p-4 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
@@ -2578,6 +2647,12 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           }
         }}
         onSelectActiveLocation={(locId) => handleSwitchSquareLocation(locId)}
+      />
+
+      {/* Square API Activity Log Modal */}
+      <ApiActivityLogModal
+        isOpen={isApiActivityModalOpen}
+        onClose={() => setIsApiActivityModalOpen(false)}
       />
     </div>
   );

@@ -299,7 +299,8 @@ export type InvoicingSubtask =
   | 'all-invoices'
   | 'rent'
   | 'late_fee'
-  | 'payment-history';
+  | 'payment-history'
+  | 'api-activity';
 
 export type InvoiceType = 'Rental' | 'Utility' | 'Supplies' | 'Late Fee' | 'Special';
 export type InvoiceStatus = 'UNPAID' | 'PAID' | 'CANCELED' | 'SCHEDULED' | 'REFUNDED' | 'OVERDUE' | 'DRAFT' | 'SENT' | 'FAILED';

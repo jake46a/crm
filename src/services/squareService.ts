@@ -300,10 +300,12 @@ export function setCustomBackendUrl(url: string) {
   } catch {}
 }
 
+import { recordApiActivity, isInterceptorEnabled } from './squareInterceptor';
+
 /**
- * Intelligent Square API fetcher.
- * Automatically injects Bearer credentials and seamlessly falls back to the live Cloud Run
- * backend gateway if Cloudflare Pages edge returns 400 (missing token), 404, 405, or network error.
+ * Intelligent Square API fetcher with real-time diagnostic interception.
+ * Intercepts all outgoing Square API requests and captures full headers, payloads,
+ * timings, and HTTP 405 Method Not Allowed diagnostic data for the API Activity panel.
  */
 export async function fetchSquareApi(endpoint: string, options: RequestInit = {}): Promise<Response> {
   const customBackend = getCustomBackendUrl();
@@ -319,23 +321,91 @@ export async function fetchSquareApi(endpoint: string, options: RequestInit = {}
     ...(options.headers as Record<string, string> || {})
   };
 
+  const method = (options.method || 'GET').toUpperCase();
+  let parsedPayload: any = null;
+  if (options.body) {
+    try {
+      parsedPayload = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+    } catch {
+      parsedPayload = options.body;
+    }
+  }
+
   const requestOptions: RequestInit = {
     ...options,
     headers: mergedHeaders
   };
 
+  const startTime = performance.now();
   let res: Response;
+
+  const logActivity = async (response: Response, targetUrl: string, errorMsg?: string) => {
+    if (!isInterceptorEnabled()) return;
+    const durationMs = performance.now() - startTime;
+    const responseHeadersObj: Record<string, string> = {};
+    try {
+      response.headers.forEach((val, key) => {
+        responseHeadersObj[key] = val;
+      });
+    } catch {}
+
+    let responsePayload: any = null;
+    try {
+      const cloned = response.clone();
+      const rawText = await cloned.text();
+      try {
+        responsePayload = JSON.parse(rawText);
+      } catch {
+        responsePayload = rawText;
+      }
+    } catch (readErr: any) {
+      responsePayload = `[Unable to clone body: ${readErr?.message}]`;
+    }
+
+    recordApiActivity({
+      durationMs,
+      method,
+      endpoint,
+      fullUrl: targetUrl,
+      requestHeaders: mergedHeaders,
+      requestPayload: parsedPayload,
+      responseStatus: response.status,
+      responseStatusText: response.statusText,
+      responseHeaders: responseHeadersObj,
+      responsePayload,
+      error: errorMsg
+    });
+  };
+
   try {
     res = await fetch(primaryUrl, requestOptions);
-  } catch (err) {
+  } catch (err: any) {
     // If local relative fetch failed (e.g. CORS/network error), attempt live Cloud Run backend gateway
     if (!customBackend && typeof window !== 'undefined' && !window.location.origin.includes('run.app')) {
       console.warn(`Local fetch to ${endpoint} failed. Attempting live Cloud Run gateway ${LIVE_BACKEND_GATEWAY}...`);
       try {
-        return await fetch(`${LIVE_BACKEND_GATEWAY}${endpoint}`, requestOptions);
-      } catch (fbErr) {
+        const gwRes = await fetch(`${LIVE_BACKEND_GATEWAY}${endpoint}`, requestOptions);
+        logActivity(gwRes, `${LIVE_BACKEND_GATEWAY}${endpoint}`);
+        return gwRes;
+      } catch (fbErr: any) {
         console.warn('Fallback gateway unreachable:', fbErr);
       }
+    }
+
+    if (isInterceptorEnabled()) {
+      recordApiActivity({
+        durationMs: performance.now() - startTime,
+        method,
+        endpoint,
+        fullUrl: primaryUrl,
+        requestHeaders: mergedHeaders,
+        requestPayload: parsedPayload,
+        responseStatus: 0,
+        responseStatusText: 'Network / Fetch Exception',
+        responseHeaders: {},
+        responsePayload: null,
+        error: err?.message || 'Network error'
+      });
     }
     throw err;
   }
@@ -344,15 +414,21 @@ export async function fetchSquareApi(endpoint: string, options: RequestInit = {}
   // 404 (functions not deployed on Cloudflare Pages), or 5xx:
   // Seamlessly route to the live Cloud Run backend gateway where Square Production is active!
   if ((res.status === 400 || res.status === 405 || res.status === 404 || res.status >= 500) && !customBackend && typeof window !== 'undefined' && !window.location.origin.includes('run.app')) {
+    // Log the primary 405 / 400 response first so the troubleshooting log captures the original edge error
+    logActivity(res, primaryUrl, res.status === 405 ? 'Cloudflare Pages edge static 405 Method Not Allowed detected' : undefined);
+
     console.info(`Local endpoint ${endpoint} returned HTTP ${res.status}. Seamlessly routing to live backend gateway ${LIVE_BACKEND_GATEWAY}...`);
     try {
       const gatewayRes = await fetch(`${LIVE_BACKEND_GATEWAY}${endpoint}`, requestOptions);
       if (gatewayRes.ok || gatewayRes.status < 400) {
+        logActivity(gatewayRes, `${LIVE_BACKEND_GATEWAY}${endpoint}`);
         return gatewayRes;
       }
     } catch (gErr) {
       console.warn('Live backend gateway unreachable:', gErr);
     }
+  } else {
+    logActivity(res, primaryUrl);
   }
 
   return res;
@@ -992,4 +1068,8 @@ export const SquareService = {
     return report;
   }
 };
+
+// Export Square API Interceptor & Diagnostics
+export * from './squareInterceptor';
+
 
