@@ -137,12 +137,42 @@ export async function onRequest(context: { request: Request; env: Env; params: a
     });
   }
 
-  // 4. Search or Create Customer
-  if ((pathname === '/api/square/customers/search-or-create' || pathname === '/api/square/customers') && request.method === 'POST') {
-    const body = (await request.json().catch(() => ({}))) as any;
-    const { email, firstName, lastName, phone, note } = body;
+  // 4. Search or Create Customer (supports POST or GET)
+  if (
+    (pathname === '/api/square/customers/search-or-create' ||
+     pathname === '/api/square/customers' ||
+     pathname === '/api/square/customers/search') &&
+    (request.method === 'POST' || request.method === 'GET')
+  ) {
+    let email = '';
+    let firstName = '';
+    let lastName = '';
+    let phone = '';
+    let note = '';
 
-    if (!email || !email.trim()) {
+    if (request.method === 'POST') {
+      const body = (await request.json().catch(() => ({}))) as any;
+      email = (body.email || '').trim();
+      firstName = (body.firstName || '').trim();
+      lastName = (body.lastName || '').trim();
+      phone = (body.phone || '').trim();
+      note = (body.note || '').trim();
+    } else {
+      email = (url.searchParams.get('email') || '').trim();
+      firstName = (url.searchParams.get('firstName') || '').trim();
+      lastName = (url.searchParams.get('lastName') || '').trim();
+      phone = (url.searchParams.get('phone') || '').trim();
+      note = (url.searchParams.get('note') || '').trim();
+    }
+
+    if (!email) {
+      if (request.method === 'GET') {
+        return jsonResponse({
+          status: 'online',
+          endpoint: '/api/square/customers',
+          description: 'Pass ?email=... to query customer.'
+        });
+      }
       return jsonResponse({ success: false, error: 'Email address is required.' }, 400);
     }
 

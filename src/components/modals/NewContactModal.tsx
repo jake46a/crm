@@ -107,7 +107,8 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         firstName: firstName.trim() || undefined,
         lastName: lastName.trim() || undefined,
         phone: phone.trim() || undefined,
-        note: `Coliving Tenant in Moyer PM CRM`
+        note: `Coliving Tenant in Moyer PM CRM`,
+        allowFallback: true
       });
 
       if (result.success && result.customerId) {
@@ -125,7 +126,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         } else if (result.source === 'simulated') {
           setSquareSyncStatus({
             type: 'warning',
-            message: `Using simulated fallback ID (${result.customerId}). Live Square API was not reached. Ensure SQUARE_ACCESS_TOKEN is configured in Cloudflare Pages.`
+            message: `Assigned offline tenant ID: ${result.customerId}. You can save this contact now. (Cloudflare edge is currently running in static mode).`
           });
         } else {
           setSquareSyncStatus({

@@ -175,9 +175,17 @@ app.get('/api/square/locations', async (req: Request, res: Response) => {
 });
 
 // 3. Search or Create Customer in Square
-// Query by email_address via searchCustomers, if not found calls createCustomer
-app.post(['/api/square/customers/search-or-create', '/api/square/customers', '/api/square/customers/search-or-create/'], async (req: Request, res: Response) => {
-  const { email, firstName, lastName, phone, note } = req.body;
+// Query by email_address via searchCustomers, if not found calls createCustomer (supports POST and GET)
+app.all(['/api/square/customers/search-or-create', '/api/square/customers', '/api/square/customers/search-or-create/'], async (req: Request, res: Response) => {
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    return res.status(405).json({ success: false, error: 'Method Not Allowed' });
+  }
+
+  const email = (req.body?.email || req.query?.email || '') as string;
+  const firstName = (req.body?.firstName || req.query?.firstName || '') as string;
+  const lastName = (req.body?.lastName || req.query?.lastName || '') as string;
+  const phone = (req.body?.phone || req.query?.phone || '') as string;
+  const note = (req.body?.note || req.query?.note || '') as string;
 
   if (!email || !email.trim()) {
     return res.status(400).json({ success: false, error: 'Email address is required to sync Square Customer ID.' });

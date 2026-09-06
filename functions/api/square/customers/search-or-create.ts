@@ -30,17 +30,8 @@ export async function onRequestOptions(): Promise<Response> {
   return new Response(null, { status: 204, headers: corsHeaders });
 }
 
-export async function onRequestGet(): Promise<Response> {
-  return jsonResponse({
-    status: 'online',
-    endpoint: '/api/square/customers/search-or-create',
-    method: 'POST',
-    description: 'Searches Square customer by email or creates a new customer.'
-  });
-}
-
-export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
-  const { request, env } = context;
+export async function handleCustomerSearchOrCreate(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
 
   const authHeader = request.headers.get('Authorization') || '';
   const bearerToken = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.substring(7).trim() : '';
@@ -55,21 +46,39 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     'Content-Type': 'application/json',
   };
 
-  const body = (await request.json().catch(() => ({}))) as any;
-  const { email, firstName, lastName, phone, note } = body;
+  let email = '';
+  let firstName = '';
+  let lastName = '';
+  let phone = '';
+  let note = '';
 
-  if (!email || !email.trim()) {
+  if (request.method === 'POST') {
+    const body = (await request.json().catch(() => ({}))) as any;
+    email = (body.email || '').trim();
+    firstName = (body.firstName || '').trim();
+    lastName = (body.lastName || '').trim();
+    phone = (body.phone || '').trim();
+    note = (body.note || '').trim();
+  } else {
+    email = (url.searchParams.get('email') || '').trim();
+    firstName = (url.searchParams.get('firstName') || '').trim();
+    lastName = (url.searchParams.get('lastName') || '').trim();
+    phone = (url.searchParams.get('phone') || '').trim();
+    note = (url.searchParams.get('note') || '').trim();
+  }
+
+  if (!email) {
     return jsonResponse({ success: false, error: 'Email address is required.' }, 400);
   }
 
-  const cleanEmail = email.trim().toLowerCase();
+  const cleanEmail = email.toLowerCase();
 
-  // If in Production and no access token is available, return informative error
+  // If in Production and no access token is available, return informative error or fallback
   if (!accessToken) {
     if (isProduction) {
       return jsonResponse({
         success: false,
-        error: 'Square Access Token not found in Cloudflare Pages. Please add SQUARE_ACCESS_TOKEN under Cloudflare Pages Settings > Environment variables (for both Production and Preview) and retry deployment.',
+        error: 'Square Access Token not found in Cloudflare Pages. Please add SQUARE_ACCESS_TOKEN under Cloudflare Pages Settings > Environment variables.',
         source: 'missing_token'
       }, 400);
     }
@@ -134,9 +143,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       email_address: cleanEmail,
       note: note || 'Moyer Property Management Speer House Tenant'
     };
-    if (firstName?.trim()) createPayload.given_name = firstName.trim();
-    if (lastName?.trim()) createPayload.family_name = lastName.trim();
-    if (phone?.trim()) createPayload.phone_number = phone.trim();
+    if (firstName) createPayload.given_name = firstName;
+    if (lastName) createPayload.family_name = lastName;
+    if (phone) createPayload.phone_number = phone;
 
     const createRes = await fetch(`${baseUrl}/v2/customers`, {
       method: 'POST',
@@ -180,6 +189,23 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       source: 'network_error'
     }, 502);
   }
+}
+
+export async function onRequestGet(context: { request: Request; env: Env }): Promise<Response> {
+  const url = new URL(context.request.url);
+  if (!url.searchParams.get('email')) {
+    return jsonResponse({
+      status: 'online',
+      endpoint: '/api/square/customers/search-or-create',
+      method: 'GET or POST',
+      description: 'Searches Square customer by email or creates a new customer. Supply ?email=...'
+    });
+  }
+  return handleCustomerSearchOrCreate(context.request, context.env);
+}
+
+export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
+  return handleCustomerSearchOrCreate(context.request, context.env);
 }
 
 export const onRequest = onRequestPost;
