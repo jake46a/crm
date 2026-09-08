@@ -221,11 +221,12 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Utility Invoicing state
+  // Note: Per policy, tenants are not charged for trash or internet. Default utilities are Electric, Gas, and Water/Sewer.
   const [electricAmount, setElectricAmount] = useState<number>(140);
   const [gasAmount, setGasAmount] = useState<number>(85);
   const [waterAmount, setWaterAmount] = useState<number>(65);
-  const [internetAmount, setInternetAmount] = useState<number>(90);
-  const [utilityNotes, setUtilityNotes] = useState<string>('Monthly high-speed fiber & shared utilities split');
+  const [utilityDivisor, setUtilityDivisor] = useState<number>(7);
+  const [utilityNotes, setUtilityNotes] = useState<string>('Monthly shared utilities split (Electric, Gas, Water/Sewer)');
 
   // Common Supplies Invoicing state
   const [suppliesAmount, setSuppliesAmount] = useState<number>(120);
@@ -816,7 +817,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
     }
   };
 
-  // 3. CREATE UTILITY INVOICES (Split equally among occupied rooms)
+  // 3. CREATE UTILITY INVOICES (Divided by custom divisor, default 7, excluding trash and internet per policy)
   const handleCreateUtilityInvoices = async () => {
     const effectiveLocationId = activeSquareLocationId || selectedProperty?.squareLocationId || getSavedSquareLocationId();
     if (!selectedProperty || !effectiveLocationId) {
@@ -828,7 +829,8 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       return;
     }
 
-    const totalBill = electricAmount + gasAmount + waterAmount + internetAmount;
+    const divisor = Math.max(1, Number(utilityDivisor) || 7);
+    const totalBill = electricAmount + gasAmount + waterAmount;
     if (totalBill <= 0) {
       alert('Please enter utility bill totals greater than $0.');
       return;
@@ -837,7 +839,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
     setIsGenerating(true);
     setBatchResult(null);
 
-    const sharePerResident = Math.round((totalBill / occupiedBedroomsWithTenants.length) * 100) / 100;
+    const sharePerResident = Math.round((totalBill / divisor) * 100) / 100;
     const dueDate = getDueDate(selectedMonth, selectedYear);
 
     try {
@@ -871,7 +873,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           totalAmount: sharePerResident,
           dueDate,
           createdAt: new Date().toISOString(),
-          description: `Shared Utilities Split (${selectedMonth} ${selectedYear}): Electric ($${electricAmount}) + Gas ($${gasAmount}) + Water/Trash ($${waterAmount}) + Fiber Internet ($${internetAmount}) / ${occupiedBedroomsWithTenants.length} rooms`,
+          description: `Shared Utilities Split (${selectedMonth} ${selectedYear}): Electric ($${electricAmount}) + Gas ($${gasAmount}) + Water/Sewer ($${waterAmount}) = $${totalBill.toFixed(2)} divided by ${divisor} ($${sharePerResident.toFixed(2)}/resident)`,
           allowPartialPayments: false,
           status: 'SENT' as InvoiceStatus
         };
@@ -903,7 +905,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       setBatchResult({
         success: true,
         count: savedInvoices.length,
-        message: `Successfully split $${totalBill.toFixed(2)} total utilities across ${savedInvoices.length} occupied rooms ($${sharePerResident.toFixed(2)}/resident). Invoices emailed via Square.${utilityAdvisory}`
+        message: `Successfully calculated $${totalBill.toFixed(2)} total utilities (Electric + Gas + Water/Sewer) divided by ${divisor} ($${sharePerResident.toFixed(2)}/resident) for ${savedInvoices.length} active tenants. Invoices created via Square.${utilityAdvisory}`
       });
     } catch (err: any) {
       setBatchResult({
@@ -1925,7 +1927,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
             <div>
               <h3 className="text-sm font-bold text-zinc-900">Shared Utility Bills Split</h3>
               <p className="text-xs text-zinc-500">
-                Enter the house utility bills for {selectedProperty?.name} ({selectedMonth} {selectedYear}). The system divides the total equally among the {occupiedBedroomsWithTenants.length} occupied rooms and dispatches individual Square orders and invoices.
+                Enter the house utility bills for {selectedProperty?.name} ({selectedMonth} {selectedYear}). Per house policy, tenants are not charged for trash or internet. The utilities (Electric, Gas, Water/Sewer) are divided by your specified divisor (default 7) and invoiced to each active tenant.
               </p>
             </div>
 
@@ -1936,6 +1938,8 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
                   <span className="absolute left-2.5 top-2 text-zinc-400 text-xs">$</span>
                   <input
                     type="number"
+                    min="0"
+                    step="0.01"
                     value={electricAmount}
                     onChange={(e) => setElectricAmount(Number(e.target.value))}
                     className="w-full pl-6 p-2 bg-white border border-zinc-300 rounded-md font-mono text-xs text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -1949,6 +1953,8 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
                   <span className="absolute left-2.5 top-2 text-zinc-400 text-xs">$</span>
                   <input
                     type="number"
+                    min="0"
+                    step="0.01"
                     value={gasAmount}
                     onChange={(e) => setGasAmount(Number(e.target.value))}
                     className="w-full pl-6 p-2 bg-white border border-zinc-300 rounded-md font-mono text-xs text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -1957,29 +1963,34 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-zinc-700 mb-1">Water, Sewer & Trash ($)</label>
+                <label className="block text-xs font-bold text-zinc-700 mb-1">Water & Sewer ($)</label>
                 <div className="relative">
                   <span className="absolute left-2.5 top-2 text-zinc-400 text-xs">$</span>
                   <input
                     type="number"
+                    min="0"
+                    step="0.01"
                     value={waterAmount}
                     onChange={(e) => setWaterAmount(Number(e.target.value))}
                     className="w-full pl-6 p-2 bg-white border border-zinc-300 rounded-md font-mono text-xs text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
                 </div>
+                <span className="text-[10px] text-zinc-400 mt-1 block">Excludes trash</span>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-zinc-700 mb-1">Gigabit Fiber Internet ($)</label>
-                <div className="relative">
-                  <span className="absolute left-2.5 top-2 text-zinc-400 text-xs">$</span>
-                  <input
-                    type="number"
-                    value={internetAmount}
-                    onChange={(e) => setInternetAmount(Number(e.target.value))}
-                    className="w-full pl-6 p-2 bg-white border border-zinc-300 rounded-md font-mono text-xs text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  />
-                </div>
+                <label className="block text-xs font-bold text-indigo-900 mb-1">Utility Divisor</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
+                  step="1"
+                  value={utilityDivisor}
+                  onChange={(e) => setUtilityDivisor(Math.max(1, Number(e.target.value)))}
+                  className="w-full p-2 bg-indigo-50/50 border-2 border-indigo-300 rounded-md font-mono font-bold text-xs text-indigo-950 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  title="Utilities are divided by this number (e.g., 7)"
+                />
+                <span className="text-[10px] text-indigo-600 font-medium mt-1 block">Always divided by {utilityDivisor || 7}</span>
               </div>
             </div>
 
@@ -1988,10 +1999,12 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
               <div className="p-4 bg-indigo-50/70 border border-indigo-200 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
                   <p className="text-xs text-indigo-900 font-semibold">
-                    Total Utility Expense: <span className="font-mono text-sm font-bold text-indigo-700">${(electricAmount + gasAmount + waterAmount + internetAmount).toFixed(2)}</span>
+                    Total Utility Expense: <span className="font-mono text-sm font-bold text-indigo-700">${(electricAmount + gasAmount + waterAmount).toFixed(2)}</span>
+                    <span className="text-[11px] text-zinc-500 ml-2 font-normal">(Trash & internet excluded)</span>
                   </p>
                   <p className="text-xs text-indigo-800 mt-0.5">
-                    Equal share for {occupiedBedroomsWithTenants.length} occupied rooms: <span className="font-mono font-bold text-sm text-indigo-900">${((electricAmount + gasAmount + waterAmount + internetAmount) / occupiedBedroomsWithTenants.length).toFixed(2)}</span> / resident
+                    Divided by {utilityDivisor || 7} = <span className="font-mono font-bold text-sm text-indigo-950">${((electricAmount + gasAmount + waterAmount) / Math.max(1, Number(utilityDivisor) || 7)).toFixed(2)}</span> / resident share
+                    <span className="text-[11px] text-indigo-600 ml-1.5 font-medium">({occupiedBedroomsWithTenants.length} active tenants to be invoiced)</span>
                   </p>
                 </div>
 
