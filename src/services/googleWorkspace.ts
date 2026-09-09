@@ -1,5 +1,7 @@
 // Google Workspace (Docs & Drive) Integration Service
-// Uses Google Identity Services (GIS) and Google REST APIs for Docs & Drive
+// Supports both Firebase Auth (recommended for custom domains/Cloudflare) and Google Identity Services (GIS)
+import { auth } from './firebase';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 export const SCOPES = [
   'https://www.googleapis.com/auth/documents',
@@ -13,6 +15,7 @@ const STORAGE_KEY_EXPIRES = 'moyer_crm_gworkspace_expires_at';
 const STORAGE_KEY_EMAIL = 'moyer_crm_gworkspace_email';
 const STORAGE_KEY_USER_NAME = 'moyer_crm_gworkspace_name';
 const STORAGE_KEY_TEMPLATES = 'moyer_crm_gworkspace_templates';
+const STORAGE_KEY_CLIENT_ID = 'moyer_crm_custom_google_client_id';
 
 export interface GoogleWorkspaceUser {
   email: string;
@@ -106,6 +109,78 @@ export class GoogleWorkspaceService {
     localStorage.removeItem(STORAGE_KEY_EXPIRES);
     localStorage.removeItem(STORAGE_KEY_EMAIL);
     localStorage.removeItem(STORAGE_KEY_USER_NAME);
+  }
+
+  /**
+   * Get custom or default Google OAuth Client ID
+   */
+  static getClientId(): string {
+    return localStorage.getItem(STORAGE_KEY_CLIENT_ID) || DEFAULT_OAUTH_CLIENT_ID;
+  }
+
+  /**
+   * Save custom Google OAuth Client ID
+   */
+  static saveClientId(clientId: string) {
+    if (!clientId.trim()) {
+      localStorage.removeItem(STORAGE_KEY_CLIENT_ID);
+    } else {
+      localStorage.setItem(STORAGE_KEY_CLIENT_ID, clientId.trim());
+    }
+  }
+
+  /**
+   * Request Access Token via Firebase Auth popup with Google Workspace scopes.
+   * Recommended for Cloudflare / custom domains because the OAuth exchange is handled
+   * via Firebase's authorized authDomain, avoiding Google Identity Services origin_mismatch errors.
+   */
+  static async requestAccessTokenViaFirebaseAuth(
+    loginHint?: string
+  ): Promise<{ accessToken: string; user?: GoogleWorkspaceUser }> {
+    const provider = new GoogleAuthProvider();
+    // Add Google Docs & Drive scopes
+    SCOPES.forEach(scope => provider.addScope(scope));
+
+    // Prompt consent so access tokens and offline scopes are granted
+    provider.setCustomParameters({
+      prompt: 'consent',
+      login_hint: loginHint || 'info@1070yankstreet.com',
+    });
+
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+
+      if (!credential?.accessToken) {
+        throw new Error(
+          'Google authentication completed, but no OAuth access token was returned for Docs/Drive. Please ensure third-party cookies/popups are enabled.'
+        );
+      }
+
+      const token = credential.accessToken;
+      this.saveToken(token, 3600, result.user.email || loginHint);
+
+      const profile: GoogleWorkspaceUser = {
+        email: result.user.email || loginHint || 'Connected Account',
+        name: result.user.displayName || result.user.email?.split('@')[0] || 'Google User',
+        picture: result.user.photoURL || undefined,
+        connectedAt: new Date().toISOString(),
+      };
+
+      if (profile.email) localStorage.setItem(STORAGE_KEY_EMAIL, profile.email);
+      if (profile.name) localStorage.setItem(STORAGE_KEY_USER_NAME, profile.name);
+
+      return { accessToken: token, user: profile };
+    } catch (err: any) {
+      console.error('Firebase Workspace Auth error:', err);
+      if (err.code === 'auth/unauthorized-domain') {
+        const currentDomain = window.location.hostname;
+        throw new Error(
+          `Domain "${currentDomain}" is not yet added to Firebase Auth Authorized Domains. Add "${currentDomain}" in Firebase Console -> Authentication -> Settings -> Authorized domains, or use Google Identity Services with your OAuth Client ID.`
+        );
+      }
+      throw err;
+    }
   }
 
   /**
