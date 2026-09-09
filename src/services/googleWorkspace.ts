@@ -122,10 +122,11 @@ export class GoogleWorkspaceService {
    * Save custom Google OAuth Client ID
    */
   static saveClientId(clientId: string) {
-    if (!clientId.trim()) {
+    const cleanId = (clientId || '').trim();
+    if (!cleanId) {
       localStorage.removeItem(STORAGE_KEY_CLIENT_ID);
     } else {
-      localStorage.setItem(STORAGE_KEY_CLIENT_ID, clientId.trim());
+      localStorage.setItem(STORAGE_KEY_CLIENT_ID, cleanId);
     }
   }
 
@@ -410,7 +411,8 @@ export class GoogleWorkspaceService {
     const documentId = doc.documentId;
 
     // 2. Insert text content into document
-    if (contentText && contentText.trim()) {
+    const cleanContent = (contentText || '').trim();
+    if (cleanContent) {
       await fetch(`https://docs.googleapis.com/v1/documents/${documentId}:batchUpdate`, {
         method: 'POST',
         headers: {
@@ -422,7 +424,7 @@ export class GoogleWorkspaceService {
             {
               insertText: {
                 location: { index: 1 },
-                text: contentText,
+                text: cleanContent,
               },
             },
           ],
@@ -447,7 +449,7 @@ export class GoogleWorkspaceService {
           text: search,
           matchCase: true,
         },
-        replaceText: replace || '',
+        replaceText: String(replace ?? ''),
       },
     }));
 

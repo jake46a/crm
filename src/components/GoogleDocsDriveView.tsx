@@ -82,11 +82,13 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
   const [isCreatingStarterDoc, setIsCreatingStarterDoc] = useState<string | null>(null);
 
   // Property Selection state - Flagship 1070 Yank St preferred default
-  const defaultProperty = properties.find(p => p.id === 'prop-1070-yank' || p.name.includes('1070 Yank')) || properties[0];
+  const defaultProperty = properties.find(p => p.id === 'prop-1070-yank' || p.name?.includes('1070 Yank')) || properties[0];
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>(defaultProperty?.id || '');
   const [customPropertyName, setCustomPropertyName] = useState<string>(defaultProperty?.name || '1070 Yank St');
   const [customPropertyAddress, setCustomPropertyAddress] = useState<string>(
-    defaultProperty ? `${defaultProperty.address}, ${defaultProperty.city}, ${defaultProperty.state} ${defaultProperty.zip}` : '1070 Yank St, Golden, CO 80215'
+    defaultProperty && defaultProperty.address
+      ? `${defaultProperty.address}, ${defaultProperty.city || ''}, ${defaultProperty.state || ''} ${defaultProperty.zip || ''}`
+      : '1070 Yank St, Golden, CO 80215'
   );
   const [showPropertyAddressEdit, setShowPropertyAddressEdit] = useState<boolean>(false);
 
@@ -94,7 +96,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
   const [residentSourceMode, setResidentSourceMode] = useState<'property_rooms' | 'crm_leads' | 'square_invoices' | 'blank_custom'>('property_rooms');
   const [selectedRoomId, setSelectedRoomId] = useState<string>('');
   const [customRoomName, setCustomRoomName] = useState<string>('');
-  const [customTenantName, setCustomTenantName] = useState<string>(initialTenantName);
+  const [customTenantName, setCustomTenantName] = useState<string>(initialTenantName || '');
   const [customTenantEmail, setCustomTenantEmail] = useState<string>('');
   const [customTenantPhone, setCustomTenantPhone] = useState<string>('');
   const [customMonthlyRent, setCustomMonthlyRent] = useState<number>(850);
@@ -161,10 +163,10 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
 
     const room = currentRoomList.find(r => r.id === roomId) || rooms.find(r => r.id === roomId);
     if (room) {
-      setCustomRoomName(room.name);
-      if (room.currentTenantName) setCustomTenantName(room.currentTenantName);
-      if (room.currentTenantEmail) setCustomTenantEmail(room.currentTenantEmail);
-      if (room.currentTenantPhone) setCustomTenantPhone(room.currentTenantPhone);
+      setCustomRoomName(room.name || 'Room 1');
+      setCustomTenantName(room.currentTenantName || '');
+      setCustomTenantEmail(room.currentTenantEmail || '');
+      setCustomTenantPhone(room.currentTenantPhone || '');
       if (room.monthlyRent) {
         setCustomMonthlyRent(room.monthlyRent);
         setCustomSecurityDeposit(room.securityDeposit || room.monthlyRent);
@@ -188,8 +190,10 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
     setSelectedPropertyId(propId);
     const prop = properties.find(p => p.id === propId);
     if (prop) {
-      setCustomPropertyName(prop.name);
-      setCustomPropertyAddress(`${prop.address}, ${prop.city}, ${prop.state} ${prop.zip}`);
+      setCustomPropertyName(prop.name || '1070 Yank St');
+      setCustomPropertyAddress(
+        prop.address ? `${prop.address}, ${prop.city || ''}, ${prop.state || ''} ${prop.zip || ''}` : '1070 Yank St, Golden, CO 80215'
+      );
       const propRooms = rooms.filter(r => r.propertyId === propId);
       if (propRooms.length > 0) {
         const firstRoom = propRooms.find(r => r.currentTenantName) || propRooms[0];
@@ -219,7 +223,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
   const handleLeadSelect = (leadId: string) => {
     const lead = leads.find(l => l.id === leadId);
     if (lead) {
-      setCustomTenantName(lead.fullName);
+      setCustomTenantName(lead.fullName || '');
       setCustomTenantEmail(lead.email || '');
       setCustomTenantPhone(lead.phone || '');
       if (lead.budgetMax) {
@@ -236,10 +240,10 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
   const handleInvoiceSelect = (invId: string) => {
     const inv = invoices.find(i => i.id === invId);
     if (inv) {
-      setCustomTenantName(inv.tenantName);
-      if (inv.tenantEmail) setCustomTenantEmail(inv.tenantEmail);
-      if (inv.roomName) setCustomRoomName(inv.roomName);
-      setCustomPastDue(inv.amount);
+      setCustomTenantName(inv.tenantName || '');
+      setCustomTenantEmail(inv.tenantEmail || '');
+      setCustomRoomName(inv.roomName || 'Room 1');
+      setCustomPastDue(inv.amount || 0);
       if (inv.amount) setCustomMonthlyRent(inv.amount);
     }
   };
@@ -254,18 +258,20 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
         setSelectedPropertyId(matchingRoom.propertyId);
         const prop = properties.find(p => p.id === matchingRoom.propertyId);
         if (prop) {
-          setCustomPropertyName(prop.name);
-          setCustomPropertyAddress(`${prop.address}, ${prop.city}, ${prop.state} ${prop.zip}`);
+          setCustomPropertyName(prop.name || '1070 Yank St');
+          setCustomPropertyAddress(
+            prop.address ? `${prop.address}, ${prop.city || ''}, ${prop.state || ''} ${prop.zip || ''}` : '1070 Yank St, Golden, CO 80215'
+          );
         }
         handleRoomChange(matchingRoom.id);
       } else {
-        setCustomTenantName(initialTenantName);
+        setCustomTenantName(initialTenantName || '');
       }
     } else if (!selectedRoomId && propertyRooms.length > 0) {
       const firstRoom = propertyRooms.find(r => r.currentTenantName) || propertyRooms[0];
       handleRoomChange(firstRoom.id, propertyRooms);
     }
-  }, [initialTenantName, selectedPropertyId]);
+  }, [initialTenantName, selectedPropertyId, rooms.length, properties.length]);
 
   // Connect via Firebase Auth (Bypasses GIS origin_mismatch on Cloudflare & custom domains)
   const handleConnectFirebase = async (loginHint: string = 'info@1070yankstreet.com') => {
@@ -328,7 +334,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
   // Save updated template Google Doc ID
   const handleSaveTemplateDocId = (tplId: string, inputUrlOrId: string) => {
     // Extract doc ID if full URL pasted
-    let docId = inputUrlOrId.trim();
+    let docId = (inputUrlOrId || '').trim();
     const match = docId.match(/\/d\/([a-zA-Z0-9-_]+)/);
     if (match && match[1]) {
       docId = match[1];
@@ -361,7 +367,18 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
       setTemplates(updated);
       GoogleWorkspaceService.saveTemplates(updated);
 
-      alert(`Success! Created starter Google Doc template: "${starterTitle}". It is now linked and saved in your Google Drive.`);
+      setGenerationSuccess({
+        id: `tpl_starter_${Date.now()}`,
+        templateType: tpl.type,
+        documentId: newDoc.documentId,
+        documentTitle: starterTitle,
+        webViewLink: `https://docs.google.com/document/d/${newDoc.documentId}/edit`,
+        tenantName: 'Template Baseline',
+        roomName: 'Master Template',
+        propertyName: '1070 Yank St',
+        createdAt: new Date().toISOString(),
+        status: 'saved_to_drive',
+      });
     } catch (err: any) {
       setGenerationError(err.message || 'Failed to create starter Google Doc in Drive.');
     } finally {
@@ -394,61 +411,61 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
     try {
       let targetDocId = '';
       const todayStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-      const tenantClean = customTenantName.trim() || activeRoom?.currentTenantName || 'Resident';
-      const roomClean = customRoomName.trim() || activeRoom?.name || 'Room 1';
-      const propertyClean = customPropertyName.trim() || activeProperty?.name || '1070 Yank St';
-      const addressClean = customPropertyAddress.trim() || (activeProperty ? `${activeProperty.address}, ${activeProperty.city}, ${activeProperty.state} ${activeProperty.zip}` : '1070 Yank St, Golden, CO 80215');
-      const newDocTitle = `${activeTemplate.name} - ${tenantClean} (${roomClean}) - ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
+      const tenantClean = (customTenantName || '').trim() || activeRoom?.currentTenantName || 'Resident';
+      const roomClean = (customRoomName || '').trim() || activeRoom?.name || 'Room 1';
+      const propertyClean = (customPropertyName || '').trim() || activeProperty?.name || '1070 Yank St';
+      const addressClean = (customPropertyAddress || '').trim() || (activeProperty && activeProperty.address ? `${activeProperty.address}, ${activeProperty.city || ''}, ${activeProperty.state || ''} ${activeProperty.zip || ''}` : '1070 Yank St, Golden, CO 80215');
+      const newDocTitle = `${activeTemplate?.name || 'Document'} - ${tenantClean} (${roomClean}) - ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
 
       // Step 1: Copy existing template OR create a clean formatted document
-      if (activeTemplate.googleDocId) {
+      if (activeTemplate?.googleDocId) {
         const copyResult = await GoogleWorkspaceService.copyDriveFile(activeTemplate.googleDocId, newDocTitle, token);
         targetDocId = copyResult.id;
       } else {
         // Create from starter content directly
-        const starterContent = GoogleWorkspaceService.getStarterTemplateContent(activeTemplate.type);
+        const starterContent = GoogleWorkspaceService.getStarterTemplateContent(activeTemplate?.type || 'lease');
         const created = await GoogleWorkspaceService.createGoogleDoc(newDocTitle, starterContent, token);
         targetDocId = created.documentId;
       }
 
       // Step 2: Build replacement dictionary
-      const totalUtilityBill = electricBill + gasBill + waterBill;
-      const tenantUtilityShare = Math.round((totalUtilityBill / Math.max(1, utilityDivisor)) * 100) / 100;
+      const totalUtilityBill = (Number(electricBill) || 0) + (Number(gasBill) || 0) + (Number(waterBill) || 0);
+      const tenantUtilityShare = Math.round((totalUtilityBill / Math.max(1, utilityDivisor || 1)) * 100) / 100;
 
       const replacements: Record<string, string> = {
         '{{tenant_name}}': tenantClean,
-        '{{tenant_email}}': customTenantEmail.trim() || activeRoom?.currentTenantEmail || 'resident@1070yankstreet.com',
-        '{{tenant_phone}}': customTenantPhone.trim() || activeRoom?.currentTenantPhone || '(303) 555-0100',
+        '{{tenant_email}}': (customTenantEmail || '').trim() || activeRoom?.currentTenantEmail || 'resident@1070yankstreet.com',
+        '{{tenant_phone}}': (customTenantPhone || '').trim() || activeRoom?.currentTenantPhone || '(303) 555-0100',
         '{{property_name}}': propertyClean,
         '{{property_address}}': addressClean,
         '{{room_name}}': roomClean,
-        '{{monthly_rent}}': `$${customMonthlyRent.toLocaleString()}`,
-        '{{security_deposit}}': `$${customSecurityDeposit.toLocaleString()}`,
-        '{{lease_start_date}}': customStartDate,
-        '{{lease_end_date}}': customEndDate,
+        '{{monthly_rent}}': `$${(Number(customMonthlyRent) || 0).toLocaleString()}`,
+        '{{security_deposit}}': `$${(Number(customSecurityDeposit) || 0).toLocaleString()}`,
+        '{{lease_start_date}}': customStartDate || new Date().toISOString().split('T')[0],
+        '{{lease_end_date}}': customEndDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         '{{payment_due_day}}': '1st',
-        '{{late_fee_amount}}': `$${customLateFee}`,
-        '{{past_due_amount}}': `$${customPastDue.toLocaleString()}`,
-        '{{total_owed}}': `$${(customPastDue + customLateFee).toLocaleString()}`,
+        '{{late_fee_amount}}': `$${Number(customLateFee) || 50}`,
+        '{{past_due_amount}}': `$${(Number(customPastDue) || 0).toLocaleString()}`,
+        '{{total_owed}}': `$${((Number(customPastDue) || 0) + (Number(customLateFee) || 0)).toLocaleString()}`,
         '{{due_date}}': new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         '{{payment_deadline}}': new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
         '{{payment_method}}': 'Square Online Tenant Portal (Credit Card, Debit, or ACH)',
-        '{{vacate_deadline_date}}': customVacateDeadline,
-        '{{violation_reason}}': customViolationReason,
+        '{{vacate_deadline_date}}': customVacateDeadline || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        '{{violation_reason}}': customViolationReason || 'Non-payment of past due rent balance and failure to cure within statutory grace period.',
         '{{key_return_instructions}}': 'Return room key and mailbox key to property manager lockbox located in the main foyer.',
         '{{manager_name}}': activeProperty?.ownerName || 'Jake Moyer, 1070 Yank Street Coliving',
         '{{manager_phone}}': activeProperty?.ownerPhone || '(303) 555-0199',
         '{{manager_email}}': activeProperty?.ownerEmail || 'jake@1070yankstreet.com',
         '{{today_date}}': todayStr,
         '{{billing_period}}': new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-        '{{electric_total}}': `$${electricBill.toFixed(2)}`,
-        '{{gas_total}}': `$${gasBill.toFixed(2)}`,
-        '{{water_total}}': `$${waterBill.toFixed(2)}`,
+        '{{electric_total}}': `$${(Number(electricBill) || 0).toFixed(2)}`,
+        '{{gas_total}}': `$${(Number(gasBill) || 0).toFixed(2)}`,
+        '{{water_total}}': `$${(Number(waterBill) || 0).toFixed(2)}`,
         '{{combined_utilities_total}}': `$${totalUtilityBill.toFixed(2)}`,
-        '{{utility_divisor}}': String(utilityDivisor),
+        '{{utility_divisor}}': String(utilityDivisor || 7),
         '{{tenant_share_amount}}': `$${tenantUtilityShare.toFixed(2)}`,
         '{{payment_due_date}}': new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-        '{{utility_terms}}': `Tenants are billed monthly for shared variable utilities (Electric, Gas, Water & Sewer) divided equally by ${utilityDivisor}. High-speed fiber internet and trash removal are provided at no additional cost.`,
+        '{{utility_terms}}': `Tenants are billed monthly for shared variable utilities (Electric, Gas, Water & Sewer) divided equally by ${utilityDivisor || 7}. High-speed fiber internet and trash removal are provided at no additional cost.`,
         '{{house_rules}}': '1. Quiet hours observed 10:00 PM - 7:00 AM daily. 2. Clean shared kitchen areas immediately following use. 3. No unauthorized overnight guests exceeding 3 consecutive nights without written manager approval. 4. Smoking prohibited indoors.',
       };
 
@@ -920,7 +937,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
                       <label className="block text-[10px] font-semibold text-blue-900 mb-0.5">Property Name in Doc</label>
                       <input
                         type="text"
-                        value={customPropertyName}
+                        value={customPropertyName || ''}
                         onChange={(e) => setCustomPropertyName(e.target.value)}
                         className="w-full p-1.5 bg-white border border-blue-300 rounded text-xs text-zinc-900"
                         placeholder="e.g. 1070 Yank St"
@@ -930,7 +947,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
                       <label className="block text-[10px] font-semibold text-blue-900 mb-0.5">Full Address in Doc</label>
                       <input
                         type="text"
-                        value={customPropertyAddress}
+                        value={customPropertyAddress || ''}
                         onChange={(e) => setCustomPropertyAddress(e.target.value)}
                         className="w-full p-1.5 bg-white border border-blue-300 rounded text-xs text-zinc-900"
                         placeholder="e.g. 1070 Yank St, Golden, CO 80215"
@@ -1037,7 +1054,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
                     <label className="block text-[11px] font-semibold text-zinc-700 mb-1">Tenant Full Name</label>
                     <input
                       type="text"
-                      value={customTenantName}
+                      value={customTenantName || ''}
                       onChange={(e) => setCustomTenantName(e.target.value)}
                       placeholder="e.g. John Doe (or real tenant name)"
                       className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -1048,7 +1065,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
                     <label className="block text-[11px] font-semibold text-zinc-700 mb-1">Room / Unit Name</label>
                     <input
                       type="text"
-                      value={customRoomName}
+                      value={customRoomName || ''}
                       onChange={(e) => setCustomRoomName(e.target.value)}
                       placeholder="e.g. Room 1 - Main Floor West Suite"
                       className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -1059,7 +1076,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
                     <label className="block text-[11px] font-semibold text-zinc-700 mb-1">Tenant Email</label>
                     <input
                       type="email"
-                      value={customTenantEmail}
+                      value={customTenantEmail || ''}
                       onChange={(e) => setCustomTenantEmail(e.target.value)}
                       placeholder="e.g. resident@gmail.com"
                       className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -1070,7 +1087,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
                     <label className="block text-[11px] font-semibold text-zinc-700 mb-1">Tenant Phone</label>
                     <input
                       type="tel"
-                      value={customTenantPhone}
+                      value={customTenantPhone || ''}
                       onChange={(e) => setCustomTenantPhone(e.target.value)}
                       placeholder="e.g. (303) 555-0100"
                       className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
