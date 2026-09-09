@@ -32,9 +32,10 @@ import {
   Activity,
   History,
   Trash2,
-  Terminal
+  Terminal,
+  HardDrive
 } from 'lucide-react';
-import { Property, Room, Contact, Invoice, InvoicingSubtask, InvoiceStatus, LeaseRenewal } from '../../types';
+import { Property, Room, Contact, Invoice, InvoicingSubtask, InvoiceStatus, LeaseRenewal, NavigationTab } from '../../types';
 import { splitFullName, formatFullName } from '../../utils/nameUtils';
 import { SquareService, SquareStatusResponse } from '../../services/squareService';
 import { FirebaseService } from '../../services/firebase';
@@ -61,6 +62,7 @@ interface InvoicingViewProps {
   onUpdateRoom?: (room: Room) => void;
   onUpdateContact?: (contact: Contact) => void;
   onUpdateProperty?: (property: Property) => void;
+  onSelectTab?: (tab: NavigationTab) => void;
 }
 
 // Robust similarity and fuzzy matching helper
@@ -103,7 +105,8 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
   onUpdateInvoiceStatus,
   onUpdateRoom,
   onUpdateContact,
-  onUpdateProperty
+  onUpdateProperty,
+  onSelectTab
 }) => {
   // Current active subtask
   const [activeSubtask, setActiveSubtask] = useState<InvoicingSubtask>('rent');
@@ -1339,6 +1342,19 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
           </div>
 
           <div className="h-6 w-px bg-zinc-800" />
+
+          {/* Google Docs & Drive Center Button */}
+          {onSelectTab && (
+            <button
+              id="btn-open-google-docs-center"
+              onClick={() => onSelectTab('docs-drive')}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded bg-blue-900/60 hover:bg-blue-800 text-blue-200 border border-blue-700/80 transition-colors whitespace-nowrap shadow-xs"
+              title="Open Google Docs & Drive Center to create late payment notices, utility summaries, and documents"
+            >
+              <HardDrive className="w-3.5 h-3.5 text-blue-400" />
+              <span>Google Docs & Drive</span>
+            </button>
+          )}
 
           {/* Square API Diagnostics & 404 Resolution Tool Button */}
           <button

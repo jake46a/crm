@@ -11,6 +11,7 @@ import {
 } from 'firebase/auth';
 import { 
   getFirestore, 
+  initializeFirestore,
   doc, 
   setDoc, 
   deleteDoc, 
@@ -46,8 +47,18 @@ import {
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// CRITICAL: The app will break without specifying the custom database ID
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// CRITICAL: Initialize Firestore with auto-detect long polling so that WebSocket drops
+// or iframe sandbox proxy restrictions gracefully fall back to HTTP long polling.
+const customDbId = (firebaseConfig as any).firestoreDatabaseId;
+export const db = (() => {
+  try {
+    return initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true
+    }, customDbId);
+  } catch {
+    return customDbId ? getFirestore(app, customDbId) : getFirestore(app);
+  }
+})();
 export const auth = getAuth(app);
 
 export enum OperationType {
@@ -103,10 +114,16 @@ export async function testFirestoreConnection(): Promise<boolean> {
     await getDocFromServer(doc(db, 'test', 'connection'));
     return true;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn("Firestore client is offline. Checking network/rules...");
+    try {
+      await setDoc(doc(db, 'test', 'connection'), {
+        connectedAt: new Date().toISOString(),
+        status: 'active'
+      }, { merge: true });
+      return true;
+    } catch (writeErr) {
+      console.warn("Firestore connection test error:", writeErr);
+      return false;
     }
-    return false;
   }
 }
 
@@ -610,5 +627,89 @@ export const FirebaseService = {
       console.warn('Could not auto-check seed data:', e);
       return false;
     }
+  },
+
+  /**
+   * Pushes all local in-memory/localStorage data directly to Cloud Firestore.
+   * Ensures every property, room, renewal, work order, lead, contact, and invoice is backed up.
+   */
+  async syncAllLocalToFirestore(data: {
+    properties: Property[];
+    rooms: Room[];
+    renewals: LeaseRenewal[];
+    workOrders: WorkOrder[];
+    leads: TenantLead[];
+    contacts: Contact[];
+    invoices?: Invoice[];
+    activityLogs?: ActivityLog[];
+  }): Promise<{ success: boolean; counts: Record<string, number> }> {
+    const counts = {
+      properties: 0,
+      rooms: 0,
+      renewals: 0,
+      workOrders: 0,
+      leads: 0,
+      contacts: 0,
+      invoices: 0,
+      activityLogs: 0
+    };
+
+    const batchWrite = async <T extends { id: string }>(col: string, items: T[]) => {
+      if (!items || items.length === 0) return 0;
+      for (let i = 0; i < items.length; i += 300) {
+        const batch = writeBatch(db);
+        const chunk = items.slice(i, i + 300);
+        chunk.forEach(item => {
+          const sanitized = sanitizeForFirestore(item);
+          batch.set(doc(db, col, item.id), sanitized, { merge: true });
+        });
+        await batch.commit();
+      }
+      return items.length;
+    };
+
+    if (data.properties?.length) counts.properties = await batchWrite(COLLECTIONS.PROPERTIES, data.properties);
+    if (data.rooms?.length) counts.rooms = await batchWrite(COLLECTIONS.ROOMS, data.rooms);
+    if (data.renewals?.length) counts.renewals = await batchWrite(COLLECTIONS.RENEWALS, data.renewals);
+    if (data.workOrders?.length) counts.workOrders = await batchWrite(COLLECTIONS.WORK_ORDERS, data.workOrders);
+    if (data.leads?.length) counts.leads = await batchWrite(COLLECTIONS.LEADS, data.leads);
+    if (data.contacts?.length) counts.contacts = await batchWrite(COLLECTIONS.CONTACTS, data.contacts);
+    if (data.invoices?.length) counts.invoices = await batchWrite(COLLECTIONS.INVOICES, data.invoices);
+    if (data.activityLogs?.length) counts.activityLogs = await batchWrite(COLLECTIONS.ACTIVITY_LOGS, data.activityLogs.slice(0, 100));
+
+    return { success: true, counts };
+  },
+
+  /**
+   * Pulls all collections from Cloud Firestore into memory.
+   */
+  async pullAllFromFirestore(): Promise<{
+    properties: Property[];
+    rooms: Room[];
+    renewals: LeaseRenewal[];
+    workOrders: WorkOrder[];
+    leads: TenantLead[];
+    contacts: Contact[];
+    invoices: Invoice[];
+  }> {
+    const [pSnap, rSnap, renSnap, woSnap, lSnap, cSnap, iSnap] = await Promise.all([
+      getDocs(collection(db, COLLECTIONS.PROPERTIES)),
+      getDocs(collection(db, COLLECTIONS.ROOMS)),
+      getDocs(collection(db, COLLECTIONS.RENEWALS)),
+      getDocs(collection(db, COLLECTIONS.WORK_ORDERS)),
+      getDocs(collection(db, COLLECTIONS.LEADS)),
+      getDocs(collection(db, COLLECTIONS.CONTACTS)),
+      getDocs(collection(db, COLLECTIONS.INVOICES))
+    ]);
+
+    return {
+      properties: pSnap.docs.map(d => d.data() as Property),
+      rooms: rSnap.docs.map(d => d.data() as Room),
+      renewals: renSnap.docs.map(d => d.data() as LeaseRenewal),
+      workOrders: woSnap.docs.map(d => d.data() as WorkOrder),
+      leads: lSnap.docs.map(d => d.data() as TenantLead),
+      contacts: cSnap.docs.map(d => d.data() as Contact),
+      invoices: iSnap.docs.map(d => d.data() as Invoice)
+    };
   }
 };

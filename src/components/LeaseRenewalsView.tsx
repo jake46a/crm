@@ -27,9 +27,10 @@ import {
   Trash2,
   CopyX,
   AlertTriangle,
-  MessageSquare
+  MessageSquare,
+  HardDrive
 } from 'lucide-react';
-import { LeaseRenewal, LeaseRenewalStatus, Room, Property, NoticeToVacateRecord } from '../types';
+import { LeaseRenewal, LeaseRenewalStatus, Room, Property, NoticeToVacateRecord, NavigationTab } from '../types';
 import { RenewalStatusBadge, MonthToMonthBadge } from './common/Badges';
 import { 
   calculateVacateDate, 
@@ -51,6 +52,7 @@ interface LeaseRenewalsViewProps {
   onOpenRenewalLetterModal: (renewal: LeaseRenewal) => void;
   onOpenAssistant: () => void;
   onResetToChangedLogic?: () => void;
+  onSelectTab?: (tab: NavigationTab) => void;
 }
 
 export const LeaseRenewalsView: React.FC<LeaseRenewalsViewProps> = ({
@@ -64,7 +66,8 @@ export const LeaseRenewalsView: React.FC<LeaseRenewalsViewProps> = ({
   onDeleteDuplicateRenewals,
   onOpenRenewalLetterModal,
   onOpenAssistant,
-  onResetToChangedLogic
+  onResetToChangedLogic,
+  onSelectTab
 }) => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [propertyFilter, setPropertyFilter] = useState<string>('all');
@@ -331,6 +334,17 @@ export const LeaseRenewalsView: React.FC<LeaseRenewalsViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {onSelectTab && (
+            <button
+              onClick={() => onSelectTab('docs-drive')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm border border-blue-300 bg-blue-50 text-blue-800 hover:bg-blue-100 text-xs font-semibold uppercase tracking-wider transition-colors shadow-2xs"
+              title="Open Google Docs & Drive Center to create and fill lease agreements and notices"
+            >
+              <HardDrive className="w-3.5 h-3.5 text-blue-600" />
+              <span>Google Docs & Drive</span>
+            </button>
+          )}
+
           {/* Deduplicate Button */}
           <button
             onClick={() => setShowDeduplicateModal(true)}
@@ -786,7 +800,7 @@ export const LeaseRenewalsView: React.FC<LeaseRenewalsViewProps> = ({
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-1.5 w-full">
+                    <div className="grid grid-cols-3 gap-1.5 w-full">
                       <button
                         onClick={() => onOpenRenewalLetterModal(renewal)}
                         className="px-2 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-sm text-[11px] font-semibold uppercase tracking-wider transition-colors flex items-center justify-center gap-1 shadow-xs"
@@ -804,6 +818,17 @@ export const LeaseRenewalsView: React.FC<LeaseRenewalsViewProps> = ({
                         <MessageSquare className="w-3 h-3" />
                         <span>SMS</span>
                       </button>
+
+                      {onSelectTab && (
+                        <button
+                          onClick={() => onSelectTab('docs-drive')}
+                          className="px-2 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-sm text-[11px] font-semibold uppercase tracking-wider transition-colors flex items-center justify-center gap-1"
+                          title="Generate Lease Agreement in Google Docs & Drive"
+                        >
+                          <HardDrive className="w-3 h-3 text-blue-600" />
+                          <span>Drive</span>
+                        </button>
+                      )}
                     </div>
 
                     <button

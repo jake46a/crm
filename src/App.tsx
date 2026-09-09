@@ -42,6 +42,7 @@ import { DashboardView } from './components/DashboardView';
 import { PropertiesRoomsView } from './components/PropertiesRoomsView';
 import { InvoicingView } from './components/invoicing/InvoicingView';
 import { LeaseRenewalsView } from './components/LeaseRenewalsView';
+import { GoogleDocsDriveView } from './components/GoogleDocsDriveView';
 import { WorkOrdersView } from './components/WorkOrdersView';
 import { LeadsPipelineView } from './components/LeadsPipelineView';
 import { ContactsView } from './components/ContactsView';
@@ -811,6 +812,20 @@ export default function App() {
             onUpdateRoom={handleSaveRoom}
             onUpdateContact={handleSaveContact}
             onUpdateProperty={handleSaveProperty}
+            onSelectTab={setActiveTab}
+          />
+        )}
+
+        {/* Tab: Google Docs & Drive Center */}
+        {activeTab === 'docs-drive' && (
+          <GoogleDocsDriveView
+            properties={properties}
+            rooms={rooms}
+            renewals={renewals}
+            invoices={invoices}
+            leads={leads}
+            contacts={contacts}
+            onSelectTab={setActiveTab}
           />
         )}
 
@@ -834,6 +849,7 @@ export default function App() {
             onOpenRenewalLetterModal={(renewal) => setSelectedRenewalForLetter(renewal)}
             onOpenAssistant={() => setIsAssistantOpen(true)}
             onResetToChangedLogic={handleResetToChangedLogic}
+            onSelectTab={setActiveTab}
           />
         )}
 

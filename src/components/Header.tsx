@@ -25,10 +25,12 @@ import {
   Copy,
   Check,
   ExternalLink,
-  Receipt
+  Receipt,
+  HardDrive
 } from 'lucide-react';
 import { NavigationTab, LeaseRenewal, WorkOrder, TenantLead, Room, Property, Contact } from '../types';
 import { useFirebase } from '../context/FirebaseContext';
+import { CloudSyncModal } from './modals/CloudSyncModal';
 
 interface HeaderProps {
   currentTab: NavigationTab;
@@ -76,6 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
   const { user, syncStatus, isFirebaseConnected, signIn, signOut, authError, clearAuthError } = useFirebase();
   const [isNewMenuOpen, setIsNewMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isCloudSyncModalOpen, setIsCloudSyncModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -120,6 +123,7 @@ export const Header: React.FC<HeaderProps> = ({
       case 'leads': return 'Tenant Leads & Roommate Screening CRM';
       case 'contacts': return 'Unified Contacts & Contractor Directory';
       case 'invoicing': return 'Square Invoicing & Payment Processing';
+      case 'docs-drive': return 'Google Docs & Drive Document Center';
     }
   };
 
@@ -140,6 +144,12 @@ export const Header: React.FC<HeaderProps> = ({
       label: 'Invoicing', 
       icon: Receipt,
       badge: <span className="text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-800 px-1.5 py-0.5 rounded-sm font-semibold">Square</span>
+    },
+    { 
+      id: 'docs-drive', 
+      label: 'Google Docs & Drive', 
+      icon: HardDrive,
+      badge: <span className="text-[10px] bg-blue-950 text-blue-300 border border-blue-800 px-1.5 py-0.5 rounded-sm font-semibold">Docs</span>
     },
     { 
       id: 'renewals', 
@@ -490,20 +500,22 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {/* Cloud Sync Status Indicator */}
-          <div 
-            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-medium border ${
+          {/* Cloud Sync Status Indicator & Interactive Dialog Trigger */}
+          <button 
+            type="button"
+            onClick={() => setIsCloudSyncModalOpen(true)}
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-medium border cursor-pointer hover:opacity-90 transition shadow-2xs ${
               syncStatus === 'connected'
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/70'
                 : syncStatus === 'error'
-                ? 'bg-rose-50 text-rose-700 border-rose-200'
-                : 'bg-zinc-100 text-zinc-600 border-zinc-200'
+                ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100/70'
+                : 'bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-200/70'
             }`}
-            title={syncStatus === 'connected' ? 'Connected to Firebase Firestore in real-time' : 'Running with local fallback cache'}
+            title="Click to view Cloud Firestore sync status or push/pull data"
           >
             <Cloud className={`w-3.5 h-3.5 ${syncStatus === 'connected' ? 'text-emerald-600' : 'text-zinc-400'}`} />
             <span className="text-[11px] hidden md:inline">{syncStatus === 'connected' ? 'Cloud Synced' : 'Syncing...'}</span>
-          </div>
+          </button>
 
           {/* User Profile & Firebase Auth Dropdown */}
           <div className="relative">
@@ -714,6 +726,13 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       )}
+
+      {/* Cloud Firestore Sync & Real-time Status Modal */}
+      <CloudSyncModal
+        isOpen={isCloudSyncModalOpen}
+        onClose={() => setIsCloudSyncModalOpen(false)}
+        onDataReload={onResetData}
+      />
     </div>
   );
 };

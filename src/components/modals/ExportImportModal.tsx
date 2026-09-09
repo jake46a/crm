@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Database, Download, Upload, Trash2, Check, AlertCircle, X, Printer, FileText } from 'lucide-react';
+import { Database, Download, Upload, Trash2, Check, AlertCircle, X, Printer, FileText, Cloud, UploadCloud } from 'lucide-react';
 import { StorageService } from '../../services/storage';
 import { FirebaseService } from '../../services/firebase';
 
@@ -19,8 +19,41 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
   const [importJson, setImportJson] = useState<string>('');
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [isClearing, setIsClearing] = useState<boolean>(false);
+  const [isSyncingCloud, setIsSyncingCloud] = useState<boolean>(false);
 
   if (!isOpen) return null;
+
+  const handleSyncToCloud = async () => {
+    setIsSyncingCloud(true);
+    try {
+      const data = {
+        properties: StorageService.getProperties(),
+        rooms: StorageService.getRooms(),
+        renewals: StorageService.getRenewals(),
+        workOrders: StorageService.getWorkOrders(),
+        leads: StorageService.getTenantLeads(),
+        contacts: StorageService.getContacts(),
+        invoices: StorageService.getInvoices(),
+        activityLogs: StorageService.getActivityLogs()
+      };
+      const res = await FirebaseService.syncAllLocalToFirestore(data);
+      if (res.success) {
+        setStatusMsg({
+          text: `Cloud sync complete! Pushed ${res.counts.properties} properties, ${res.counts.rooms} rooms, and ${res.counts.renewals} renewals to Cloud Firestore.`,
+          type: 'success'
+        });
+        onDataReload();
+      }
+    } catch (err: any) {
+      console.error("Cloud sync error:", err);
+      setStatusMsg({
+        text: `Cloud sync error: ${err?.message || 'Failed to sync to Firestore'}`,
+        type: 'error'
+      });
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  };
 
   const handleExport = () => {
     const data = StorageService.exportAllData();
@@ -117,6 +150,29 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
               <span>{statusMsg.text}</span>
             </div>
           )}
+
+          {/* Real-time Cloud Sync Action */}
+          <div className="bg-emerald-50/80 p-4 rounded-md border border-emerald-200 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-bold text-emerald-950 text-xs flex items-center gap-1.5">
+                  <Cloud className="w-4 h-4 text-emerald-600" />
+                  <span>Push All Current Data to Cloud Firestore</span>
+                </h3>
+                <p className="text-[11px] text-emerald-800 leading-snug">
+                  Save all local properties, rooms, lease renewals, work orders, and contacts into your Google Cloud Firestore database.
+                </p>
+              </div>
+              <button
+                onClick={handleSyncToCloud}
+                disabled={isSyncingCloud}
+                className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-md font-bold text-xs shadow-xs transition whitespace-nowrap shrink-0"
+              >
+                <UploadCloud className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-bounce' : ''}`} />
+                <span>{isSyncingCloud ? 'Syncing...' : 'Sync to Cloud Now'}</span>
+              </button>
+            </div>
+          </div>
 
           {/* Reset to New Logic Engine Seed */}
           <div className="bg-indigo-50/70 p-4 rounded-md border border-indigo-200 space-y-2">

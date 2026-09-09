@@ -46,7 +46,16 @@ function setItem<T>(key: string, value: T): void {
 export const StorageService = {
   // Properties
   getProperties(): Property[] {
-    return getItem<Property[]>(STORAGE_KEYS.PROPERTIES, INITIAL_PROPERTIES);
+    const list = getItem<Property[]>(STORAGE_KEYS.PROPERTIES, INITIAL_PROPERTIES);
+    // Guarantee 1070 Yank St is present as flagship property
+    const has1070 = list.some(p => p.id === 'prop-1070-yank' || p.name.includes('1070 Yank'));
+    if (!has1070 && INITIAL_PROPERTIES.length > 0) {
+      const yankProp = INITIAL_PROPERTIES.find(p => p.id === 'prop-1070-yank') || INITIAL_PROPERTIES[0];
+      const updated = [yankProp, ...list];
+      this.saveProperties(updated);
+      return updated;
+    }
+    return list;
   },
   saveProperties(properties: Property[]): void {
     setItem(STORAGE_KEYS.PROPERTIES, properties);
@@ -54,7 +63,16 @@ export const StorageService = {
   
   // Rooms
   getRooms(): Room[] {
-    const rooms = getItem<Room[]>(STORAGE_KEYS.ROOMS, INITIAL_ROOMS);
+    let rooms = getItem<Room[]>(STORAGE_KEYS.ROOMS, INITIAL_ROOMS);
+    // Guarantee 1070 Yank St rooms exist
+    const hasYankRooms = rooms.some(r => r.propertyId === 'prop-1070-yank' || r.propertyName?.includes('1070 Yank'));
+    if (!hasYankRooms) {
+      const yankRooms = INITIAL_ROOMS.filter(r => r.propertyId === 'prop-1070-yank');
+      if (yankRooms.length > 0) {
+        rooms = [...yankRooms, ...rooms];
+        this.saveRooms(rooms);
+      }
+    }
     return rooms.map(room => {
       let fName = room.currentTenantFirstName;
       let lName = room.currentTenantLastName;

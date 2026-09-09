@@ -7,7 +7,8 @@ export type NavigationTab =
   | 'contacts'
   | 'invoicing'
   | 'tenant-portal'
-  | 'assistant';
+  | 'assistant'
+  | 'docs-drive';
 
 export interface Property {
   id: string;
