@@ -489,7 +489,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
         getSimilarityScore(r.tenantName || `${r.tenantFirstName || ''} ${r.tenantLastName || ''}`, rawName) >= 0.75
       );
       if (renewal?.tenantEmail) {
-        resolvedEmail = renewal.tenantEmail.trim();
+        resolvedEmail = (renewal.tenantEmail || '').trim();
       }
     }
 
@@ -500,7 +500,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
         (i.roomId === room.id || getSimilarityScore(i.tenantName, rawName) >= 0.75)
       );
       if (inv?.tenantEmail) {
-        resolvedEmail = inv.tenantEmail.trim();
+        resolvedEmail = (inv.tenantEmail || '').trim();
       }
     }
 
@@ -510,7 +510,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
         c.email && getSimilarityScore(c.name || `${c.firstName || ''} ${c.lastName || ''}`, rawName) >= 0.7
       );
       if (cWithEmail?.email) {
-        resolvedEmail = cWithEmail.email.trim();
+        resolvedEmail = (cWithEmail.email || '').trim();
       }
     }
 
@@ -636,7 +636,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
 
       for (const item of itemsToInvoice) {
         // 1. Explicitly validate the associated bedroom ID
-        const bedroomId = item.room?.id?.trim();
+        const bedroomId = item.room?.id ? String(item.room.id).trim() : '';
         if (!bedroomId) {
           console.error('[Square Invoicing] Validation failure: Missing bedroom ID on invoice item:', item);
           throw new Error(`Invoice generation aborted: Missing bedroom ID for resident "${item.tenantName}". Every invoice must link to a valid bedroom.`);

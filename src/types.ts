@@ -66,6 +66,7 @@ export interface Room {
   currentTenantName?: string;
   currentTenantPhone?: string;
   currentTenantEmail?: string;
+  squareCustomerId?: string;
   currentLeaseId?: string;
   leaseStartDate?: string;
   leaseEndDate?: string;

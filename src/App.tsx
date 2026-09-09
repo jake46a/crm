@@ -22,7 +22,23 @@ import {
   Invoice
 } from './types';
 
-import { StorageService } from './services/storage';
+import { 
+  StorageService,
+  LEGACY_SAMPLE_PROPERTY_IDS,
+  LEGACY_SAMPLE_ROOM_IDS,
+  LEGACY_SAMPLE_RENEWAL_IDS,
+  LEGACY_SAMPLE_WORK_ORDER_IDS,
+  LEGACY_SAMPLE_CONTACT_IDS,
+  LEGACY_SAMPLE_ACTIVITY_LOG_IDS,
+  REJECTED_SAMPLE_TENANT_NAMES,
+  REJECTED_SAMPLE_CONTACT_IDS,
+  REJECTED_SAMPLE_RENEWAL_IDS
+} from './services/storage';
+import {
+  INITIAL_ROOMS,
+  INITIAL_RENEWALS,
+  INITIAL_CONTACTS
+} from './data/initialData';
 import { 
   FirebaseService,
   subscribeToProperties,
@@ -143,29 +159,104 @@ export default function App() {
     // 3. Real-time Firebase Sync Listeners
     const unsubProperties = subscribeToProperties((liveProps) => {
       if (liveProps) {
-        setProperties(liveProps);
-        StorageService.saveProperties(liveProps);
+        const cleaned = liveProps.filter(p => !LEGACY_SAMPLE_PROPERTY_IDS.has(p.id) && !p.name.includes('Speer') && !p.name.includes('Capitol Hill') && !p.name.includes('Highlands'));
+        liveProps.forEach(p => {
+          if (LEGACY_SAMPLE_PROPERTY_IDS.has(p.id) || p.name.includes('Speer') || p.name.includes('Capitol Hill') || p.name.includes('Highlands')) {
+            FirebaseService.deleteProperty(p.id).catch(() => {});
+          }
+        });
+        setProperties(cleaned);
+        StorageService.saveProperties(cleaned);
       }
     });
 
     const unsubRooms = subscribeToRooms((liveRooms) => {
       if (liveRooms) {
-        setRooms(liveRooms);
-        StorageService.saveRooms(liveRooms);
+        let cleaned = liveRooms.filter(r => !LEGACY_SAMPLE_ROOM_IDS.has(r.id) && r.propertyId !== 'prop-1' && r.propertyId !== 'prop-2' && r.propertyId !== 'prop-3');
+        liveRooms.forEach(r => {
+          if (LEGACY_SAMPLE_ROOM_IDS.has(r.id) || r.propertyId === 'prop-1' || r.propertyId === 'prop-2' || r.propertyId === 'prop-3') {
+            FirebaseService.deleteRoom(r.id).catch(() => {});
+          }
+        });
+
+        // Ensure Room 1 is named Bedroom suite
+        const suite = cleaned.find(r => r.id === 'room-yank-1' || r.roomNumber === '1');
+        if (!suite) {
+          const defaultSuite = INITIAL_ROOMS.find(r => r.id === 'room-yank-1')!;
+          cleaned = [defaultSuite, ...cleaned];
+          FirebaseService.saveRoom(defaultSuite).catch(() => {});
+        } else if (suite.name !== 'Bedroom suite') {
+          const updated: Room = { ...suite, name: 'Bedroom suite' };
+          cleaned = cleaned.map(r => r.id === suite.id ? updated : r);
+          FirebaseService.saveRoom(updated).catch(() => {});
+        }
+
+        // Clean up any rooms that still have rejected sample tenants
+        cleaned = cleaned.map(r => {
+          if (r.currentTenantName && typeof r.currentTenantName === 'string' && REJECTED_SAMPLE_TENANT_NAMES.has(r.currentTenantName.toLowerCase().trim())) {
+            const updatedRoom: Room = {
+              ...r,
+              status: 'Available',
+              currentTenantId: undefined,
+              currentTenantFirstName: undefined,
+              currentTenantLastName: undefined,
+              currentTenantName: undefined,
+              currentTenantEmail: undefined,
+              currentTenantPhone: undefined,
+              squareCustomerId: undefined,
+              leaseStartDate: undefined,
+              leaseEndDate: undefined
+            };
+            FirebaseService.saveRoom(updatedRoom).catch(() => {});
+            return updatedRoom;
+          }
+          return r;
+        });
+
+        setRooms(cleaned);
+        StorageService.saveRooms(cleaned);
       }
     });
 
     const unsubRenewals = subscribeToRenewals((liveRenewals) => {
       if (liveRenewals) {
-        setRenewals(liveRenewals);
-        StorageService.saveLeaseRenewals(liveRenewals);
+        const cleaned = liveRenewals.filter(ren => 
+          !LEGACY_SAMPLE_RENEWAL_IDS.has(ren.id) && 
+          !REJECTED_SAMPLE_RENEWAL_IDS.has(ren.id) &&
+          !REJECTED_SAMPLE_TENANT_NAMES.has(typeof ren.tenantName === 'string' ? ren.tenantName.toLowerCase().trim() : '') &&
+          ren.propertyId !== 'prop-1' && ren.propertyId !== 'prop-2' && ren.propertyId !== 'prop-3'
+        );
+        liveRenewals.forEach(ren => {
+          if (
+            LEGACY_SAMPLE_RENEWAL_IDS.has(ren.id) ||
+            REJECTED_SAMPLE_RENEWAL_IDS.has(ren.id) ||
+            REJECTED_SAMPLE_TENANT_NAMES.has(typeof ren.tenantName === 'string' ? ren.tenantName.toLowerCase().trim() : '') ||
+            ren.propertyId === 'prop-1' || ren.propertyId === 'prop-2' || ren.propertyId === 'prop-3'
+          ) {
+            FirebaseService.deleteRenewal(ren.id).catch(() => {});
+          }
+        });
+        let finalRenewals = cleaned;
+        const hasWilliam = finalRenewals.some(r => r.tenantName?.toLowerCase().includes('william jacobs') || r.id === 'ren-william-jacobs-1');
+        if (!hasWilliam && INITIAL_RENEWALS.length > 0) {
+          finalRenewals = [...INITIAL_RENEWALS, ...finalRenewals];
+          INITIAL_RENEWALS.forEach(ren => FirebaseService.saveRenewal(ren).catch(() => {}));
+        }
+        setRenewals(finalRenewals);
+        StorageService.saveLeaseRenewals(finalRenewals);
       }
     });
 
     const unsubWorkOrders = subscribeToWorkOrders((liveWOs) => {
       if (liveWOs) {
-        setWorkOrders(liveWOs);
-        StorageService.saveWorkOrders(liveWOs);
+        const cleaned = liveWOs.filter(wo => !LEGACY_SAMPLE_WORK_ORDER_IDS.has(wo.id) && wo.propertyId !== 'prop-1' && wo.propertyId !== 'prop-2' && wo.propertyId !== 'prop-3');
+        liveWOs.forEach(wo => {
+          if (LEGACY_SAMPLE_WORK_ORDER_IDS.has(wo.id) || wo.propertyId === 'prop-1' || wo.propertyId === 'prop-2' || wo.propertyId === 'prop-3') {
+            FirebaseService.deleteWorkOrder(wo.id).catch(() => {});
+          }
+        });
+        setWorkOrders(cleaned);
+        StorageService.saveWorkOrders(cleaned);
       }
     });
 
@@ -186,15 +277,44 @@ export default function App() {
 
     const unsubContacts = subscribeToContacts((liveContacts) => {
       if (liveContacts) {
-        setContacts(liveContacts);
-        StorageService.saveContacts(liveContacts);
+        const cleaned = liveContacts.filter(c => 
+          !LEGACY_SAMPLE_CONTACT_IDS.has(c.id) &&
+          !REJECTED_SAMPLE_CONTACT_IDS.has(c.id) &&
+          !REJECTED_SAMPLE_TENANT_NAMES.has(typeof c.name === 'string' ? c.name.toLowerCase().trim() : '') &&
+          c.propertyId !== 'prop-1' && c.propertyId !== 'prop-2' && c.propertyId !== 'prop-3'
+        );
+        liveContacts.forEach(c => {
+          if (
+            LEGACY_SAMPLE_CONTACT_IDS.has(c.id) ||
+            REJECTED_SAMPLE_CONTACT_IDS.has(c.id) ||
+            REJECTED_SAMPLE_TENANT_NAMES.has(typeof c.name === 'string' ? c.name.toLowerCase().trim() : '') ||
+            c.propertyId === 'prop-1' || c.propertyId === 'prop-2' || c.propertyId === 'prop-3'
+          ) {
+            FirebaseService.deleteContact(c.id).catch(() => {});
+          }
+        });
+        let finalContacts = cleaned;
+        const hasWilliam = finalContacts.some(c => c.name?.toLowerCase().includes('william jacobs') || c.id === 'cont-william-jacobs');
+        if (!hasWilliam && INITIAL_CONTACTS.length > 0) {
+          const williamContact = INITIAL_CONTACTS.find(c => c.id === 'cont-william-jacobs')!;
+          finalContacts = [williamContact, ...finalContacts];
+          FirebaseService.saveContact(williamContact).catch(() => {});
+        }
+        setContacts(finalContacts);
+        StorageService.saveContacts(finalContacts);
       }
     });
 
     const unsubLogs = subscribeToActivityLogs((liveLogs) => {
       if (liveLogs) {
-        setActivityLogs(liveLogs);
-        StorageService.saveActivityLogs(liveLogs);
+        const cleaned = liveLogs.filter(a => !LEGACY_SAMPLE_ACTIVITY_LOG_IDS.has(a.id) && !a.message?.includes('Chloe Davenport') && !a.message?.includes('Liam O\'Connor') && !a.message?.includes('Highlands') && !a.message?.includes('Speer'));
+        liveLogs.forEach(a => {
+          if (LEGACY_SAMPLE_ACTIVITY_LOG_IDS.has(a.id) || a.message?.includes('Chloe Davenport') || a.message?.includes('Liam O\'Connor') || a.message?.includes('Highlands') || a.message?.includes('Speer')) {
+            FirebaseService.deleteActivityLog(a.id).catch(() => {});
+          }
+        });
+        setActivityLogs(cleaned);
+        StorageService.saveActivityLogs(cleaned);
       }
     });
 

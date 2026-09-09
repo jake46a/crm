@@ -118,7 +118,7 @@ export const PaymentHistoryTab: React.FC<PaymentHistoryTabProps> = ({
       const isPaid = inv.status === 'PAID' || (inv.amountPaid !== undefined && inv.amountPaid > 0);
       
       const isExplicitFailed = inv.status === 'FAILED' || 
-        Boolean(inv.failureReason && inv.failureReason.trim().length > 0);
+        Boolean(inv.failureReason && String(inv.failureReason).trim().length > 0);
 
       const isCanceled = inv.status === 'CANCELED';
       const isOverdue = inv.status === 'OVERDUE' || 

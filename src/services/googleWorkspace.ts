@@ -260,7 +260,10 @@ export class GoogleWorkspaceService {
     const saved = localStorage.getItem(STORAGE_KEY_TEMPLATES);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
       } catch (e) {
         console.error('Failed to parse saved templates:', e);
       }
@@ -367,14 +370,24 @@ export class GoogleWorkspaceService {
    * Copy a file in Google Drive
    */
   static async copyDriveFile(fileId: string, newTitle: string, token: string): Promise<any> {
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/copy`, {
+    const cleanFileId = (fileId || '').trim();
+    if (!cleanFileId) {
+      throw new Error('No template Google Doc ID provided to copy.');
+    }
+    const cleanTitle = (newTitle || 'New Document').trim();
+    const cleanToken = (token || '').trim();
+    if (!cleanToken) {
+      throw new Error('Google Workspace OAuth access token is required.');
+    }
+
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${cleanFileId}/copy`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${cleanToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        name: newTitle,
+        name: cleanTitle,
       }),
     });
 
@@ -390,15 +403,21 @@ export class GoogleWorkspaceService {
    * Create a brand new Google Doc with starter formatted text
    */
   static async createGoogleDoc(title: string, contentText: string, token: string): Promise<{ documentId: string; title: string }> {
+    const cleanTitle = (title || 'New Document').trim();
+    const cleanToken = (token || '').trim();
+    if (!cleanToken) {
+      throw new Error('Google Workspace OAuth access token is required.');
+    }
+
     // 1. Create document using Docs API
     const res = await fetch('https://docs.googleapis.com/v1/documents', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${cleanToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        title,
+        title: cleanTitle,
       }),
     });
 
@@ -408,15 +427,18 @@ export class GoogleWorkspaceService {
     }
 
     const doc = await res.json();
-    const documentId = doc.documentId;
+    const documentId = doc?.documentId;
+    if (!documentId) {
+      throw new Error('Google Docs API created the document, but did not return a valid documentId.');
+    }
 
     // 2. Insert text content into document
     const cleanContent = (contentText || '').trim();
     if (cleanContent) {
-      await fetch(`https://docs.googleapis.com/v1/documents/${documentId}:batchUpdate`, {
+      const batchRes = await fetch(`https://docs.googleapis.com/v1/documents/${documentId}:batchUpdate`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${cleanToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -430,9 +452,13 @@ export class GoogleWorkspaceService {
           ],
         }),
       });
+      if (!batchRes.ok) {
+        const batchErr = await batchRes.json().catch(() => ({}));
+        console.warn('Initial text insert failed:', batchErr);
+      }
     }
 
-    return { documentId, title };
+    return { documentId, title: cleanTitle };
   }
 
   /**
@@ -443,10 +469,19 @@ export class GoogleWorkspaceService {
     replacements: Record<string, string>,
     token: string
   ): Promise<void> {
-    const requests = Object.entries(replacements).map(([search, replace]) => ({
+    const cleanDocId = (documentId || '').trim();
+    if (!cleanDocId) {
+      throw new Error('No documentId provided for placeholder replacement.');
+    }
+    const cleanToken = (token || '').trim();
+    if (!cleanToken) {
+      throw new Error('Google Workspace OAuth access token is required.');
+    }
+
+    const requests = Object.entries(replacements || {}).map(([search, replace]) => ({
       replaceAllText: {
         containsText: {
-          text: search,
+          text: String(search || ''),
           matchCase: true,
         },
         replaceText: String(replace ?? ''),
@@ -455,10 +490,10 @@ export class GoogleWorkspaceService {
 
     if (requests.length === 0) return;
 
-    const res = await fetch(`https://docs.googleapis.com/v1/documents/${documentId}:batchUpdate`, {
+    const res = await fetch(`https://docs.googleapis.com/v1/documents/${cleanDocId}:batchUpdate`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${cleanToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ requests }),
@@ -474,10 +509,19 @@ export class GoogleWorkspaceService {
    * Get metadata and web link for a Drive file
    */
   static async getDriveFile(fileId: string, token: string): Promise<any> {
+    const cleanFileId = (fileId || '').trim();
+    if (!cleanFileId) {
+      throw new Error('No fileId provided to get Drive file.');
+    }
+    const cleanToken = (token || '').trim();
+    if (!cleanToken) {
+      throw new Error('Google Workspace OAuth access token is required.');
+    }
+
     const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,mimeType,webViewLink,webContentLink,owners,modifiedTime`,
+      `https://www.googleapis.com/drive/v3/files/${cleanFileId}?fields=id,name,mimeType,webViewLink,webContentLink,owners,modifiedTime`,
       {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${cleanToken}` },
       }
     );
 

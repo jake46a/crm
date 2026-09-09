@@ -41,7 +41,8 @@ import {
   INITIAL_WORK_ORDERS,
   INITIAL_LEADS,
   INITIAL_CONTACTS,
-  INITIAL_ACTIVITY_LOGS
+  INITIAL_ACTIVITY_LOGS,
+  DEMO_DATASET
 } from '../data/initialData';
 
 // Initialize Firebase App
@@ -533,6 +534,15 @@ export const FirebaseService = {
     }
   },
 
+  async deleteActivityLog(logId: string): Promise<void> {
+    const docPath = `${COLLECTIONS.ACTIVITY_LOGS}/${logId}`;
+    try {
+      await deleteDoc(doc(db, COLLECTIONS.ACTIVITY_LOGS, logId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, docPath);
+    }
+  },
+
   // Clear only leads collection
   async clearLeads(): Promise<void> {
     try {
@@ -611,8 +621,47 @@ export const FirebaseService = {
   },
 
   async resetToSeedData(): Promise<void> {
+    await this.resetToCleanSlate();
+  },
+
+  async resetToCleanSlate(): Promise<void> {
     await this.clearAllData();
     await this.seedInitialData();
+  },
+
+  async resetToDemoDataset(): Promise<void> {
+    await this.clearAllData();
+    const batch = writeBatch(db);
+
+    DEMO_DATASET.properties.forEach(p => {
+      batch.set(doc(db, COLLECTIONS.PROPERTIES, p.id), sanitizeForFirestore(p));
+    });
+
+    DEMO_DATASET.rooms.forEach(r => {
+      batch.set(doc(db, COLLECTIONS.ROOMS, r.id), sanitizeForFirestore(r));
+    });
+
+    DEMO_DATASET.renewals.forEach(ren => {
+      batch.set(doc(db, COLLECTIONS.RENEWALS, ren.id), sanitizeForFirestore(ren));
+    });
+
+    DEMO_DATASET.workOrders.forEach(wo => {
+      batch.set(doc(db, COLLECTIONS.WORK_ORDERS, wo.id), sanitizeForFirestore(wo));
+    });
+
+    DEMO_DATASET.leads.forEach(l => {
+      batch.set(doc(db, COLLECTIONS.LEADS, l.id), sanitizeForFirestore(l));
+    });
+
+    DEMO_DATASET.contacts.forEach(c => {
+      batch.set(doc(db, COLLECTIONS.CONTACTS, c.id), sanitizeForFirestore(c));
+    });
+
+    DEMO_DATASET.activityLogs.forEach(act => {
+      batch.set(doc(db, COLLECTIONS.ACTIVITY_LOGS, act.id), sanitizeForFirestore(act));
+    });
+
+    await batch.commit();
   },
 
   async seedInitialDataIfEmpty(): Promise<boolean> {

@@ -395,12 +395,12 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
 
   // Execute Auto-Fill and Save Document in Google Drive
   const handleGenerateDocument = async () => {
-    if (!token) {
+    if (!token || !String(token).trim()) {
       handleConnectGoogle('jake@1070yankstreet.com');
       return;
     }
 
-    const activeTemplate = templates.find(t => t.id === selectedTemplateId) || templates[0];
+    const activeTemplate = templates.find(t => t.id === selectedTemplateId) || templates[0] || GoogleWorkspaceService.getTemplates()[0];
     const activeRoom = rooms.find(r => r.id === selectedRoomId);
     const activeProperty = properties.find(p => p.id === selectedPropertyId) || properties.find(p => p.id === activeRoom?.propertyId) || defaultProperty;
 
@@ -411,16 +411,20 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
     try {
       let targetDocId = '';
       const todayStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-      const tenantClean = (customTenantName || '').trim() || activeRoom?.currentTenantName || 'Resident';
-      const roomClean = (customRoomName || '').trim() || activeRoom?.name || 'Room 1';
-      const propertyClean = (customPropertyName || '').trim() || activeProperty?.name || '1070 Yank St';
+      const tenantClean = (customTenantName || '').trim() || (activeRoom?.currentTenantName || '').trim() || 'Resident';
+      const roomClean = (customRoomName || '').trim() || (activeRoom?.name || '').trim() || 'Room 1';
+      const propertyClean = (customPropertyName || '').trim() || (activeProperty?.name || '').trim() || '1070 Yank St';
       const addressClean = (customPropertyAddress || '').trim() || (activeProperty && activeProperty.address ? `${activeProperty.address}, ${activeProperty.city || ''}, ${activeProperty.state || ''} ${activeProperty.zip || ''}` : '1070 Yank St, Golden, CO 80215');
-      const newDocTitle = `${activeTemplate?.name || 'Document'} - ${tenantClean} (${roomClean}) - ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
+      const newDocTitle = `${(activeTemplate?.name || 'Document').trim()} - ${tenantClean} (${roomClean}) - ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
 
       // Step 1: Copy existing template OR create a clean formatted document
-      if (activeTemplate?.googleDocId) {
-        const copyResult = await GoogleWorkspaceService.copyDriveFile(activeTemplate.googleDocId, newDocTitle, token);
-        targetDocId = copyResult.id;
+      const docTemplateId = (activeTemplate?.googleDocId || '').trim();
+      if (docTemplateId) {
+        const copyResult = await GoogleWorkspaceService.copyDriveFile(docTemplateId, newDocTitle, token);
+        targetDocId = copyResult?.id;
+        if (!targetDocId) {
+          throw new Error('Drive file copied successfully, but no document ID was returned.');
+        }
       } else {
         // Create from starter content directly
         const starterContent = GoogleWorkspaceService.getStarterTemplateContent(activeTemplate?.type || 'lease');
@@ -433,16 +437,16 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
       const tenantUtilityShare = Math.round((totalUtilityBill / Math.max(1, utilityDivisor || 1)) * 100) / 100;
 
       const replacements: Record<string, string> = {
-        '{{tenant_name}}': tenantClean,
-        '{{tenant_email}}': (customTenantEmail || '').trim() || activeRoom?.currentTenantEmail || 'resident@1070yankstreet.com',
-        '{{tenant_phone}}': (customTenantPhone || '').trim() || activeRoom?.currentTenantPhone || '(303) 555-0100',
-        '{{property_name}}': propertyClean,
-        '{{property_address}}': addressClean,
-        '{{room_name}}': roomClean,
+        '{{tenant_name}}': String(tenantClean || 'Resident'),
+        '{{tenant_email}}': String((customTenantEmail || '').trim() || (activeRoom?.currentTenantEmail || '').trim() || 'resident@1070yankstreet.com'),
+        '{{tenant_phone}}': String((customTenantPhone || '').trim() || (activeRoom?.currentTenantPhone || '').trim() || '(303) 555-0100'),
+        '{{property_name}}': String(propertyClean || '1070 Yank St'),
+        '{{property_address}}': String(addressClean || '1070 Yank St, Golden, CO 80215'),
+        '{{room_name}}': String(roomClean || 'Room 1'),
         '{{monthly_rent}}': `$${(Number(customMonthlyRent) || 0).toLocaleString()}`,
         '{{security_deposit}}': `$${(Number(customSecurityDeposit) || 0).toLocaleString()}`,
-        '{{lease_start_date}}': customStartDate || new Date().toISOString().split('T')[0],
-        '{{lease_end_date}}': customEndDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        '{{lease_start_date}}': String(customStartDate || new Date().toISOString().split('T')[0]),
+        '{{lease_end_date}}': String(customEndDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
         '{{payment_due_day}}': '1st',
         '{{late_fee_amount}}': `$${Number(customLateFee) || 50}`,
         '{{past_due_amount}}': `$${(Number(customPastDue) || 0).toLocaleString()}`,
@@ -450,12 +454,12 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
         '{{due_date}}': new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         '{{payment_deadline}}': new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
         '{{payment_method}}': 'Square Online Tenant Portal (Credit Card, Debit, or ACH)',
-        '{{vacate_deadline_date}}': customVacateDeadline || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        '{{violation_reason}}': customViolationReason || 'Non-payment of past due rent balance and failure to cure within statutory grace period.',
+        '{{vacate_deadline_date}}': String(customVacateDeadline || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
+        '{{violation_reason}}': String(customViolationReason || 'Non-payment of past due rent balance and failure to cure within statutory grace period.'),
         '{{key_return_instructions}}': 'Return room key and mailbox key to property manager lockbox located in the main foyer.',
-        '{{manager_name}}': activeProperty?.ownerName || 'Jake Moyer, 1070 Yank Street Coliving',
-        '{{manager_phone}}': activeProperty?.ownerPhone || '(303) 555-0199',
-        '{{manager_email}}': activeProperty?.ownerEmail || 'jake@1070yankstreet.com',
+        '{{manager_name}}': String(activeProperty?.ownerName || 'Jake Moyer, 1070 Yank Street Coliving'),
+        '{{manager_phone}}': String(activeProperty?.ownerPhone || '(303) 555-0199'),
+        '{{manager_email}}': String(activeProperty?.ownerEmail || 'jake@1070yankstreet.com'),
         '{{today_date}}': todayStr,
         '{{billing_period}}': new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
         '{{electric_total}}': `$${(Number(electricBill) || 0).toFixed(2)}`,
@@ -474,11 +478,11 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
 
       // Step 4: Retrieve web view link
       const driveFile = await GoogleWorkspaceService.getDriveFile(targetDocId, token);
-      const webViewLink = driveFile.webViewLink || `https://docs.google.com/document/d/${targetDocId}/edit`;
+      const webViewLink = driveFile?.webViewLink || `https://docs.google.com/document/d/${targetDocId}/edit`;
 
       const record: GeneratedDocRecord = {
         id: `gen_${Date.now()}`,
-        templateType: activeTemplate.type,
+        templateType: activeTemplate?.type || 'lease',
         documentId: targetDocId,
         documentTitle: newDocTitle,
         webViewLink,
@@ -500,7 +504,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
     }
   };
 
-  const activeTemplate = templates.find(t => t.id === selectedTemplateId) || templates[0];
+  const activeTemplate = templates.find(t => t.id === selectedTemplateId) || templates[0] || GoogleWorkspaceService.getTemplates()[0];
   const activeRoom = rooms.find(r => r.id === selectedRoomId);
 
   return (

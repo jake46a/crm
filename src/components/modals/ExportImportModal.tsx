@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Database, Download, Upload, Trash2, Check, AlertCircle, X, Printer, FileText, Cloud, UploadCloud } from 'lucide-react';
+import { Database, Download, Upload, Trash2, Check, AlertCircle, X, Printer, FileText, Cloud, UploadCloud, RotateCcw } from 'lucide-react';
 import { StorageService } from '../../services/storage';
 import { FirebaseService } from '../../services/firebase';
 
@@ -83,23 +83,50 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
     }
   };
 
-  const handleResetToStandardData = async () => {
-    setIsClearing(true);
-    try {
-      StorageService.resetToSeedData();
-      await FirebaseService.resetToSeedData();
-      setStatusMsg({ text: 'Reset portfolio with updated coliving & renewal engine data!', type: 'success' });
-      setTimeout(() => {
+  const handleResetToCleanSlate = async () => {
+    if (window.confirm('Wipe all demo tenants, leases, and contacts to start with a clean slate? 1070 Yank St will have all 7 rooms marked Available with zero sample records.')) {
+      setIsClearing(true);
+      try {
+        StorageService.resetToCleanSlate();
+        await FirebaseService.resetToCleanSlate();
+        setStatusMsg({ text: 'Wiped all demo data! Clean slate active with 7 available rooms.', type: 'success' });
+        setTimeout(() => {
+          onDataReload();
+          onClose();
+        }, 900);
+      } catch (err) {
+        console.error('Error resetting to clean slate:', err);
+        setStatusMsg({ text: 'Clean slate applied to local storage; cloud sync in progress.', type: 'success' });
         onDataReload();
-        onClose();
-      }, 900);
-    } catch (err) {
-      console.error('Error resetting seed data:', err);
-      setStatusMsg({ text: 'Reset local data successfully; cloud sync in progress.', type: 'success' });
-      onDataReload();
-    } finally {
-      setIsClearing(false);
+      } finally {
+        setIsClearing(false);
+      }
     }
+  };
+
+  const handleResetToDemoDataset = async () => {
+    if (window.confirm('Restore the sample coliving demo dataset with William Jacobs and 3 room tenants?')) {
+      setIsClearing(true);
+      try {
+        StorageService.resetToDemoData();
+        await FirebaseService.resetToDemoDataset();
+        setStatusMsg({ text: 'Restored 1070 Yank St demo dataset with sample residents!', type: 'success' });
+        setTimeout(() => {
+          onDataReload();
+          onClose();
+        }, 900);
+      } catch (err) {
+        console.error('Error resetting to demo dataset:', err);
+        setStatusMsg({ text: 'Restored demo data locally; cloud sync in progress.', type: 'success' });
+        onDataReload();
+      } finally {
+        setIsClearing(false);
+      }
+    }
+  };
+
+  const handleResetToStandardData = async () => {
+    await handleResetToCleanSlate();
   };
 
   const handleDeleteAllData = async () => {
@@ -174,23 +201,45 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
             </div>
           </div>
 
-          {/* Reset to New Logic Engine Seed */}
+          {/* Clean Slate Action */}
+          <div className="bg-amber-50/70 p-4 rounded-md border border-amber-200 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-bold text-amber-950 text-xs flex items-center gap-1.5">
+                  <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                  <span>✨ Wipe All Demo Data (Clean Slate)</span>
+                </h3>
+                <p className="text-[11px] text-amber-900 leading-snug">
+                  Keep 1070 Yank St with all 7 rooms marked Available, but wipe sample tenants, mock renewals, demo contacts, and work orders for a fresh live setup.
+                </p>
+              </div>
+              <button
+                onClick={handleResetToCleanSlate}
+                disabled={isClearing}
+                className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-md font-bold text-xs shadow-xs transition whitespace-nowrap shrink-0"
+              >
+                <span>{isClearing ? 'Wiping...' : 'Clean Slate'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Restore Demo Dataset */}
           <div className="bg-indigo-50/70 p-4 rounded-md border border-indigo-200 space-y-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="font-bold text-indigo-950 text-xs flex items-center gap-1.5">
-                  <span>⚡ Reset to Changed Engine Logic Data</span>
+                  <span>⚡ Restore Coliving Demo Dataset</span>
                 </h3>
                 <p className="text-[11px] text-indigo-800 leading-snug">
-                  Populate month-to-month leases, 1-year rate anniversary reviews (2-month window & 12th-month deadline), and 21-day notice vacate test cases.
+                  Load the sample resident dataset (William Jacobs in Bedroom suite, 3 room residents, renewals engine test cases, and vendor contacts).
                 </p>
               </div>
               <button
-                onClick={handleResetToStandardData}
+                onClick={handleResetToDemoDataset}
                 disabled={isClearing}
                 className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-md font-bold text-xs shadow-xs transition whitespace-nowrap shrink-0"
               >
-                <span>{isClearing ? 'Loading...' : 'Reset to New Logic'}</span>
+                <span>{isClearing ? 'Loading...' : 'Restore Demo Data'}</span>
               </button>
             </div>
           </div>
