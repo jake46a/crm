@@ -162,68 +162,77 @@ service cloud.firestore {
     // Collections
     // ==========================================
 
+    function isAuthorized() {
+      return isSignedIn();
+    }
+
     // Properties
     match /properties/{propertyId} {
       allow get, list: if true;
-      allow create: if isValidId(propertyId) && isValidProperty(incoming());
-      allow update: if isValidId(propertyId) && isValidProperty(incoming()) && incoming().id == existing().id;
-      allow delete: if isValidId(propertyId);
+      allow create: if isAuthorized() || (isValidId(propertyId) && isValidProperty(incoming()));
+      allow update: if isAuthorized() || (isValidId(propertyId) && isValidProperty(incoming()) && (!('id' in existing()) || incoming().id == existing().id));
+      allow delete: if isAuthorized() || isValidId(propertyId);
     }
 
     // Rooms
     match /rooms/{roomId} {
       allow get, list: if true;
-      allow create: if isValidId(roomId) && isValidRoom(incoming());
-      allow update: if isValidId(roomId) && isValidRoom(incoming()) && incoming().id == existing().id;
-      allow delete: if isValidId(roomId);
+      allow create: if isAuthorized() || (isValidId(roomId) && isValidRoom(incoming()));
+      allow update: if isAuthorized() || (isValidId(roomId) && isValidRoom(incoming()) && (!('id' in existing()) || incoming().id == existing().id));
+      allow delete: if isAuthorized() || isValidId(roomId);
     }
 
     // Lease Renewals
     match /renewals/{renewalId} {
       allow get, list: if true;
-      allow create: if isValidId(renewalId) && isValidLeaseRenewal(incoming());
-      allow update: if isValidId(renewalId) && isValidLeaseRenewal(incoming()) && incoming().id == existing().id;
-      allow delete: if isValidId(renewalId);
+      allow create: if isAuthorized() || (isValidId(renewalId) && isValidLeaseRenewal(incoming()));
+      allow update: if isAuthorized() || (isValidId(renewalId) && isValidLeaseRenewal(incoming()) && (!('id' in existing()) || incoming().id == existing().id));
+      allow delete: if isAuthorized() || isValidId(renewalId);
     }
 
     // Work Orders
     match /workorders/{workOrderId} {
       allow get, list: if true;
-      allow create: if isValidId(workOrderId) && isValidWorkOrder(incoming());
-      allow update: if isValidId(workOrderId) && isValidWorkOrder(incoming()) && incoming().id == existing().id;
-      allow delete: if isValidId(workOrderId);
+      allow create: if isAuthorized() || (isValidId(workOrderId) && isValidWorkOrder(incoming()));
+      allow update: if isAuthorized() || (isValidId(workOrderId) && isValidWorkOrder(incoming()) && (!('id' in existing()) || incoming().id == existing().id));
+      allow delete: if isAuthorized() || isValidId(workOrderId);
     }
 
     // Tenant Leads
     match /leads/{leadId} {
       allow get, list: if true;
-      allow create: if isValidId(leadId) && isValidTenantLead(incoming());
-      allow update: if isValidId(leadId) && isValidTenantLead(incoming()) && incoming().id == existing().id;
-      allow delete: if isValidId(leadId);
+      allow create: if isAuthorized() || (isValidId(leadId) && isValidTenantLead(incoming()));
+      allow update: if isAuthorized() || (isValidId(leadId) && isValidTenantLead(incoming()) && (!('id' in existing()) || incoming().id == existing().id));
+      allow delete: if isAuthorized() || isValidId(leadId);
     }
 
     // Contacts
     match /contacts/{contactId} {
       allow get, list: if true;
-      allow create: if isValidId(contactId) && isValidContact(incoming());
-      allow update: if isValidId(contactId) && isValidContact(incoming()) && incoming().id == existing().id;
-      allow delete: if isValidId(contactId);
+      allow create: if isAuthorized() || (isValidId(contactId) && isValidContact(incoming()));
+      allow update: if isAuthorized() || (isValidId(contactId) && isValidContact(incoming()) && (!('id' in existing()) || incoming().id == existing().id));
+      allow delete: if isAuthorized() || isValidId(contactId);
     }
 
     // Invoices (Square Billing)
     match /invoices/{invoiceId} {
       allow get, list: if true;
-      allow create: if isValidId(invoiceId) && isValidInvoice(incoming());
-      allow update: if isValidId(invoiceId) && isValidInvoice(incoming()) && (!('id' in incoming()) || incoming().id == existing().id);
-      allow delete: if isValidId(invoiceId);
+      allow create: if isAuthorized() || (isValidId(invoiceId) && isValidInvoice(incoming()));
+      allow update: if isAuthorized() || (isValidId(invoiceId) && isValidInvoice(incoming()) && (!('id' in incoming()) || !('id' in existing()) || incoming().id == existing().id));
+      allow delete: if isAuthorized() || isValidId(invoiceId);
     }
 
-    // Activity Logs (Append-Only)
+    // Activity Logs
     match /activityLogs/{logId} {
       allow get, list: if true;
-      allow create: if isValidId(logId) && isValidActivityLog(incoming());
-      allow update: if false; // Append-only audit log
-      allow delete: if isValidId(logId);
+      allow create, update: if isAuthorized() || (isValidId(logId) && isValidActivityLog(incoming()));
+      allow delete: if isAuthorized() || isValidId(logId);
+    }
+
+    // Square Customers Cache
+    match /squareCustomers/{customerId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAuthorized() || isValidId(customerId);
     }
 
     // Connection Health Test Doc

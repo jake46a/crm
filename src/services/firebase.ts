@@ -712,7 +712,12 @@ export const FirebaseService = {
           const sanitized = sanitizeForFirestore(item);
           batch.set(doc(db, col, item.id), sanitized, { merge: true });
         });
-        await batch.commit();
+        try {
+          await batch.commit();
+        } catch (batchErr: any) {
+          console.error(`Batch commit failed for collection "${col}":`, batchErr);
+          throw new Error(`Sync failed on collection "${col}": ${batchErr?.message || batchErr}`);
+        }
       }
       return items.length;
     };
