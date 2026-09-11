@@ -9,7 +9,8 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Permissive CORS and preflight headers for all endpoints
 app.use((req, res, next) => {
@@ -1031,6 +1032,208 @@ app.post('/api/square/sandbox/simulate-payment', (req: Request, res: Response) =
     paymentMethod,
     paidAt: new Date().toISOString()
   });
+});
+
+// ----------------------------------------------------
+// GOOGLE WORKSPACE DRIVE & DOCS PROXY ENDPOINTS
+// Bypasses browser CORS restrictions for file uploads
+// ----------------------------------------------------
+
+// 1. Proxy PDF Upload to Google Drive
+app.post('/api/google/upload-pdf', async (req: Request, res: Response) => {
+  try {
+    const authHeader = (req.headers['authorization'] || '') as string;
+    const token = authHeader.replace(/^bearer\s+/i, '').trim();
+
+    if (!token) {
+      return res.status(401).json({
+        error: 'Google Workspace access token is required. Please click "Connect Google Drive" to authenticate.'
+      });
+    }
+
+    const { name, base64Data, mimeType = 'application/pdf' } = req.body;
+    if (!base64Data) {
+      return res.status(400).json({ error: 'No PDF file data provided.' });
+    }
+
+    const cleanName = (name || 'Document.pdf').trim();
+    const finalName = cleanName.toLowerCase().endsWith('.pdf') ? cleanName : `${cleanName}.pdf`;
+
+    // Extract base64 binary content
+    const base64Clean = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
+    const fileBuffer = Buffer.from(base64Clean, 'base64');
+
+    const boundary = '-------moyerDrivePdfUploadBoundary' + Math.random().toString(36).substring(2);
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelim = `\r\n--${boundary}--`;
+
+    const metadata = {
+      name: finalName,
+      mimeType: 'application/pdf',
+    };
+
+    const metaPart = `${delimiter}Content-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n${delimiter}Content-Type: ${mimeType}\r\n\r\n`;
+
+    const bodyBuffer = Buffer.concat([
+      Buffer.from(metaPart, 'utf-8'),
+      fileBuffer,
+      Buffer.from(closeDelim, 'utf-8')
+    ]);
+
+    const driveRes = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink,size,createdTime',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': `multipart/related; boundary=${boundary}`,
+          'Content-Length': String(bodyBuffer.length)
+        },
+        body: bodyBuffer
+      }
+    );
+
+    const data = (await driveRes.json().catch(() => ({}))) as any;
+
+    if (!driveRes.ok) {
+      console.warn('Google Drive API upload rejected:', driveRes.status, data);
+      const errMsg = data.error?.message || `Google Drive upload error (${driveRes.status})`;
+      return res.status(driveRes.status).json({
+        error: errMsg,
+        status: driveRes.status,
+        details: data.error
+      });
+    }
+
+    return res.json(data);
+  } catch (err: any) {
+    console.error('Server error proxying PDF upload to Google Drive:', err);
+    return res.status(500).json({ error: err.message || 'Internal server error while uploading to Google Drive.' });
+  }
+});
+
+// 2. Proxy Rename File in Google Drive
+app.patch('/api/google/rename-file', async (req: Request, res: Response) => {
+  try {
+    const authHeader = (req.headers['authorization'] || '') as string;
+    const token = authHeader.replace(/^bearer\s+/i, '').trim();
+
+    if (!token) {
+      return res.status(401).json({ error: 'Google Workspace access token is required.' });
+    }
+
+    const { fileId, newName } = req.body;
+    if (!fileId) {
+      return res.status(400).json({ error: 'fileId is required.' });
+    }
+
+    const cleanName = (newName || '').trim();
+    const finalName = cleanName.toLowerCase().endsWith('.pdf') ? cleanName : `${cleanName}.pdf`;
+
+    const driveRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,webViewLink,webContentLink`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: finalName })
+      }
+    );
+
+    const data = (await driveRes.json().catch(() => ({}))) as any;
+
+    if (!driveRes.ok) {
+      return res.status(driveRes.status).json({
+        error: data.error?.message || `Google Drive rename error (${driveRes.status})`,
+        details: data.error
+      });
+    }
+
+    return res.json(data);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to rename file.' });
+  }
+});
+
+// 3. Proxy Delete File in Google Drive
+app.delete('/api/google/delete-file', async (req: Request, res: Response) => {
+  try {
+    const authHeader = (req.headers['authorization'] || '') as string;
+    const token = authHeader.replace(/^bearer\s+/i, '').trim();
+
+    if (!token) {
+      return res.status(401).json({ error: 'Google Workspace access token is required.' });
+    }
+
+    const fileId = (req.query.fileId as string) || req.body?.fileId;
+    if (!fileId) {
+      return res.status(400).json({ error: 'fileId is required.' });
+    }
+
+    const driveRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    );
+
+    if (!driveRes.ok && driveRes.status !== 404) {
+      const data = (await driveRes.json().catch(() => ({}))) as any;
+      return res.status(driveRes.status).json({
+        error: data.error?.message || `Failed to delete from Google Drive (${driveRes.status})`
+      });
+    }
+
+    return res.json({ success: true, fileId });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to delete file.' });
+  }
+});
+
+// 4. Proxy Copy Drive File
+app.post('/api/google/copy-file', async (req: Request, res: Response) => {
+  try {
+    const authHeader = (req.headers['authorization'] || '') as string;
+    const token = authHeader.replace(/^bearer\s+/i, '').trim();
+
+    if (!token) {
+      return res.status(401).json({ error: 'Google Workspace access token is required.' });
+    }
+
+    const { fileId, name } = req.body;
+    if (!fileId) {
+      return res.status(400).json({ error: 'fileId is required.' });
+    }
+
+    const driveRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/copy?fields=id,name,webViewLink`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: name || 'Copy' })
+      }
+    );
+
+    const data = (await driveRes.json().catch(() => ({}))) as any;
+
+    if (!driveRes.ok) {
+      return res.status(driveRes.status).json({
+        error: data.error?.message || `Failed to copy Drive file (${driveRes.status})`
+      });
+    }
+
+    return res.json(data);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to copy Drive file.' });
+  }
 });
 
 // ----------------------------------------------------

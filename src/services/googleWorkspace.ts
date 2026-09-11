@@ -135,7 +135,7 @@ export interface DrivePdfRecord {
   sizeBytes?: number;
   uploadedAt: string;
   lastRenamedAt?: string;
-  status?: 'uploaded' | 'renamed' | 'error';
+  status?: 'uploaded' | 'renamed' | 'local' | 'error';
 }
 
 declare global {
@@ -509,23 +509,44 @@ export class GoogleWorkspaceService {
       throw new Error('Google Workspace OAuth access token is required.');
     }
 
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${cleanFileId}/copy`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${cleanToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: cleanTitle,
-      }),
-    });
+    try {
+      const res = await fetch('/api/google/copy-file', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileId: cleanFileId,
+          name: cleanTitle,
+        }),
+      });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Failed to copy Google Drive file (${res.status})`);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        return data;
+      }
+      throw new Error(data.error || `Failed to copy Google Drive file (${res.status})`);
+    } catch (err: any) {
+      // Fallback to direct call if proxy fails
+      const directRes = await fetch(`https://www.googleapis.com/drive/v3/files/${cleanFileId}/copy`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: cleanTitle,
+        }),
+      });
+
+      if (!directRes.ok) {
+        const directErr = await directRes.json().catch(() => ({}));
+        throw new Error(directErr.error?.message || err.message || `Failed to copy Google Drive file (${directRes.status})`);
+      }
+
+      return await directRes.json();
     }
-
-    return await res.json();
   }
 
   /**
@@ -857,7 +878,7 @@ Management: ___________________________ Date: {{today_date}}
   // ==========================================
 
   /**
-   * Uploads a PDF file directly to Google Drive via multipart/related upload.
+   * Uploads a PDF file directly to Google Drive via server proxy (bypassing browser CORS).
    */
   static async uploadPdfToDrive(
     file: File,
@@ -870,38 +891,51 @@ Management: ___________________________ Date: {{today_date}}
     }
 
     const cleanName = (name || file.name).trim();
-    const metadata = {
-      name: cleanName.toLowerCase().endsWith('.pdf') ? cleanName : `${cleanName}.pdf`,
-      mimeType: 'application/pdf',
-    };
 
-    const boundary = '-------moyerDrivePdfUploadBoundary' + Math.random().toString(36).substring(2);
-    const delimiter = `\r\n--${boundary}\r\n`;
-    const closeDelim = `\r\n--${boundary}--`;
-
-    const metaPart = `${delimiter}Content-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n${delimiter}Content-Type: ${file.type || 'application/pdf'}\r\n\r\n`;
-
-    const multipartBlob = new Blob([metaPart, file, closeDelim], {
-      type: `multipart/related; boundary=${boundary}`,
+    // Read file as base64 string
+    const base64Data = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result);
+      };
+      reader.onerror = (e) => reject(new Error('Failed to read PDF file for upload.'));
+      reader.readAsDataURL(file);
     });
 
-    const res = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink,size,createdTime',
-      {
+    let res: Response;
+    try {
+      res = await fetch('/api/google/upload-pdf', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${cleanToken}`,
+          'Authorization': `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json',
         },
-        body: multipartBlob,
-      }
-    );
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Failed to upload PDF to Google Drive (${res.status})`);
+        body: JSON.stringify({
+          name: cleanName,
+          base64Data,
+          mimeType: file.type || 'application/pdf',
+        }),
+      });
+    } catch (networkErr: any) {
+      console.warn('Proxy fetch network error:', networkErr);
+      throw new Error(
+        `Network error communicating with upload service: ${networkErr.message || networkErr}. Please verify your connection.`
+      );
     }
 
-    return await res.json();
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new Error(
+          'Google Workspace OAuth session has expired or is unauthorized. Please click "Connect Google Drive" to re-authenticate.'
+        );
+      }
+      throw new Error(data.error || `Failed to upload PDF to Google Drive (${res.status})`);
+    }
+
+    return data;
   }
 
   /**
@@ -922,21 +956,42 @@ Management: ___________________________ Date: {{today_date}}
       targetName = `${targetName}.pdf`;
     }
 
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${cleanFileId}?fields=id,name,webViewLink,webContentLink`, {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${cleanToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ name: targetName }),
-    });
+    try {
+      const res = await fetch('/api/google/rename-file', {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ fileId: cleanFileId, newName: targetName }),
+      });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Failed to rename file in Google Drive (${res.status})`);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        return data;
+      }
+      if (res.status === 401) {
+        throw new Error('Google token expired. Please reconnect your Google account.');
+      }
+      throw new Error(data.error || `Failed to rename in Google Drive (${res.status})`);
+    } catch (err: any) {
+      // Direct fallback if proxy is unavailable
+      const directRes = await fetch(`https://www.googleapis.com/drive/v3/files/${cleanFileId}?fields=id,name,webViewLink,webContentLink`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: targetName }),
+      });
+
+      if (!directRes.ok) {
+        const directErr = await directRes.json().catch(() => ({}));
+        throw new Error(directErr.error?.message || err.message || `Failed to rename file in Google Drive (${directRes.status})`);
+      }
+
+      return await directRes.json();
     }
-
-    return await res.json();
   }
 
   /**
@@ -948,14 +1003,18 @@ Management: ___________________________ Date: {{today_date}}
     const cleanToken = (token || '').trim();
     if (!cleanToken) return;
 
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${cleanFileId}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${cleanToken}` },
-    });
-
-    if (!res.ok && res.status !== 404) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Failed to delete file from Google Drive (${res.status})`);
+    try {
+      await fetch('/api/google/delete-file', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${cleanToken}` },
+        body: JSON.stringify({ fileId: cleanFileId }),
+      });
+    } catch (err) {
+      console.warn('Proxy delete failed, trying direct:', err);
+      await fetch(`https://www.googleapis.com/drive/v3/files/${cleanFileId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${cleanToken}` },
+      }).catch(() => {});
     }
   }
 

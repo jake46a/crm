@@ -146,15 +146,26 @@ export const DrivePdfManager: React.FC<DrivePdfManagerProps> = ({
       let driveFileId = 'local-' + Date.now();
       let webViewLink = '';
       let driveFileName = file.name;
+      let isSyncedToDrive = false;
+      let driveNotice = '';
 
-      // If connected with Google Workspace Token, upload to Google Drive via multipart API
+      // If connected with Google Workspace Token, upload to Google Drive via server proxy
       if (token) {
-        const driveUploadRes = await GoogleWorkspaceService.uploadPdfToDrive(file, file.name, token);
-        driveFileId = driveUploadRes.id;
-        driveFileName = driveUploadRes.name || file.name;
-        webViewLink = driveUploadRes.webViewLink || `https://drive.google.com/file/d/${driveFileId}/view`;
+        try {
+          const driveUploadRes = await GoogleWorkspaceService.uploadPdfToDrive(file, file.name, token);
+          driveFileId = driveUploadRes.id;
+          driveFileName = driveUploadRes.name || file.name;
+          webViewLink = driveUploadRes.webViewLink || `https://drive.google.com/file/d/${driveFileId}/view`;
+          isSyncedToDrive = true;
+          driveNotice = `Successfully uploaded "${driveFileName}" to Google Drive!`;
+        } catch (driveErr: any) {
+          console.warn('Google Drive direct upload failed, preserving in local vault:', driveErr);
+          driveNotice = `Saved "${file.name}" to Vault (${driveErr.message || 'Google Drive sync pending'}).`;
+          webViewLink = URL.createObjectURL(file);
+        }
       } else {
-        webViewLink = `https://drive.google.com/file/d/${driveFileId}/view`;
+        webViewLink = URL.createObjectURL(file);
+        driveNotice = `Uploaded "${file.name}" to Vault! Connect Google Drive to sync to cloud.`;
       }
 
       // Default property to 1070 Yank Street or first property
@@ -171,25 +182,21 @@ export const DrivePdfManager: React.FC<DrivePdfManagerProps> = ({
         sizeBytes: file.size,
         uploadedAt: new Date().toISOString(),
         webViewLink,
-        status: 'uploaded',
+        status: isSyncedToDrive ? 'uploaded' : 'local',
       };
 
       // Save locally
       const updatedList = GoogleWorkspaceService.saveDrivePdf(newRecord);
       setPdfRecords(updatedList);
 
-      setUploadSuccess(
-        token
-          ? `Successfully uploaded "${file.name}" to Google Drive!`
-          : `Uploaded "${file.name}"! Open "Tag & Rename" to assign unit/tenant.`
-      );
+      setUploadSuccess(driveNotice);
 
       // Automatically open Tag & Rename modal for this file so user can enter unit and tenant info
       setSelectedPdfForTagging(newRecord);
       setIsTagModalOpen(true);
     } catch (err: any) {
       console.error('Upload to Drive failed:', err);
-      setUploadError(err.message || 'Failed to upload PDF to Google Drive.');
+      setUploadError(err.message || 'Failed to upload PDF.');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -206,6 +213,14 @@ export const DrivePdfManager: React.FC<DrivePdfManagerProps> = ({
 
   // Print PDF in Chrome
   const handlePrintPdf = (record: DrivePdfRecord) => {
+    if (record.webViewLink && record.webViewLink.startsWith('blob:')) {
+      const printWin = window.open(record.webViewLink, '_blank');
+      if (printWin) {
+        printWin.focus();
+        printWin.print();
+      }
+      return;
+    }
     const printUrl = `https://drive.google.com/file/d/${record.driveFileId}/preview`;
     window.open(printUrl, '_blank', 'noopener,noreferrer');
   };
@@ -461,9 +476,15 @@ export const DrivePdfManager: React.FC<DrivePdfManagerProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">
-                        Drive PDF
-                      </span>
+                      {pdf.status === 'local' ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                          Vault PDF
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                          Drive Cloud
+                        </span>
+                      )}
                     </div>
                   </div>
 

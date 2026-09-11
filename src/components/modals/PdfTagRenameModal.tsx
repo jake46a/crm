@@ -164,9 +164,9 @@ export const PdfTagRenameModal: React.FC<PdfTagRenameModalProps> = ({
 
     setIsRenaming(true);
     try {
-      // 1. Rename file in Google Drive via API
+      // 1. Rename file in Google Drive via API if it's already in Drive
       let driveResponse: any = null;
-      if (pdfRecord.driveFileId) {
+      if (pdfRecord.driveFileId && !pdfRecord.driveFileId.startsWith('local-')) {
         driveResponse = await GoogleWorkspaceService.renameDriveFile(
           pdfRecord.driveFileId,
           finalName,
