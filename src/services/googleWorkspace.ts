@@ -16,6 +16,7 @@ const STORAGE_KEY_EMAIL = 'moyer_crm_gworkspace_email';
 const STORAGE_KEY_USER_NAME = 'moyer_crm_gworkspace_name';
 const STORAGE_KEY_TEMPLATES = 'moyer_crm_gworkspace_templates';
 const STORAGE_KEY_CLIENT_ID = 'moyer_crm_custom_google_client_id';
+const STORAGE_KEY_DRIVE_PDFS = 'moyer_crm_drive_pdfs';
 
 export interface GoogleWorkspaceUser {
   email: string;
@@ -114,6 +115,27 @@ export interface GeneratedDocRecord {
   propertyName?: string;
   createdAt: string;
   status: 'created' | 'saved_to_drive';
+}
+
+export interface DrivePdfRecord {
+  id: string; // Local / Drive file ID
+  driveFileId: string;
+  name: string; // Current filename in Drive
+  originalName: string;
+  propertyId?: string;
+  propertyName?: string;
+  roomId?: string;
+  roomName?: string;
+  tenantName?: string;
+  tenantId?: string;
+  docCategory?: string; // 'lease' | 'checklist' | 'id_scan' | 'receipt' | 'addendum' | 'notice' | 'other'
+  notes?: string;
+  webViewLink?: string;
+  webContentLink?: string;
+  sizeBytes?: number;
+  uploadedAt: string;
+  lastRenamedAt?: string;
+  status?: 'uploaded' | 'renamed' | 'error';
 }
 
 declare global {
@@ -828,5 +850,211 @@ Resident: _____________________________ Date: {{today_date}}
 Management: ___________________________ Date: {{today_date}}
 `;
     }
+  }
+
+  // ==========================================
+  // GOOGLE DRIVE PDF OPERATIONS & WORKFLOW
+  // ==========================================
+
+  /**
+   * Uploads a PDF file directly to Google Drive via multipart/related upload.
+   */
+  static async uploadPdfToDrive(
+    file: File,
+    name: string,
+    token: string
+  ): Promise<{ id: string; name: string; webViewLink?: string; webContentLink?: string; size?: string }> {
+    const cleanToken = (token || '').trim();
+    if (!cleanToken) {
+      throw new Error('Google Workspace OAuth access token is required to upload to Drive.');
+    }
+
+    const cleanName = (name || file.name).trim();
+    const metadata = {
+      name: cleanName.toLowerCase().endsWith('.pdf') ? cleanName : `${cleanName}.pdf`,
+      mimeType: 'application/pdf',
+    };
+
+    const boundary = '-------moyerDrivePdfUploadBoundary' + Math.random().toString(36).substring(2);
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelim = `\r\n--${boundary}--`;
+
+    const metaPart = `${delimiter}Content-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n${delimiter}Content-Type: ${file.type || 'application/pdf'}\r\n\r\n`;
+
+    const multipartBlob = new Blob([metaPart, file, closeDelim], {
+      type: `multipart/related; boundary=${boundary}`,
+    });
+
+    const res = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink,size,createdTime',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${cleanToken}`,
+        },
+        body: multipartBlob,
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Failed to upload PDF to Google Drive (${res.status})`);
+    }
+
+    return await res.json();
+  }
+
+  /**
+   * Renames an existing file in Google Drive to reflect Unit and Tenant.
+   */
+  static async renameDriveFile(
+    fileId: string,
+    newName: string,
+    token: string
+  ): Promise<{ id: string; name: string; webViewLink?: string }> {
+    const cleanFileId = (fileId || '').trim();
+    if (!cleanFileId) throw new Error('File ID is required to rename in Google Drive.');
+    const cleanToken = (token || '').trim();
+    if (!cleanToken) throw new Error('Google OAuth token is required.');
+
+    let targetName = newName.trim();
+    if (!targetName.toLowerCase().endsWith('.pdf')) {
+      targetName = `${targetName}.pdf`;
+    }
+
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${cleanFileId}?fields=id,name,webViewLink,webContentLink`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${cleanToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name: targetName }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Failed to rename file in Google Drive (${res.status})`);
+    }
+
+    return await res.json();
+  }
+
+  /**
+   * Deletes a file from Google Drive
+   */
+  static async deleteDriveFile(fileId: string, token: string): Promise<void> {
+    const cleanFileId = (fileId || '').trim();
+    if (!cleanFileId) return;
+    const cleanToken = (token || '').trim();
+    if (!cleanToken) return;
+
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${cleanFileId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${cleanToken}` },
+    });
+
+    if (!res.ok && res.status !== 404) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Failed to delete file from Google Drive (${res.status})`);
+    }
+  }
+
+  /**
+   * Formats a standardized filename reflecting property, unit/room, tenant, and document type.
+   * e.g. "[1070 Yank - Room 2] [John Doe] Signed Lease Agreement.pdf"
+   */
+  static formatStandardPdfName(options: {
+    propertyName?: string;
+    roomName?: string;
+    tenantName?: string;
+    docType?: string;
+    customSuffix?: string;
+  }): string {
+    const parts: string[] = [];
+
+    // Unit / Property segment
+    const unitParts: string[] = [];
+    if (options.propertyName) {
+      // Shorten 1070 Yank Street to 1070 Yank if present
+      const shortProp = options.propertyName.replace(/\s+Street/i, ' St').replace(/\s+Ave/i, ' Ave');
+      unitParts.push(shortProp);
+    }
+    if (options.roomName) {
+      unitParts.push(options.roomName);
+    }
+    if (unitParts.length > 0) {
+      parts.push(`[${unitParts.join(' - ')}]`);
+    }
+
+    // Tenant segment
+    if (options.tenantName && options.tenantName.trim()) {
+      parts.push(`[${options.tenantName.trim()}]`);
+    }
+
+    // Document label
+    const label = options.docType || 'Document';
+    parts.push(label);
+
+    if (options.customSuffix && options.customSuffix.trim()) {
+      parts.push(`- ${options.customSuffix.trim()}`);
+    }
+
+    let fullName = parts.join(' ').trim();
+    if (!fullName) fullName = 'Property Document';
+    if (!fullName.toLowerCase().endsWith('.pdf')) {
+      fullName = `${fullName}.pdf`;
+    }
+
+    return fullName;
+  }
+
+  /**
+   * Retrieves saved Drive PDF records from localStorage
+   */
+  static getSavedDrivePdfs(): DrivePdfRecord[] {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_DRIVE_PDFS);
+      if (!raw) return [];
+      return JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Saves a new Drive PDF record
+   */
+  static saveDrivePdf(record: DrivePdfRecord): DrivePdfRecord[] {
+    const list = this.getSavedDrivePdfs();
+    const existingIndex = list.findIndex(r => r.driveFileId === record.driveFileId || r.id === record.id);
+    let updated: DrivePdfRecord[];
+    if (existingIndex >= 0) {
+      updated = [...list];
+      updated[existingIndex] = { ...updated[existingIndex], ...record };
+    } else {
+      updated = [record, ...list];
+    }
+    localStorage.setItem(STORAGE_KEY_DRIVE_PDFS, JSON.stringify(updated));
+    return updated;
+  }
+
+  /**
+   * Updates an existing Drive PDF record
+   */
+  static updateDrivePdfRecord(id: string, updates: Partial<DrivePdfRecord>): DrivePdfRecord[] {
+    const list = this.getSavedDrivePdfs();
+    const updated = list.map(item => (item.id === id || item.driveFileId === id ? { ...item, ...updates } : item));
+    localStorage.setItem(STORAGE_KEY_DRIVE_PDFS, JSON.stringify(updated));
+    return updated;
+  }
+
+  /**
+   * Deletes a Drive PDF record from local tracking
+   */
+  static deleteDrivePdfRecord(id: string): DrivePdfRecord[] {
+    const list = this.getSavedDrivePdfs();
+    const updated = list.filter(item => item.id !== id && item.driveFileId !== id);
+    localStorage.setItem(STORAGE_KEY_DRIVE_PDFS, JSON.stringify(updated));
+    return updated;
   }
 }

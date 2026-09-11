@@ -45,6 +45,7 @@ import {
   isValidGoogleDocId,
 } from '../services/googleWorkspace';
 import { DocTemplateModal } from './modals/DocTemplateModal';
+import { DrivePdfManager } from './DrivePdfManager';
 
 interface GoogleDocsDriveViewProps {
   properties: Property[];
@@ -77,6 +78,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
   const [customClientId, setCustomClientId] = useState<string>(GoogleWorkspaceService.getClientId());
   const [showSettings, setShowSettings] = useState(false);
   const [copiedOrigin, setCopiedOrigin] = useState(false);
+  const [centerTab, setCenterTab] = useState<'docs_generator' | 'drive_pdfs'>('docs_generator');
 
   const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
   const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
@@ -844,8 +846,65 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
         )}
       </div>
 
-      {/* Main 2-Column Work Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      {/* Center Sub-Navigation Tabs: Docs Generator vs Drive PDF Manager */}
+      <div className="flex items-center justify-between border-b border-zinc-200 pb-3 gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            id="tab-btn-docs-generator"
+            onClick={() => setCenterTab('docs_generator')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${
+              centerTab === 'docs_generator'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-white text-zinc-600 hover:text-zinc-900 border border-zinc-200 hover:bg-zinc-50'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Google Docs Generator & Templates</span>
+          </button>
+
+          <button
+            type="button"
+            id="tab-btn-drive-pdfs"
+            onClick={() => setCenterTab('drive_pdfs')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${
+              centerTab === 'drive_pdfs'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-white text-zinc-600 hover:text-zinc-900 border border-zinc-200 hover:bg-zinc-50'
+            }`}
+          >
+            <FileText className="w-4 h-4 text-rose-500" />
+            <span>PDF Vault & Unit/Tenant Renamer</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+              centerTab === 'drive_pdfs' ? 'bg-blue-500 text-white' : 'bg-zinc-100 text-zinc-700'
+            }`}>
+              Drive PDFs
+            </span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-zinc-500 hidden sm:inline">
+            Connected: <strong className="text-zinc-800">{user?.email || 'jake@1070yankstreet.com'}</strong>
+          </span>
+        </div>
+      </div>
+
+      {/* View Content based on active tab */}
+      {centerTab === 'drive_pdfs' ? (
+        <DrivePdfManager
+          properties={properties}
+          rooms={rooms}
+          contacts={contacts}
+          leads={leads}
+          token={token}
+          onConnectGoogle={() => handleConnectGoogle('jake@1070yankstreet.com')}
+          userEmail={user?.email}
+        />
+      ) : (
+        <>
+          {/* Main 2-Column Work Area */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Column: 1-Click Document Generator (7 Cols) */}
         <div className="lg:col-span-7 space-y-6">
           <div className="bg-white rounded-xl border border-zinc-200 shadow-xs overflow-hidden">
@@ -1856,6 +1915,8 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
             </table>
           </div>
         </div>
+      )}
+      </>
       )}
 
       {/* Add / Edit Template Modal */}
