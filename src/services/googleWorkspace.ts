@@ -24,13 +24,82 @@ export interface GoogleWorkspaceUser {
   connectedAt: string;
 }
 
+export type DocumentTemplateType =
+  | 'lease'
+  | 'late_notice'
+  | 'eviction'
+  | 'utility_statement'
+  | 'addendum'
+  | 'checklist'
+  | 'custom'
+  | string;
+
 export interface DocumentTemplateConfig {
   id: string;
   name: string;
-  type: 'lease' | 'late_notice' | 'eviction' | 'utility_statement';
+  type: DocumentTemplateType;
   googleDocId: string; // The ID of the Google Doc template in Drive
   description: string;
   placeholders: string[];
+  isCustom?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Extracts a Google Doc or Drive File ID from various URL formats or raw ID strings.
+ * Examples supported:
+ * - https://docs.google.com/document/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit?usp=sharing
+ * - https://docs.google.com/document/u/0/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/
+ * - https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view
+ * - https://drive.google.com/open?id=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms
+ * - 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms
+ */
+export function extractGoogleDocId(urlOrId: string): string {
+  if (!urlOrId) return '';
+  const trimmed = urlOrId.trim();
+
+  // Pattern 1: /d/([a-zA-Z0-9_-]+)
+  const dMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (dMatch && dMatch[1]) {
+    return dMatch[1];
+  }
+
+  // Pattern 2: id=([a-zA-Z0-9_-]+)
+  const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idMatch && idMatch[1]) {
+    return idMatch[1];
+  }
+
+  // Pattern 3: raw doc ID or stripped url
+  const stripped = trimmed
+    .replace(/^https?:\/\/[^/]+\//, '')
+    .replace(/\/edit.*$/, '')
+    .replace(/\/view.*$/, '')
+    .replace(/[?#].*$/, '')
+    .trim();
+
+  if (/^[a-zA-Z0-9_-]{15,}$/.test(stripped)) {
+    return stripped;
+  }
+
+  return trimmed;
+}
+
+/**
+ * Formats a clean web edit URL for a Google Doc given its ID
+ */
+export function getGoogleDocUrl(docId: string): string {
+  const cleanId = extractGoogleDocId(docId);
+  return cleanId ? `https://docs.google.com/document/d/${cleanId}/edit` : '';
+}
+
+/**
+ * Validates if a string looks like a valid Google Doc ID
+ */
+export function isValidGoogleDocId(docId: string): boolean {
+  const clean = extractGoogleDocId(docId);
+  return Boolean(clean && /^[a-zA-Z0-9_-]{15,100}$/.test(clean));
 }
 
 export interface GeneratedDocRecord {
@@ -367,6 +436,44 @@ export class GoogleWorkspaceService {
   }
 
   /**
+   * Add a new template configuration
+   */
+  static addTemplate(newTemplate: DocumentTemplateConfig): DocumentTemplateConfig[] {
+    const current = GoogleWorkspaceService.getTemplates();
+    const updated = [...current, newTemplate];
+    GoogleWorkspaceService.saveTemplates(updated);
+    return updated;
+  }
+
+  /**
+   * Update an existing template configuration
+   */
+  static updateTemplate(id: string, updates: Partial<DocumentTemplateConfig>): DocumentTemplateConfig[] {
+    const current = GoogleWorkspaceService.getTemplates();
+    const updated = current.map(t => (t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t));
+    GoogleWorkspaceService.saveTemplates(updated);
+    return updated;
+  }
+
+  /**
+   * Delete a template configuration
+   */
+  static deleteTemplate(id: string): DocumentTemplateConfig[] {
+    const current = GoogleWorkspaceService.getTemplates();
+    const updated = current.filter(t => t.id !== id);
+    GoogleWorkspaceService.saveTemplates(updated);
+    return updated;
+  }
+
+  /**
+   * Reset templates to baseline default configurations
+   */
+  static resetTemplatesToDefault(): DocumentTemplateConfig[] {
+    localStorage.removeItem(STORAGE_KEY_TEMPLATES);
+    return GoogleWorkspaceService.getTemplates();
+  }
+
+  /**
    * Copy a file in Google Drive
    */
   static async copyDriveFile(fileId: string, newTitle: string, token: string): Promise<any> {
@@ -536,7 +643,7 @@ export class GoogleWorkspaceService {
   /**
    * Generate Starter Template Body Text for each document type
    */
-  static getStarterTemplateContent(type: 'lease' | 'late_notice' | 'eviction' | 'utility_statement'): string {
+  static getStarterTemplateContent(type: DocumentTemplateType): string {
     switch (type) {
       case 'lease':
         return `RESIDENTIAL ROOM RENTAL LEASE AGREEMENT
@@ -647,6 +754,78 @@ PAYMENT DUE DATE: {{payment_due_date}}
 
 Invoiced automatically via Square Payment Portal.
 Thank you for your prompt payment!
+`;
+
+      case 'addendum':
+        return `LEASE ADDENDUM & HOUSE RULES ACKNOWLEDGMENT
+Property Address: {{property_address}}
+Property Name: {{property_name}}
+Designated Room: {{room_name}}
+Resident: {{tenant_name}}
+Date: {{today_date}}
+
+1. ADDENDUM PROVISIONS
+This Addendum supplements and modifies the Residential Room Rental Agreement between {{manager_name}} ("Management") and {{tenant_name}} ("Resident") for {{room_name}} at {{property_address}}.
+
+2. SHARED COMMUNITY EXPECTATIONS
+- Quiet Hours: Strictly observed 10:00 PM to 7:00 AM daily.
+- Utilities: Variable utilities are divided by house divisor {{utility_divisor}}. High-speed Wi-Fi and trash are included.
+- Common Areas: Resident agrees to clean up immediately following kitchen and shared area use.
+- Guest Policy: Overnight guests may not exceed 3 consecutive nights without prior written approval.
+
+3. ACKNOWLEDGMENT & AGREEMENT
+The parties agree to the terms set forth herein as of {{today_date}}.
+
+Resident Signature: ______________________ Date: {{today_date}}
+Management Signature: ____________________ Date: {{today_date}}
+`;
+
+      case 'checklist':
+        return `ROOM INSPECTION & MOVE-IN / MOVE-OUT CONDITION REPORT
+Property: {{property_name}} - {{property_address}}
+Room: {{room_name}}
+Resident: {{tenant_name}} (Phone: {{tenant_phone}} | Email: {{tenant_email}})
+Move-In Date: {{lease_start_date}} | Move-Out Date: {{lease_end_date}}
+Inspection Date: {{today_date}}
+
+ROOM INVENTORY & CONDITION CHECKLIST:
+[ ] Entry Door, Deadbolt & Key Operation: [ Satisfactory ]
+[ ] Walls, Baseboards & Ceiling: [ Clean, No Damage ]
+[ ] Flooring / Carpet: [ Clean, Swept / Vacuumed ]
+[ ] Window, Lock & Screen: [ Intact & Functional ]
+[ ] Window Blinds / Coverings: [ Operational ]
+[ ] Electrical Outlets & Light Fixtures: [ Tested Working ]
+[ ] Heating / Cooling Vent: [ Clear & Clean ]
+[ ] Smoke / CO Detector in Unit: [ Tested & Functional ]
+
+KEYS & ACCESS CODES ISSUED:
+- Bedroom Key: [ ] Issued
+- House Main Door Key / Code: [ ] Provided
+- Mailbox Key: [ ] Issued
+
+COMMENTS & OBSERVATIONS:
+___________________________________________________________________
+
+SIGNATURES:
+Resident: _____________________________ Date: {{today_date}}
+Inspector / Property Manager: __________ Date: {{today_date}}
+`;
+
+      default:
+        return `DOCUMENT AGREEMENT
+Property: {{property_name}} ({{property_address}})
+Resident: {{tenant_name}} ({{room_name}})
+Date: {{today_date}}
+
+TERMS & DETAILS:
+This document records the agreement between {{manager_name}} and {{tenant_name}} regarding {{room_name}} at {{property_address}}.
+
+Monthly Rent: {{monthly_rent}} | Security Deposit: {{security_deposit}}
+Lease Period: {{lease_start_date}} through {{lease_end_date}}
+
+SIGNATURES:
+Resident: _____________________________ Date: {{today_date}}
+Management: ___________________________ Date: {{today_date}}
 `;
     }
   }

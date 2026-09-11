@@ -26,7 +26,11 @@ import {
   Users,
   RotateCcw,
   Edit3,
-  UserCheck
+  UserCheck,
+  Link2,
+  Unlink,
+  Trash2,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { Property, Room, LeaseRenewal, NavigationTab, Invoice, TenantLead, Contact } from '../types';
 import { formatPhoneNumber, formatPhoneInput } from '../utils/phoneUtils';
@@ -35,8 +39,12 @@ import {
   GoogleWorkspaceUser, 
   DocumentTemplateConfig, 
   GeneratedDocRecord,
-  DEFAULT_OAUTH_CLIENT_ID
+  DEFAULT_OAUTH_CLIENT_ID,
+  extractGoogleDocId,
+  getGoogleDocUrl,
+  isValidGoogleDocId,
 } from '../services/googleWorkspace';
+import { DocTemplateModal } from './modals/DocTemplateModal';
 
 interface GoogleDocsDriveViewProps {
   properties: Property[];
@@ -81,6 +89,12 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [templateDocInput, setTemplateDocInput] = useState<string>('');
   const [isCreatingStarterDoc, setIsCreatingStarterDoc] = useState<string | null>(null);
+
+  // Template Modal and Quick Link Editing
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState<boolean>(false);
+  const [templateToEdit, setTemplateToEdit] = useState<DocumentTemplateConfig | null>(null);
+  const [quickEditTemplateId, setQuickEditTemplateId] = useState<string | null>(null);
+  const [quickDocLinkInput, setQuickDocLinkInput] = useState<string>('');
 
   // Property Selection state - Flagship 1070 Yank St preferred default
   const defaultProperty = properties.find(p => p.id === 'prop-1070-yank' || p.name?.includes('1070 Yank')) || properties[0];
@@ -332,18 +346,65 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
     setUser(null);
   };
 
-  // Save updated template Google Doc ID
-  const handleSaveTemplateDocId = (tplId: string, inputUrlOrId: string) => {
-    // Extract doc ID if full URL pasted
-    let docId = (inputUrlOrId || '').trim();
-    const match = docId.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (match && match[1]) {
-      docId = match[1];
-    }
+  // Template Management: Open Add / Edit Modal
+  const handleOpenAddTemplate = () => {
+    setTemplateToEdit(null);
+    setIsTemplateModalOpen(true);
+  };
 
-    const updated = templates.map(t => t.id === tplId ? { ...t, googleDocId: docId } : t);
+  const handleOpenEditTemplate = (tpl: DocumentTemplateConfig) => {
+    setTemplateToEdit(tpl);
+    setIsTemplateModalOpen(true);
+  };
+
+  const handleSaveTemplate = (savedTemplate: DocumentTemplateConfig) => {
+    const exists = templates.some(t => t.id === savedTemplate.id);
+    let updated: DocumentTemplateConfig[];
+    if (exists) {
+      updated = GoogleWorkspaceService.updateTemplate(savedTemplate.id, savedTemplate);
+    } else {
+      updated = GoogleWorkspaceService.addTemplate(savedTemplate);
+    }
     setTemplates(updated);
-    GoogleWorkspaceService.saveTemplates(updated);
+    setSelectedTemplateId(savedTemplate.id);
+    setIsTemplateModalOpen(false);
+    setTemplateToEdit(null);
+  };
+
+  const handleDeleteTemplate = (tplId: string) => {
+    const updated = GoogleWorkspaceService.deleteTemplate(tplId);
+    setTemplates(updated);
+    if (selectedTemplateId === tplId && updated.length > 0) {
+      setSelectedTemplateId(updated[0].id);
+    }
+  };
+
+  const handleResetDefaultTemplates = () => {
+    if (window.confirm('Reset all templates to original system defaults? Custom templates will be cleared.')) {
+      const defaults = GoogleWorkspaceService.resetTemplatesToDefault();
+      setTemplates(defaults);
+      setSelectedTemplateId(defaults[0]?.id || 'tpl_lease');
+    }
+  };
+
+  // Quick inline document link save
+  const handleSaveQuickDocLink = (tplId: string, inputUrlOrId: string) => {
+    const docId = extractGoogleDocId(inputUrlOrId);
+    const updated = GoogleWorkspaceService.updateTemplate(tplId, { googleDocId: docId });
+    setTemplates(updated);
+    setQuickEditTemplateId(null);
+    setQuickDocLinkInput('');
+  };
+
+  // Unlink document from template
+  const handleUnlinkTemplateDoc = (tplId: string) => {
+    const updated = GoogleWorkspaceService.updateTemplate(tplId, { googleDocId: '' });
+    setTemplates(updated);
+  };
+
+  // Legacy fallback save
+  const handleSaveTemplateDocId = (tplId: string, inputUrlOrId: string) => {
+    handleSaveQuickDocLink(tplId, inputUrlOrId);
     setEditingTemplateId(null);
     setTemplateDocInput('');
   };
@@ -364,9 +425,8 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
       const newDoc = await GoogleWorkspaceService.createGoogleDoc(starterTitle, starterBody, token);
 
       // Save the created Doc ID as this template's active Google Doc
-      const updated = templates.map(t => t.id === tpl.id ? { ...t, googleDocId: newDoc.documentId } : t);
+      const updated = GoogleWorkspaceService.updateTemplate(tpl.id, { googleDocId: newDoc.documentId });
       setTemplates(updated);
-      GoogleWorkspaceService.saveTemplates(updated);
 
       setGenerationSuccess({
         id: `tpl_starter_${Date.now()}`,
@@ -502,6 +562,18 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
       setGenerationError(err.message || 'An error occurred during Google Docs generation.');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const getTemplateBadge = (type: string) => {
+    switch (type) {
+      case 'lease': return { icon: <FileText className="w-4 h-4" />, label: 'Lease' };
+      case 'late_notice': return { icon: <DollarSign className="w-4 h-4" />, label: 'Late Notice' };
+      case 'eviction': return { icon: <ShieldAlert className="w-4 h-4" />, label: 'Notice to Vacate' };
+      case 'utility_statement': return { icon: <FileSpreadsheet className="w-4 h-4" />, label: 'Utility Split' };
+      case 'addendum': return { icon: <Layers className="w-4 h-4" />, label: 'Addendum' };
+      case 'checklist': return { icon: <CheckCircle2 className="w-4 h-4" />, label: 'Checklist' };
+      default: return { icon: <FileText className="w-4 h-4" />, label: 'Custom Doc' };
     }
   };
 
@@ -790,12 +862,25 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
             <div className="p-6 space-y-6">
               {/* Step 1: Select Document Type */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700 mb-2">
-                  1. Select Document Template
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-700">
+                    1. Select Document Template ({templates.length})
+                  </label>
+                  <button
+                    type="button"
+                    id="btn-open-add-template-step1"
+                    onClick={handleOpenAddTemplate}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add New Template</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                   {templates.map(tpl => {
                     const isSelected = tpl.id === selectedTemplateId;
+                    const badge = getTemplateBadge(tpl.type);
                     return (
                       <button
                         key={tpl.id}
@@ -803,33 +888,137 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
                         onClick={() => setSelectedTemplateId(tpl.id)}
                         className={`p-3 rounded-lg border text-left transition-all flex flex-col justify-between ${
                           isSelected
-                            ? 'border-blue-600 bg-blue-50/60 ring-1 ring-blue-600'
+                            ? 'border-blue-600 bg-blue-50/60 ring-1 ring-blue-600 shadow-xs'
                             : 'border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50/50'
                         }`}
                       >
                         <div>
-                          <div className={`p-1.5 rounded-md inline-block mb-2 ${
-                            isSelected ? 'bg-blue-600 text-white' : 'bg-zinc-100 text-zinc-600'
-                          }`}>
-                            {tpl.type === 'lease' && <FileText className="w-4 h-4" />}
-                            {tpl.type === 'late_notice' && <DollarSign className="w-4 h-4" />}
-                            {tpl.type === 'eviction' && <ShieldAlert className="w-4 h-4" />}
-                            {tpl.type === 'utility_statement' && <FileSpreadsheet className="w-4 h-4" />}
+                          <div className="flex items-center justify-between gap-1 mb-2">
+                            <div className={`p-1.5 rounded-md inline-block ${
+                              isSelected ? 'bg-blue-600 text-white' : 'bg-zinc-100 text-zinc-600'
+                            }`}>
+                              {badge.icon}
+                            </div>
+                            {tpl.isCustom && (
+                              <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
+                                Custom
+                              </span>
+                            )}
                           </div>
-                          <p className={`text-xs font-bold leading-snug ${isSelected ? 'text-blue-950' : 'text-zinc-800'}`}>
-                            {tpl.type === 'lease' && 'Lease'}
-                            {tpl.type === 'late_notice' && 'Late Notice'}
-                            {tpl.type === 'eviction' && 'Notice to Vacate'}
-                            {tpl.type === 'utility_statement' && 'Utility Split'}
+                          <p className={`text-xs font-bold leading-snug line-clamp-2 ${isSelected ? 'text-blue-950' : 'text-zinc-800'}`}>
+                            {tpl.name}
                           </p>
                         </div>
                         <span className="text-[10px] text-zinc-400 mt-2 block">
-                          {tpl.googleDocId ? 'Template Linked' : 'Starter Included'}
+                          {tpl.googleDocId ? 'Doc Linked' : 'Starter Included'}
                         </span>
                       </button>
                     );
                   })}
+
+                  {/* Add New Template Quick Card */}
+                  <button
+                    type="button"
+                    id="btn-card-add-template"
+                    onClick={handleOpenAddTemplate}
+                    className="p-3 rounded-lg border border-dashed border-zinc-300 hover:border-blue-500 bg-zinc-50/60 hover:bg-blue-50/30 text-left transition-all flex flex-col items-center justify-center text-center gap-1.5 min-h-[95px]"
+                  >
+                    <div className="p-1.5 bg-white rounded-full text-blue-600 border border-zinc-200 shadow-2xs">
+                      <Plus className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs font-bold text-zinc-700 hover:text-blue-700">
+                      Add Template
+                    </span>
+                  </button>
                 </div>
+
+                {/* Active Template Status & Doc Link Control */}
+                {activeTemplate && (
+                  <div className="mt-3.5 p-3.5 bg-zinc-50 border border-zinc-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2.5 overflow-hidden">
+                      <div className="p-2 bg-blue-600 text-white rounded-lg shrink-0">
+                        {getTemplateBadge(activeTemplate.type).icon}
+                      </div>
+                      <div className="overflow-hidden">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-zinc-900 truncate">
+                            {activeTemplate.name}
+                          </span>
+                          {activeTemplate.googleDocId ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 shrink-0 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              Doc Linked
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 shrink-0">
+                              Standard Baseline (No Doc Linked)
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-zinc-500 truncate mt-0.5">
+                          {activeTemplate.googleDocId ? (
+                            <span className="font-mono text-[11px] text-zinc-600">
+                              Doc ID: {activeTemplate.googleDocId}
+                            </span>
+                          ) : (
+                            activeTemplate.description || 'Uses standard clause replacement when generating.'
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                      {activeTemplate.googleDocId ? (
+                        <>
+                          <a
+                            href={getGoogleDocUrl(activeTemplate.googleDocId)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2.5 py-1.5 bg-white hover:bg-zinc-100 text-blue-700 border border-zinc-200 rounded-md font-semibold text-xs flex items-center gap-1 transition shadow-2xs"
+                            title="Open Google Doc in a new tab"
+                          >
+                            <span>Open Doc</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditTemplate(activeTemplate)}
+                            className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-semibold text-xs flex items-center gap-1 transition shadow-xs"
+                            title="Edit template name, description, tags, or Google Doc link"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            <span>Edit Link</span>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleCreateStarterTemplateInDrive(activeTemplate)}
+                            disabled={isCreatingStarterDoc === activeTemplate.id}
+                            className="px-2.5 py-1.5 bg-white hover:bg-zinc-100 text-blue-700 border border-blue-200 rounded-md font-semibold text-xs flex items-center gap-1 transition disabled:opacity-50"
+                            title="Create starter document in your Google Drive"
+                          >
+                            {isCreatingStarterDoc === activeTemplate.id ? (
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <HardDrive className="w-3 h-3" />
+                            )}
+                            <span>Create in Drive</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditTemplate(activeTemplate)}
+                            className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-semibold text-xs flex items-center gap-1 transition shadow-xs"
+                          >
+                            <Link2 className="w-3 h-3" />
+                            <span>Link Google Doc</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Step 2: Target Property & Resident Selection */}
@@ -1327,112 +1516,226 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
         <div className="lg:col-span-5 space-y-6">
           {/* Master Template Configuration Card */}
           <div className="bg-white rounded-xl border border-zinc-200 shadow-xs overflow-hidden">
-            <div className="p-5 border-b border-zinc-100 bg-zinc-50/50 flex items-center justify-between">
+            <div className="p-4 sm:p-5 border-b border-zinc-100 bg-zinc-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-zinc-700" />
                 <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-wider">
-                  Master Google Doc Templates
+                  Master Google Doc Templates ({templates.length})
                 </h3>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                <button
+                  type="button"
+                  id="btn-reset-templates-defaults"
+                  onClick={handleResetDefaultTemplates}
+                  className="text-[11px] text-zinc-500 hover:text-zinc-800 font-semibold underline transition-colors"
+                  title="Reset templates to original system baseline"
+                >
+                  Reset Defaults
+                </button>
+                <button
+                  type="button"
+                  id="btn-add-template-header"
+                  onClick={handleOpenAddTemplate}
+                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-bold flex items-center gap-1 shadow-xs transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Template</span>
+                </button>
               </div>
             </div>
 
             <div className="p-5 divide-y divide-zinc-100">
               {templates.map(tpl => {
-                const isEditing = editingTemplateId === tpl.id;
+                const isQuickEditing = quickEditTemplateId === tpl.id;
+                const badge = getTemplateBadge(tpl.type);
+                const extractedQuickId = extractGoogleDocId(quickDocLinkInput);
+                const hasValidQuickDoc = isValidGoogleDocId(extractedQuickId);
+
                 return (
-                  <div key={tpl.id} className="py-3.5 first:pt-0 last:pb-0 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <h4 className="text-xs font-bold text-zinc-900">{tpl.name}</h4>
-                        <p className="text-[11px] text-zinc-500 line-clamp-1">{tpl.description}</p>
+                  <div key={tpl.id} className="py-4 first:pt-0 last:pb-0 space-y-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2">
+                        <div className="p-1.5 bg-zinc-100 text-zinc-700 rounded-md shrink-0 mt-0.5">
+                          {badge.icon}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h4 className="text-xs font-bold text-zinc-900">{tpl.name}</h4>
+                            {tpl.isCustom && (
+                              <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.2 rounded bg-purple-100 text-purple-700">
+                                Custom
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-zinc-500 line-clamp-1 mt-0.5">{tpl.description}</p>
+                        </div>
                       </div>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                        tpl.googleDocId ? 'bg-emerald-100 text-emerald-800' : 'bg-zinc-100 text-zinc-600'
-                      }`}>
-                        {tpl.googleDocId ? 'Drive Linked' : 'Standard'}
-                      </span>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                          tpl.googleDocId ? 'bg-emerald-100 text-emerald-800' : 'bg-zinc-100 text-zinc-600'
+                        }`}>
+                          {tpl.googleDocId ? 'Doc Linked' : 'Standard'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditTemplate(tpl)}
+                          className="p-1 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded transition-colors"
+                          title="Full template settings"
+                        >
+                          <SlidersHorizontal className="w-3.5 h-3.5" />
+                        </button>
+                        {tpl.isCustom && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`Delete custom template "${tpl.name}"?`)) {
+                                handleDeleteTemplate(tpl.id);
+                              }
+                            }}
+                            className="p-1 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                            title="Delete template"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    {tpl.googleDocId ? (
-                      <div className="flex items-center justify-between gap-2 bg-zinc-50 p-2 rounded border border-zinc-200">
-                        <div className="flex items-center gap-1.5 overflow-hidden">
-                          <span className="text-[10px] font-mono text-zinc-500 truncate">
-                            ID: {tpl.googleDocId.substring(0, 16)}...
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <a
-                            href={`https://docs.google.com/document/d/${tpl.googleDocId}/edit`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1"
-                          >
-                            Open <ExternalLink className="w-3 h-3" />
-                          </a>
-                          <button
-                            onClick={() => {
-                              setEditingTemplateId(tpl.id);
-                              setTemplateDocInput(tpl.googleDocId);
-                            }}
-                            className="text-[11px] text-zinc-500 hover:text-zinc-700 ml-2"
-                          >
-                            Edit
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {isEditing ? (
-                          <div className="space-y-2">
-                            <input
-                              type="text"
-                              value={templateDocInput}
-                              onChange={(e) => setTemplateDocInput(e.target.value)}
-                              placeholder="Paste Google Doc URL or ID"
-                              className="w-full p-2 bg-white border border-zinc-300 rounded text-xs text-zinc-800"
-                            />
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => handleSaveTemplateDocId(tpl.id, templateDocInput)}
-                                className="px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded"
-                              >
-                                Save Link
-                              </button>
-                              <button
-                                onClick={() => setEditingTemplateId(null)}
-                                className="px-3 py-1 bg-zinc-200 text-zinc-700 text-xs font-semibold rounded"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
+                    {/* Google Doc Link / Quick Edit */}
+                    {isQuickEditing ? (
+                      <div className="p-3 bg-blue-50/50 border border-blue-200 rounded-lg space-y-2 text-xs">
+                        <label className="block text-[11px] font-bold text-zinc-700 flex items-center gap-1">
+                          <Link2 className="w-3.5 h-3.5 text-blue-600" />
+                          Paste Google Doc Link or ID
+                        </label>
+                        <input
+                          type="text"
+                          value={quickDocLinkInput}
+                          onChange={(e) => setQuickDocLinkInput(e.target.value)}
+                          placeholder="https://docs.google.com/document/d/... or Doc ID"
+                          className="w-full p-2 bg-white border border-zinc-300 rounded font-mono text-xs text-zinc-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                        <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => handleCreateStarterTemplateInDrive(tpl)}
-                              disabled={isCreatingStarterDoc === tpl.id}
-                              className="px-2.5 py-1 text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded transition-colors flex items-center gap-1"
+                              onClick={() => handleSaveQuickDocLink(tpl.id, quickDocLinkInput)}
+                              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded text-xs transition-colors"
                             >
-                              {isCreatingStarterDoc === tpl.id ? (
-                                <RefreshCw className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <Plus className="w-3 h-3" />
-                              )}
-                              Create in My Drive
+                              Save Link
                             </button>
                             <button
                               type="button"
                               onClick={() => {
-                                setEditingTemplateId(tpl.id);
-                                setTemplateDocInput('');
+                                setQuickEditTemplateId(null);
+                                setQuickDocLinkInput('');
                               }}
-                              className="px-2.5 py-1 text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded transition-colors"
+                              className="px-3 py-1 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 font-semibold rounded text-xs transition-colors"
                             >
-                              Paste Existing Doc Link
+                              Cancel
                             </button>
                           </div>
-                        )}
+
+                          <div className="flex items-center gap-2">
+                            {hasValidQuickDoc && (
+                              <a
+                                href={getGoogleDocUrl(extractedQuickId)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[11px] text-blue-700 hover:text-blue-900 font-semibold flex items-center gap-1"
+                              >
+                                <span>Test Doc</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                            {tpl.googleDocId && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleUnlinkTemplateDoc(tpl.id);
+                                  setQuickEditTemplateId(null);
+                                }}
+                                className="text-[11px] text-rose-600 hover:text-rose-800 font-medium"
+                              >
+                                Unlink
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : tpl.googleDocId ? (
+                      <div className="flex items-center justify-between gap-2 bg-zinc-50 p-2.5 rounded-lg border border-zinc-200 text-xs">
+                        <div className="flex items-center gap-1.5 overflow-hidden">
+                          <FileText className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span className="text-[11px] font-mono text-zinc-600 truncate">
+                            ID: {tpl.googleDocId}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <a
+                            href={getGoogleDocUrl(tpl.googleDocId)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 px-2 py-0.5 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+                          >
+                            <span>Open</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setQuickEditTemplateId(tpl.id);
+                              setQuickDocLinkInput(getGoogleDocUrl(tpl.googleDocId));
+                            }}
+                            className="text-[11px] text-zinc-600 hover:text-zinc-900 font-semibold px-2 py-0.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded transition-colors"
+                          >
+                            Edit Link
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUnlinkTemplateDoc(tpl.id)}
+                            className="p-1 text-zinc-400 hover:text-rose-600 rounded transition-colors"
+                            title="Unlink document"
+                          >
+                            <Unlink className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => handleCreateStarterTemplateInDrive(tpl)}
+                          disabled={isCreatingStarterDoc === tpl.id}
+                          className="px-2.5 py-1 text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors flex items-center gap-1 disabled:opacity-50"
+                        >
+                          {isCreatingStarterDoc === tpl.id ? (
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <HardDrive className="w-3 h-3" />
+                          )}
+                          <span>Create in Drive</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuickEditTemplateId(tpl.id);
+                            setQuickDocLinkInput('');
+                          }}
+                          className="px-2.5 py-1 text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-md transition-colors flex items-center gap-1"
+                        >
+                          <Link2 className="w-3 h-3 text-zinc-500" />
+                          <span>Link Google Doc</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditTemplate(tpl)}
+                          className="px-2 py-1 text-[11px] font-medium text-zinc-500 hover:text-zinc-800 transition-colors"
+                        >
+                          Configure
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1554,6 +1857,20 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Add / Edit Template Modal */}
+      <DocTemplateModal
+        isOpen={isTemplateModalOpen}
+        onClose={() => {
+          setIsTemplateModalOpen(false);
+          setTemplateToEdit(null);
+        }}
+        onSave={handleSaveTemplate}
+        editingTemplate={templateToEdit}
+        onDelete={handleDeleteTemplate}
+        token={token}
+        onConnectGoogle={() => handleConnectGoogle('jake@1070yankstreet.com')}
+      />
     </div>
   );
 };
