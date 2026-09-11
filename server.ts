@@ -1211,7 +1211,7 @@ app.post('/api/google/copy-file', async (req: Request, res: Response) => {
     }
 
     const driveRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/copy?fields=id,name,webViewLink`,
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/copy?fields=id,name,webViewLink,webContentLink`,
       {
         method: 'POST',
         headers: {
@@ -1233,6 +1233,95 @@ app.post('/api/google/copy-file', async (req: Request, res: Response) => {
     return res.json(data);
   } catch (err: any) {
     return res.status(500).json({ error: err.message || 'Failed to copy Drive file.' });
+  }
+});
+
+// 5. Proxy Search Google Drive for PDFs
+app.get('/api/google/search-drive-pdfs', async (req: Request, res: Response) => {
+  try {
+    const authHeader = (req.headers['authorization'] || '') as string;
+    const token = authHeader.replace(/^bearer\s+/i, '').trim();
+
+    if (!token) {
+      return res.status(401).json({ error: 'Google Workspace access token is required.' });
+    }
+
+    const keyword = (req.query.keyword as string || '').trim();
+    let queryClause = "mimeType = 'application/pdf' and trashed = false";
+    if (keyword) {
+      // Escape single quotes in keyword
+      const escaped = keyword.replace(/'/g, "\\'");
+      queryClause += ` and name contains '${escaped}'`;
+    }
+
+    const driveRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(queryClause)}&fields=files(id,name,webViewLink,webContentLink,size,createdTime,modifiedTime)&pageSize=50&orderBy=modifiedTime desc`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    );
+
+    const data = (await driveRes.json().catch(() => ({}))) as any;
+
+    if (!driveRes.ok) {
+      return res.status(driveRes.status).json({
+        error: data.error?.message || `Failed to search Google Drive (${driveRes.status})`
+      });
+    }
+
+    return res.json(data);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to search Google Drive files.' });
+  }
+});
+
+// 6. Proxy Replace File Content (updates existing Drive PDF with newly filled PDF)
+app.patch('/api/google/replace-file-content', async (req: Request, res: Response) => {
+  try {
+    const authHeader = (req.headers['authorization'] || '') as string;
+    const token = authHeader.replace(/^bearer\s+/i, '').trim();
+
+    if (!token) {
+      return res.status(401).json({ error: 'Google Workspace access token is required.' });
+    }
+
+    const { fileId, base64Data, mimeType = 'application/pdf' } = req.body;
+    if (!fileId) {
+      return res.status(400).json({ error: 'fileId is required.' });
+    }
+    if (!base64Data) {
+      return res.status(400).json({ error: 'No PDF file data provided.' });
+    }
+
+    const base64Clean = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
+    const fileBuffer = Buffer.from(base64Clean, 'base64');
+
+    const driveRes = await fetch(
+      `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(fileId)}?uploadType=media&fields=id,name,webViewLink,webContentLink,modifiedTime`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': mimeType,
+          'Content-Length': String(fileBuffer.length)
+        },
+        body: fileBuffer
+      }
+    );
+
+    const data = (await driveRes.json().catch(() => ({}))) as any;
+
+    if (!driveRes.ok) {
+      return res.status(driveRes.status).json({
+        error: data.error?.message || `Failed to update file in Google Drive (${driveRes.status})`
+      });
+    }
+
+    return res.json(data);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to replace file content in Google Drive.' });
   }
 });
 

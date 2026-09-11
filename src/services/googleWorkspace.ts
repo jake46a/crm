@@ -128,14 +128,19 @@ export interface DrivePdfRecord {
   roomName?: string;
   tenantName?: string;
   tenantId?: string;
-  docCategory?: string; // 'lease' | 'checklist' | 'id_scan' | 'receipt' | 'addendum' | 'notice' | 'other'
+  docCategory?: string; // 'lease' | 'checklist' | 'id_scan' | 'receipt' | 'addendum' | 'notice' | 'court_form' | 'other'
   notes?: string;
   webViewLink?: string;
   webContentLink?: string;
   sizeBytes?: number;
   uploadedAt: string;
   lastRenamedAt?: string;
-  status?: 'uploaded' | 'renamed' | 'local' | 'error';
+  status?: 'uploaded' | 'renamed' | 'copied' | 'in_acrobat' | 'filled_and_saved' | 'printed' | 'local' | 'error';
+  isMasterTemplate?: boolean;
+  masterSourceId?: string;
+  masterSourceName?: string;
+  isFilled?: boolean;
+  lastPrintedAt?: string;
 }
 
 declare global {
@@ -1016,6 +1021,90 @@ Management: ___________________________ Date: {{today_date}}
         headers: { Authorization: `Bearer ${cleanToken}` },
       }).catch(() => {});
     }
+  }
+
+  /**
+   * Searches user's Google Drive for PDF documents (e.g. Master templates, court forms)
+   */
+  static async searchDrivePdfs(token: string, keyword?: string): Promise<any[]> {
+    const cleanToken = (token || '').trim();
+    if (!cleanToken) return [];
+
+    try {
+      const url = keyword
+        ? `/api/google/search-drive-pdfs?keyword=${encodeURIComponent(keyword)}`
+        : '/api/google/search-drive-pdfs';
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${cleanToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.files || [];
+      }
+      throw new Error(`Drive search returned status ${res.status}`);
+    } catch (err) {
+      console.warn('Proxy search failed, falling back to direct:', err);
+      try {
+        let q = "mimeType = 'application/pdf' and trashed = false";
+        if (keyword) {
+          const escaped = keyword.replace(/'/g, "\\'");
+          q += ` and name contains '${escaped}'`;
+        }
+        const directRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,webViewLink,webContentLink,size,createdTime,modifiedTime)&pageSize=30&orderBy=modifiedTime desc`,
+          { headers: { Authorization: `Bearer ${cleanToken}` } }
+        );
+        if (directRes.ok) {
+          const directData = await directRes.json();
+          return directData.files || [];
+        }
+      } catch (directErr) {
+        console.warn('Direct search failed:', directErr);
+      }
+      return [];
+    }
+  }
+
+  /**
+   * Replaces an existing Google Drive PDF file's content with newly filled PDF data.
+   */
+  static async replaceDrivePdfContent(
+    fileId: string,
+    file: File | Blob,
+    token: string
+  ): Promise<any> {
+    const cleanFileId = (fileId || '').trim();
+    if (!cleanFileId) throw new Error('File ID is required to replace content.');
+    const cleanToken = (token || '').trim();
+    if (!cleanToken) throw new Error('Google OAuth token is required.');
+
+    // Convert file to base64
+    const base64Data = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Failed to read filled PDF file.'));
+      reader.readAsDataURL(file);
+    });
+
+    const res = await fetch('/api/google/replace-file-content', {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${cleanToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        fileId: cleanFileId,
+        base64Data,
+        mimeType: 'application/pdf',
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `Failed to replace PDF content in Google Drive (${res.status})`);
+    }
+
+    return data;
   }
 
   /**
