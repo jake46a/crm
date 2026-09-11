@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users2, Plus, X, Building, DollarSign, User, BadgeCheck, Trash2, AlertTriangle } from 'lucide-react';
 import { TenantLead, LeadStage, Property, Contact } from '../../types';
 import { splitFullName, formatFullName } from '../../utils/nameUtils';
+import { formatPhoneNumber, formatPhoneInput } from '../../utils/phoneUtils';
 
 interface NewLeadModalProps {
   isOpen: boolean;
@@ -62,7 +63,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
         setFirstName(fName);
         setLastName(lName);
         setEmail(editingLead.email || '');
-        setPhone(editingLead.phone || '');
+        setPhone(formatPhoneNumber(editingLead.phone) || '');
         setSource(editingLead.source || 'Roomies.com');
         setStage(editingLead.stage || 'New Lead');
         setAssignedAgent(editingLead.assignedAgent || '');
@@ -121,7 +122,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
       lastName: lName || undefined,
       name: fullName,
       email: email.trim(),
-      phone: phone.trim() || '(303) 555-0199',
+      phone: formatPhoneNumber(phone.trim()) || '(303) 555-0199',
       source: source as any,
       stage,
       assignedAgent: assignedAgent.trim() || (leasingAgentContacts[0]?.name || 'Jake Moyer'),
@@ -229,7 +230,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                 type="tel"
                 placeholder="(303) 555-0182"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
                 className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono"
               />
             </div>
@@ -265,7 +266,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                   {matchedAgent.name} • {matchedAgent.roleOrSpecialty || 'Leasing Agent'}
                   {matchedAgent.licenseNumber ? ` (${matchedAgent.licenseNumber})` : ''}
                 </span>
-                <span className="text-indigo-700 font-mono">{matchedAgent.phone}</span>
+                <span className="text-indigo-700 font-mono">{formatPhoneNumber(matchedAgent.phone)}</span>
               </div>
             )}
           </div>

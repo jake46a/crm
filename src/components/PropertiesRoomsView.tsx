@@ -24,6 +24,7 @@ import {
 import { Property, Room, RoomStatus, RoomBathroomType, TenantLead } from '../types';
 import { RoomStatusBadge, BathroomTypeBadge } from './common/Badges';
 import { getTenantFullName } from '../utils/nameUtils';
+import { formatPhoneNumber } from '../utils/phoneUtils';
 
 interface PropertiesRoomsViewProps {
   properties: Property[];
@@ -289,7 +290,7 @@ export const PropertiesRoomsView: React.FC<PropertiesRoomsViewProps> = ({
               <div>
                 <p className="text-[10px] uppercase text-zinc-400 font-bold tracking-wider">Owner</p>
                 <p className="font-bold text-zinc-200 text-sm mt-0.5">{selectedProperty.ownerName}</p>
-                <p className="text-zinc-400 font-mono text-[11px]">{selectedProperty.ownerPhone}</p>
+                <p className="text-zinc-400 font-mono text-[11px]">{formatPhoneNumber(selectedProperty.ownerPhone)}</p>
                 <p className="text-zinc-400 text-[11px] truncate">{selectedProperty.ownerEmail}</p>
               </div>
 
@@ -478,7 +479,7 @@ export const PropertiesRoomsView: React.FC<PropertiesRoomsViewProps> = ({
                       Active Lease
                     </span>
                   </div>
-                  <p className="text-zinc-500 text-[11px] font-mono">{room.currentTenantPhone}</p>
+                  <p className="text-zinc-500 text-[11px] font-mono">{formatPhoneNumber(room.currentTenantPhone)}</p>
                   <div className="pt-1.5 border-t border-zinc-100 flex justify-between text-[11px]">
                     <span className="text-zinc-500">Lease Ends:</span>
                     <strong className="text-zinc-900 font-mono">{room.leaseEndDate}</strong>

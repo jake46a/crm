@@ -38,6 +38,7 @@ import {
   formatDateToISO 
 } from '../utils/leaseEngine';
 import { formatFullName } from '../utils/nameUtils';
+import { formatPhoneNumber } from '../utils/phoneUtils';
 import { QuickSmsModal, QuickSmsRecipient } from './modals/QuickSmsModal';
 
 interface LeaseRenewalsViewProps {
@@ -696,7 +697,7 @@ export const LeaseRenewalsView: React.FC<LeaseRenewalsViewProps> = ({
                       {renewal.tenantPhone && (
                         <>
                           <span>•</span>
-                          <span className="text-zinc-500 font-mono text-[11px]">{renewal.tenantPhone}</span>
+                          <span className="text-zinc-500 font-mono text-[11px]">{formatPhoneNumber(renewal.tenantPhone)}</span>
                         </>
                       )}
                     </div>
@@ -1156,7 +1157,7 @@ export const LeaseRenewalsView: React.FC<LeaseRenewalsViewProps> = ({
           firstName: smsTargetRenewal.tenantFirstName,
           lastName: smsTargetRenewal.tenantLastName,
           name: smsTargetRenewal.tenantName,
-          phone: smsTargetRenewal.tenantPhone || '(303) 555-0100',
+          phone: formatPhoneNumber(smsTargetRenewal.tenantPhone) || '(303) 555-0100',
           email: smsTargetRenewal.tenantEmail,
           roleOrType: 'Active Room Tenant',
           propertyName: smsTargetRenewal.propertyName,

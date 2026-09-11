@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, Plus, X, Trash2, Home, Wifi, Key, AlertTriangle, CreditCard, RefreshCw } from 'lucide-react';
 import { Property } from '../../types';
+import { formatPhoneNumber, formatPhoneInput } from '../../utils/phoneUtils';
 import { SquareService, SquareLocation } from '../../services/squareService';
 
 interface NewPropertyModalProps {
@@ -54,7 +55,7 @@ export const NewPropertyModal: React.FC<NewPropertyModalProps> = ({
         setPropertyType(editingProperty.propertyType || 'Coliving Single-Family');
         setYearBuilt(editingProperty.yearBuilt || 2020);
         setOwnerName(editingProperty.ownerName || 'Jake Moyer');
-        setOwnerPhone(editingProperty.ownerPhone || '(303) 555-0100');
+        setOwnerPhone(formatPhoneNumber(editingProperty.ownerPhone) || '(303) 555-0100');
         setOwnerEmail(editingProperty.ownerEmail || 'jmoyer@moyerpm.com');
         setWifiNetwork(editingProperty.wifiNetwork || 'MoyerColiving_Guest');
         setWifiPassword(editingProperty.wifiPassword || 'StayClean2026!');
@@ -130,7 +131,7 @@ export const NewPropertyModal: React.FC<NewPropertyModalProps> = ({
       monthlyRevenueEstimate: editingProperty?.monthlyRevenueEstimate || 3600,
       ownerName: ownerName.trim(),
       ownerEmail: ownerEmail.trim(),
-      ownerPhone: ownerPhone.trim(),
+      ownerPhone: formatPhoneNumber(ownerPhone.trim()) || ownerPhone.trim(),
       wifiNetwork: wifiNetwork.trim(),
       wifiPassword: wifiPassword.trim(),
       keypadMasterCode: keypadMasterCode.trim(),
@@ -344,7 +345,7 @@ export const NewPropertyModal: React.FC<NewPropertyModalProps> = ({
               <input
                 type="tel"
                 value={ownerPhone}
-                onChange={(e) => setOwnerPhone(e.target.value)}
+                onChange={(e) => setOwnerPhone(formatPhoneInput(e.target.value))}
                 className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md text-zinc-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
             </div>

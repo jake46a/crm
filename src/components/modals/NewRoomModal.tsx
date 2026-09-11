@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Home, Plus, X, Building, DollarSign, Trash2, AlertCircle, PlusCircle } from 'lucide-react';
 import { Room, RoomStatus, RoomBathroomType, FloorLevel, Property } from '../../types';
 import { splitFullName, formatFullName } from '../../utils/nameUtils';
+import { formatPhoneNumber, formatPhoneInput } from '../../utils/phoneUtils';
 
 interface NewRoomModalProps {
   isOpen: boolean;
@@ -104,7 +105,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
         setCurrentTenantFirstName(fName);
         setCurrentTenantLastName(lName);
         setCurrentTenantEmail(editingRoom.currentTenantEmail || '');
-        setCurrentTenantPhone(editingRoom.currentTenantPhone || '');
+        setCurrentTenantPhone(formatPhoneNumber(editingRoom.currentTenantPhone) || '');
         setLeaseEndDate(editingRoom.leaseEndDate || '');
         setAmenities(
           editingRoom.amenities?.join(', ') ||
@@ -222,7 +223,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
         const fullName = formatFullName(fName, lName);
         if (fullName) newRoom.currentTenantName = fullName;
         if (currentTenantEmail.trim()) newRoom.currentTenantEmail = currentTenantEmail.trim();
-        if (currentTenantPhone.trim()) newRoom.currentTenantPhone = currentTenantPhone.trim();
+        if (currentTenantPhone.trim()) newRoom.currentTenantPhone = formatPhoneNumber(currentTenantPhone.trim()) || currentTenantPhone.trim();
         if (leaseEndDate.trim()) newRoom.leaseEndDate = leaseEndDate.trim();
       }
 
@@ -486,7 +487,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
                     type="tel"
                     placeholder="e.g. (303) 555-0145"
                     value={currentTenantPhone}
-                    onChange={(e) => setCurrentTenantPhone(e.target.value)}
+                    onChange={(e) => setCurrentTenantPhone(formatPhoneInput(e.target.value))}
                     className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>

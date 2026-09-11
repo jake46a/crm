@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Contact as ContactIcon, Plus, X, Trash2, AlertTriangle, CreditCard, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Contact, ContactType, Property } from '../../types';
 import { splitFullName, formatFullName } from '../../utils/nameUtils';
+import { formatPhoneNumber, formatPhoneInput } from '../../utils/phoneUtils';
 import { SquareService } from '../../services/squareService';
 
 interface NewContactModalProps {
@@ -57,7 +58,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         setLastName(lName);
         setType(editingContact.type || 'Tenant');
         setEmail(editingContact.email || '');
-        setPhone(editingContact.phone || '');
+        setPhone(formatPhoneNumber(editingContact.phone) || '');
         setCompany(editingContact.company || '');
         setRoleOrSpecialty(editingContact.roleOrSpecialty || '');
         setHourlyRate(editingContact.hourlyRate);
@@ -67,7 +68,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         setStatus(editingContact.status || 'Active');
         setNotes(editingContact.notes || '');
         setEmergencyContactName(editingContact.emergencyContactName || '');
-        setEmergencyContactPhone(editingContact.emergencyContactPhone || '');
+        setEmergencyContactPhone(formatPhoneNumber(editingContact.emergencyContactPhone) || '');
         setSquareCustomerId(editingContact.squareCustomerId || '');
       } else {
         setFirstName('');
@@ -106,7 +107,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         email: email.trim(),
         firstName: firstName.trim() || undefined,
         lastName: lastName.trim() || undefined,
-        phone: phone.trim() || undefined,
+        phone: formatPhoneNumber(phone.trim()) || undefined,
         note: `Coliving Tenant in Moyer PM CRM`,
         allowFallback: true
       });
@@ -214,7 +215,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         type,
         status: isAgent ? status : (editingContact?.status || 'Active'),
         email: email.trim() || undefined,
-        phone: phone.trim(),
+        phone: formatPhoneNumber(phone.trim()) || phone.trim(),
         company: (isVendor || isOwner) && company.trim() ? company.trim() : undefined,
         roleOrSpecialty: (isVendor || isAgent) && roleOrSpecialty.trim() ? roleOrSpecialty.trim() : (isAgent ? 'Leasing Agent' : undefined),
         hourlyRate: isVendor && hourlyRate ? Number(hourlyRate) : undefined,
@@ -224,7 +225,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         propertyName: (isTenant || isOwner || isAgent) ? prop?.name : undefined,
         notes: notes.trim() || '',
         emergencyContactName: isTenant && emergencyContactName.trim() ? emergencyContactName.trim() : undefined,
-        emergencyContactPhone: isTenant && emergencyContactPhone.trim() ? emergencyContactPhone.trim() : undefined,
+        emergencyContactPhone: isTenant && emergencyContactPhone.trim() ? (formatPhoneNumber(emergencyContactPhone.trim()) || emergencyContactPhone.trim()) : undefined,
         squareCustomerId: isTenant && finalSquareId ? finalSquareId : undefined,
         avatarBg: editingContact?.avatarBg || (isAgent ? 'bg-indigo-600' : randomBg)
       };
@@ -304,7 +305,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
                 required
                 placeholder="(303) 555-0199"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
                 className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
             </div>
@@ -448,7 +449,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
                     type="tel"
                     placeholder="(303) 555-0144"
                     value={emergencyContactPhone}
-                    onChange={(e) => setEmergencyContactPhone(e.target.value)}
+                    onChange={(e) => setEmergencyContactPhone(formatPhoneInput(e.target.value))}
                     className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
                 </div>

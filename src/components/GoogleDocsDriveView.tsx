@@ -29,6 +29,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { Property, Room, LeaseRenewal, NavigationTab, Invoice, TenantLead, Contact } from '../types';
+import { formatPhoneNumber, formatPhoneInput } from '../utils/phoneUtils';
 import { 
   GoogleWorkspaceService, 
   GoogleWorkspaceUser, 
@@ -166,7 +167,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
       setCustomRoomName(room.name || 'Room 1');
       setCustomTenantName(room.currentTenantName || '');
       setCustomTenantEmail(room.currentTenantEmail || '');
-      setCustomTenantPhone(room.currentTenantPhone || '');
+      setCustomTenantPhone(formatPhoneNumber(room.currentTenantPhone) || '');
       if (room.monthlyRent) {
         setCustomMonthlyRent(room.monthlyRent);
         setCustomSecurityDeposit(room.securityDeposit || room.monthlyRent);
@@ -225,7 +226,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
     if (lead) {
       setCustomTenantName(lead.fullName || '');
       setCustomTenantEmail(lead.email || '');
-      setCustomTenantPhone(lead.phone || '');
+      setCustomTenantPhone(formatPhoneNumber(lead.phone) || '');
       if (lead.budgetMax) {
         setCustomMonthlyRent(lead.budgetMax);
         setCustomSecurityDeposit(lead.budgetMax);
@@ -439,7 +440,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
       const replacements: Record<string, string> = {
         '{{tenant_name}}': String(tenantClean || 'Resident'),
         '{{tenant_email}}': String((customTenantEmail || '').trim() || (activeRoom?.currentTenantEmail || '').trim() || 'resident@1070yankstreet.com'),
-        '{{tenant_phone}}': String((customTenantPhone || '').trim() || (activeRoom?.currentTenantPhone || '').trim() || '(303) 555-0100'),
+        '{{tenant_phone}}': formatPhoneNumber((customTenantPhone || '').trim() || (activeRoom?.currentTenantPhone || '').trim() || '(303) 555-0100') || '(303) 555-0100',
         '{{property_name}}': String(propertyClean || '1070 Yank St'),
         '{{property_address}}': String(addressClean || '1070 Yank St, Golden, CO 80215'),
         '{{room_name}}': String(roomClean || 'Room 1'),
@@ -458,7 +459,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
         '{{violation_reason}}': String(customViolationReason || 'Non-payment of past due rent balance and failure to cure within statutory grace period.'),
         '{{key_return_instructions}}': 'Return room key and mailbox key to property manager lockbox located in the main foyer.',
         '{{manager_name}}': String(activeProperty?.ownerName || 'Jake Moyer, 1070 Yank Street Coliving'),
-        '{{manager_phone}}': String(activeProperty?.ownerPhone || '(303) 555-0199'),
+        '{{manager_phone}}': formatPhoneNumber(activeProperty?.ownerPhone || '(303) 555-0199') || '(303) 555-0199',
         '{{manager_email}}': String(activeProperty?.ownerEmail || 'jake@1070yankstreet.com'),
         '{{today_date}}': todayStr,
         '{{billing_period}}': new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
@@ -1092,7 +1093,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
                     <input
                       type="tel"
                       value={customTenantPhone || ''}
-                      onChange={(e) => setCustomTenantPhone(e.target.value)}
+                      onChange={(e) => setCustomTenantPhone(formatPhoneInput(e.target.value))}
                       placeholder="e.g. (303) 555-0100"
                       className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     />

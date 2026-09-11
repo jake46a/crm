@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Contact, ContactType, Property, Room } from '../types';
 import { formatFullName } from '../utils/nameUtils';
+import { formatPhoneNumber, getPhoneTelHref } from '../utils/phoneUtils';
 import { QuickSmsModal, QuickSmsRecipient } from './modals/QuickSmsModal';
 
 interface ContactsViewProps {
@@ -286,8 +287,8 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
               <div className="space-y-1 text-xs text-zinc-600 pt-1 border-t border-zinc-100">
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400">Phone:</span>
-                  <a href={`tel:${contact.phone}`} className="font-mono font-medium text-zinc-800 hover:text-indigo-600">
-                    {contact.phone}
+                  <a href={getPhoneTelHref(contact.phone)} className="font-mono font-medium text-zinc-800 hover:text-indigo-600">
+                    {formatPhoneNumber(contact.phone)}
                   </a>
                 </div>
                 <div className="flex items-center justify-between">
@@ -299,7 +300,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                 {contact.emergencyContactName && (
                   <div className="pt-1 text-[11px] text-zinc-500 flex justify-between">
                     <span>Emergency:</span>
-                    <span className="font-medium text-zinc-700">{contact.emergencyContactName} ({contact.emergencyContactPhone})</span>
+                    <span className="font-medium text-zinc-700">{contact.emergencyContactName} {contact.emergencyContactPhone ? `(${formatPhoneNumber(contact.emergencyContactPhone)})` : ''}</span>
                   </div>
                 )}
               </div>
@@ -325,7 +326,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
 
               <div className="flex items-center gap-1.5">
                 <a
-                  href={`tel:${contact.phone}`}
+                  href={getPhoneTelHref(contact.phone)}
                   className="p-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-sm transition-colors"
                   title="Call Contact"
                 >
@@ -432,7 +433,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
           firstName: quickSmsModalContact.firstName,
           lastName: quickSmsModalContact.lastName,
           name: quickSmsModalContact.name,
-          phone: quickSmsModalContact.phone,
+          phone: formatPhoneNumber(quickSmsModalContact.phone),
           email: quickSmsModalContact.email,
           roleOrType: quickSmsModalContact.type,
           propertyName: quickSmsModalContact.propertyName,

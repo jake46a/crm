@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { Property, Room, Contact, Invoice, InvoicingSubtask, InvoiceStatus, LeaseRenewal, NavigationTab } from '../../types';
 import { splitFullName, formatFullName } from '../../utils/nameUtils';
+import { formatPhoneNumber, formatPhoneInput } from '../../utils/phoneUtils';
 import { SquareService, SquareStatusResponse } from '../../services/squareService';
 import { FirebaseService } from '../../services/firebase';
 import { StorageService } from '../../services/storage';
@@ -340,7 +341,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
       currentRent: item.rent || Number(item.room.monthlyRent) || 895
     });
     setModalEmail(item.tenantEmail || '');
-    setModalPhone(item.tenantPhone || '');
+    setModalPhone(formatPhoneNumber(item.tenantPhone) || '');
     setModalRent(item.rent || Number(item.room.monthlyRent) || 895);
     setEmailModalError('');
   };
@@ -357,7 +358,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
     setEmailModalError('');
 
     try {
-      const cleanPhone = modalPhone.trim();
+      const cleanPhone = formatPhoneNumber(modalPhone.trim()) || modalPhone.trim();
       const targetRoom = editingEmailItem.room;
       const cleanRent = modalRent > 0 ? modalRent : (Number(targetRoom.monthlyRent) || 895);
 
@@ -515,7 +516,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
     }
 
     // 3. Resolve Tenant Phone
-    const resolvedPhone = matchedContact?.phone?.trim() || room.currentTenantPhone?.trim() || '';
+    const resolvedPhone = formatPhoneNumber(matchedContact?.phone?.trim() || room.currentTenantPhone?.trim() || '') || '';
 
     // 4. Square customer ID
     const squareCustomerId = matchedContact?.squareCustomerId || '';
@@ -2493,7 +2494,7 @@ export const InvoicingView: React.FC<InvoicingViewProps> = ({
                   type="tel"
                   placeholder="e.g. (415) 555-0199"
                   value={modalPhone}
-                  onChange={(e) => setModalPhone(e.target.value)}
+                  onChange={(e) => setModalPhone(formatPhoneInput(e.target.value))}
                   className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs font-mono text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
               </div>

@@ -3,6 +3,7 @@ import { FileText, Plus, X, Building, DollarSign, Sparkles, AlertCircle, Calenda
 import { LeaseRenewal, LeaseRenewalStatus, Property, Room } from '../../types';
 import { calculateAnnualReviewMilestones } from '../../utils/leaseEngine';
 import { splitFullName, formatFullName } from '../../utils/nameUtils';
+import { formatPhoneNumber, formatPhoneInput } from '../../utils/phoneUtils';
 
 interface NewRenewalModalProps {
   isOpen: boolean;
@@ -60,7 +61,7 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
         setTenantFirstName(fName);
         setTenantLastName(lName);
         setTenantEmail(editingRenewal.tenantEmail || '');
-        setTenantPhone(editingRenewal.tenantPhone || '');
+        setTenantPhone(formatPhoneNumber(editingRenewal.tenantPhone) || '');
         setRenewalStatus(editingRenewal.renewalStatus || 'Review Pending');
         setLeaseStartDate(editingRenewal.leaseStartDate || '2025-10-01');
         setCurrentMonthlyRent(editingRenewal.currentMonthlyRent || 895);
@@ -81,7 +82,7 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
         setTenantFirstName(fName);
         setTenantLastName(lName);
         setTenantEmail(r?.currentTenantEmail || 'resident@moyercoliving.com');
-        setTenantPhone(r?.currentTenantPhone || '(303) 555-0100');
+        setTenantPhone(formatPhoneNumber(r?.currentTenantPhone) || '(303) 555-0100');
         setRenewalStatus('Review Pending');
         setLeaseStartDate(start);
         setCurrentMonthlyRent(rent);
@@ -113,7 +114,7 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
         setTenantFirstName(fName);
         setTenantLastName(lName);
         setTenantEmail(r.currentTenantEmail || 'resident@moyercoliving.com');
-        setTenantPhone(r.currentTenantPhone || '(303) 555-0100');
+        setTenantPhone(formatPhoneNumber(r.currentTenantPhone) || '(303) 555-0100');
       }
       setCurrentMonthlyRent(r.monthlyRent);
       setProposedMonthlyRent(Math.round(r.monthlyRent * 1.04));
@@ -163,7 +164,7 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
       tenantLastName: lName || undefined,
       tenantName: fullName,
       tenantEmail: tenantEmail.trim() || 'resident@moyercoliving.com',
-      tenantPhone: tenantPhone.trim() || '(303) 555-0100',
+      tenantPhone: formatPhoneNumber(tenantPhone.trim()) || '(303) 555-0100',
       propertyId: selectedProperty.id,
       propertyName: selectedProperty.name,
       roomId: selectedRoom.id,
@@ -282,7 +283,7 @@ export const NewRenewalModal: React.FC<NewRenewalModalProps> = ({
                   type="text"
                   placeholder="(303) 555-0100"
                   value={tenantPhone}
-                  onChange={(e) => setTenantPhone(e.target.value)}
+                  onChange={(e) => setTenantPhone(formatPhoneInput(e.target.value))}
                   className="w-full p-2 bg-white border border-zinc-300 rounded-md text-zinc-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
               </div>

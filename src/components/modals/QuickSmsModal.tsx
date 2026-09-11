@@ -12,6 +12,7 @@ import {
   Phone
 } from 'lucide-react';
 import { formatFullName } from '../../utils/nameUtils';
+import { formatPhoneNumber } from '../../utils/phoneUtils';
 import { cleanPhoneNumber, openGoogleVoice, openNativeSms, SMS_TEMPLATES } from '../../utils/smsUtils';
 
 export interface QuickSmsRecipient {
@@ -198,7 +199,7 @@ export const QuickSmsModal: React.FC<QuickSmsModalProps> = ({
             <div>
               <span className="text-[10px] uppercase font-bold text-zinc-500 block">Recipient Phone</span>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="font-mono font-bold text-zinc-900 text-sm">{recipient.phone}</span>
+                <span className="font-mono font-bold text-zinc-900 text-sm">{formatPhoneNumber(recipient.phone)}</span>
                 <button
                   type="button"
                   onClick={handleCopyPhone}
