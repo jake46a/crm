@@ -24,6 +24,7 @@ import {
   Sparkles,
   ChevronDown,
   ChevronUp,
+  RotateCcw,
 } from 'lucide-react';
 import { Property, Room, Contact, TenantLead } from '../types';
 import {
@@ -35,6 +36,7 @@ import {
   MasterPdfWorkflowModal,
   MasterPdfTemplate,
 } from './modals/MasterPdfWorkflowModal';
+import { EditMasterTemplateModal } from './modals/EditMasterTemplateModal';
 
 interface DrivePdfManagerProps {
   properties: Property[];
@@ -109,11 +111,39 @@ export const DrivePdfManager: React.FC<DrivePdfManagerProps> = ({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
 
-  // Master Forms state
-  const [masterTemplates, setMasterTemplates] = useState<MasterPdfTemplate[]>(STANDARD_MASTER_TEMPLATES);
+  // Master Forms state with local storage persistence
+  const STORAGE_KEY_MASTER_TEMPLATES = 'moyer_crm_master_pdf_templates';
+  const [masterTemplates, setMasterTemplates] = useState<MasterPdfTemplate[]>(() => {
+    try {
+      const raw = localStorage.getItem('moyer_crm_master_pdf_templates');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not parse stored master templates', e);
+    }
+    return STANDARD_MASTER_TEMPLATES;
+  });
+
+  const saveMasterTemplates = (templates: MasterPdfTemplate[]) => {
+    setMasterTemplates(templates);
+    try {
+      localStorage.setItem(STORAGE_KEY_MASTER_TEMPLATES, JSON.stringify(templates));
+    } catch (e) {
+      console.warn('Could not save master templates to localStorage', e);
+    }
+  };
+
   const [isSearchingDriveTemplates, setIsSearchingDriveTemplates] = useState<boolean>(false);
   const [driveSearchQuery, setDriveSearchQuery] = useState<string>('');
   const [driveSearchStatus, setDriveSearchStatus] = useState<string | null>(null);
+
+  // Master Template Edit Modal State
+  const [isEditMasterModalOpen, setIsEditMasterModalOpen] = useState<boolean>(false);
+  const [selectedTemplateForEdit, setSelectedTemplateForEdit] = useState<MasterPdfTemplate | null>(null);
 
   // Workflow Modal State
   const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState<boolean>(false);
@@ -227,11 +257,10 @@ export const DrivePdfManager: React.FC<DrivePdfManagerProps> = ({
         }));
 
         // Merge without duplicates
-        setMasterTemplates((prev) => {
-          const existingIds = new Set(prev.map((p) => p.name));
-          const newOnes = mapped.filter((m) => !existingIds.has(m.name));
-          return [...newOnes, ...prev];
-        });
+        const existingIds = new Set(masterTemplates.map((p) => p.name));
+        const newOnes = mapped.filter((m) => !existingIds.has(m.name));
+        const updatedTemplates = [...newOnes, ...masterTemplates];
+        saveMasterTemplates(updatedTemplates);
 
         setDriveSearchStatus(`Found ${results.length} PDF form(s) in your Google Drive!`);
       } else {
@@ -259,6 +288,54 @@ export const DrivePdfManager: React.FC<DrivePdfManagerProps> = ({
     setIsWorkflowModalOpen(true);
   };
 
+  // Open Edit Master Template Modal
+  const handleOpenEditMasterTemplate = (tpl: MasterPdfTemplate) => {
+    setSelectedTemplateForEdit(tpl);
+    setIsEditMasterModalOpen(true);
+  };
+
+  // Save changes to a Master Template
+  const handleSaveMasterTemplate = (updated: MasterPdfTemplate) => {
+    const updatedList = masterTemplates.map((t) => (t.id === updated.id ? updated : t));
+    saveMasterTemplates(updatedList);
+    setUploadSuccess(`Master template "${updated.name}" updated successfully.`);
+  };
+
+  // Delete a Master Template
+  const handleDeleteMasterTemplate = async (templateId: string) => {
+    const target = masterTemplates.find((t) => t.id === templateId);
+    if (!target) return;
+
+    if (!window.confirm(`Are you sure you want to delete "${target.name}" from your master forms?`)) {
+      return;
+    }
+
+    // If it has a remote Drive file ID, optionally remove from Drive
+    if (token && target.driveFileId && !target.id.startsWith('tpl-')) {
+      try {
+        await GoogleWorkspaceService.deleteDriveFile(target.driveFileId, token);
+      } catch (err) {
+        console.warn('Could not delete master file from Drive:', err);
+      }
+    }
+
+    const updatedList = masterTemplates.filter((t) => t.id !== templateId);
+    saveMasterTemplates(updatedList);
+    setUploadSuccess(`Master template "${target.name}" removed from library.`);
+  };
+
+  // Restore Default Colorado Court & Lease Master Templates
+  const handleRestoreDefaultMasterTemplates = () => {
+    if (
+      window.confirm(
+        'Restore default master templates list (jdf101, jdf102, jdf99, Colorado residential lease, condition checklist, rules)?'
+      )
+    ) {
+      saveMasterTemplates(STANDARD_MASTER_TEMPLATES);
+      setUploadSuccess('Default Colorado master templates restored.');
+    }
+  };
+
   // Upload a new master PDF to Drive
   const handleUploadNewMasterPdf = async (files: FileList | null) => {
     if (!files || !files[0]) return;
@@ -282,7 +359,7 @@ export const DrivePdfManager: React.FC<DrivePdfManagerProps> = ({
         driveFileId: fileId,
         isCourtForm: file.name.toLowerCase().includes('jdf'),
       };
-      setMasterTemplates((prev) => [newTpl, ...prev]);
+      saveMasterTemplates([newTpl, ...masterTemplates]);
       setUploadSuccess(`Uploaded "${file.name}" to Master Templates in Google Drive!`);
     } catch (err: any) {
       console.error('Error uploading master PDF:', err);
@@ -484,6 +561,16 @@ export const DrivePdfManager: React.FC<DrivePdfManagerProps> = ({
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Master PDF</span>
               </button>
+
+              <button
+                type="button"
+                onClick={handleRestoreDefaultMasterTemplates}
+                className="px-2.5 py-2 text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 rounded-lg text-xs font-semibold transition border border-zinc-200 flex items-center gap-1"
+                title="Restore default Colorado court forms and residential lease templates"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Reset Defaults</span>
+              </button>
             </div>
           </div>
 
@@ -536,60 +623,137 @@ export const DrivePdfManager: React.FC<DrivePdfManagerProps> = ({
 
           {/* Master Form Templates Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {masterTemplates.map((tpl) => (
-              <div
-                key={tpl.id}
-                id={`master-tpl-${tpl.id}`}
-                className="bg-white border-2 border-zinc-200 hover:border-rose-500 rounded-xl p-4 transition-all shadow-2xs hover:shadow-md flex flex-col justify-between group cursor-pointer"
-                onClick={() => handlePickMasterForm(tpl)}
-              >
-                <div className="space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="p-2 rounded-lg bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition">
-                      <FileText className="w-5 h-5" />
-                    </div>
+            {masterTemplates.map((tpl) => {
+              const driveUrl = tpl.driveFileId
+                ? `https://drive.google.com/file/d/${tpl.driveFileId}/view`
+                : tpl.driveLink || null;
 
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {tpl.isCourtForm && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                          Colorado Court Form
+              return (
+                <div
+                  key={tpl.id}
+                  id={`master-tpl-${tpl.id}`}
+                  className="bg-white border-2 border-zinc-200 hover:border-rose-500 rounded-xl p-4 transition-all shadow-2xs hover:shadow-md flex flex-col justify-between group cursor-pointer"
+                  onClick={() => handlePickMasterForm(tpl)}
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="p-2 rounded-lg bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition">
+                        <FileText className="w-5 h-5" />
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                        {tpl.isCourtForm && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                            Colorado Court Form
+                          </span>
+                        )}
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-100 text-zinc-700 border border-zinc-200">
+                          Drive Master
                         </span>
-                      )}
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-100 text-zinc-700 border border-zinc-200">
-                        Drive Master
-                      </span>
+
+                        {/* Top quick action buttons for Edit and Delete */}
+                        <div className="flex items-center gap-0.5 ml-1">
+                          <button
+                            type="button"
+                            id={`btn-edit-master-${tpl.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEditMasterTemplate(tpl);
+                            }}
+                            className="p-1 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
+                            title="Edit master file details and link"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            id={`btn-delete-master-${tpl.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteMasterTemplate(tpl.id);
+                            }}
+                            className="p-1 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                            title="Delete master file"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="text-xs font-bold text-zinc-900 group-hover:text-rose-700 transition font-mono break-all">
+                        {tpl.name}
+                      </h4>
+                      <p className="text-[11px] text-zinc-500 mt-1 line-clamp-2 leading-relaxed">
+                        {tpl.description}
+                      </p>
                     </div>
                   </div>
 
-                  <div>
-                    <h4 className="text-xs font-bold text-zinc-900 group-hover:text-rose-700 transition font-mono break-all">
-                      {tpl.name}
-                    </h4>
-                    <p className="text-[11px] text-zinc-500 mt-1 line-clamp-2 leading-relaxed">
-                      {tpl.description}
-                    </p>
+                  {/* Bottom Action */}
+                  <div className="pt-3 mt-3 border-t border-zinc-100 flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-semibold text-zinc-500 truncate max-w-[100px]" title={tpl.category}>
+                      {tpl.category}
+                    </span>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {driveUrl && (
+                        <a
+                          href={driveUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                          title="Open master file in Google Drive"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span className="hidden sm:inline">Drive</span>
+                        </a>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditMasterTemplate(tpl);
+                        }}
+                        className="text-xs font-semibold text-zinc-600 hover:text-blue-700 hover:underline flex items-center gap-1"
+                        title="Edit master file details, category, or replace PDF"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                        <span>Edit</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteMasterTemplate(tpl.id);
+                        }}
+                        className="text-xs font-semibold text-zinc-400 hover:text-rose-600 hover:underline flex items-center gap-1"
+                        title="Delete master form from library"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Delete</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePickMasterForm(tpl);
+                        }}
+                        className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-2xs"
+                      >
+                        <span>Use Form</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-                {/* Bottom Action */}
-                <div className="pt-3 mt-3 border-t border-zinc-100 flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-zinc-500">
-                    {tpl.category}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePickMasterForm(tpl);
-                    }}
-                    className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-2xs"
-                  >
-                    <span>Use Form</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* 6-Step Visual Flow Banner */}
@@ -1009,6 +1173,19 @@ export const DrivePdfManager: React.FC<DrivePdfManagerProps> = ({
           setPdfRecords((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
         }}
         onConnectGoogle={onConnectGoogle}
+      />
+
+      {/* Edit Master Template Modal */}
+      <EditMasterTemplateModal
+        isOpen={isEditMasterModalOpen}
+        onClose={() => {
+          setIsEditMasterModalOpen(false);
+          setSelectedTemplateForEdit(null);
+        }}
+        template={selectedTemplateForEdit}
+        token={token}
+        onSave={handleSaveMasterTemplate}
+        onDelete={handleDeleteMasterTemplate}
       />
     </div>
   );
