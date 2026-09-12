@@ -886,6 +886,297 @@ export async function onRequest(context: { request: Request; env: Env; params: a
     });
   }
 
+  // ----------------------------------------------------
+  // GOOGLE WORKSPACE / DRIVE PDF ENDPOINTS (Cloudflare Pages Edge)
+  // ----------------------------------------------------
+  if (pathname.startsWith('/api/google')) {
+    const googleAuthHeader = request.headers.get('Authorization') || '';
+    const googleToken = googleAuthHeader.replace(/^bearer\s+/i, '').trim();
+
+    // 8a. Google Health / Status
+    if ((pathname === '/api/google/status' || pathname === '/api/google') && request.method === 'GET') {
+      return jsonResponse({
+        status: 'online',
+        platform: 'cloudflare-pages',
+        hasToken: Boolean(googleToken),
+        endpoints: [
+          '/api/google/upload-pdf',
+          '/api/google/copy-file',
+          '/api/google/rename-file',
+          '/api/google/delete-file',
+          '/api/google/search-drive-pdfs',
+          '/api/google/replace-file-content',
+        ],
+      });
+    }
+
+    if (!googleToken) {
+      return jsonResponse({
+        error: 'Google Workspace access token is required. Please authenticate with Google Drive.',
+        source: 'cloudflare_pages_api',
+      }, 401);
+    }
+
+    // Helper: Decode Base64 to Uint8Array safely in Cloudflare edge worker
+    const parseBase64ToBytes = (base64String: string): Uint8Array => {
+      const clean = base64String.includes(',') ? base64String.split(',')[1] : base64String;
+      const binary = atob(clean);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    };
+
+    // Helper: Build multipart/related body for Google Drive upload
+    const buildMultipartBody = (metadata: any, fileBytes: Uint8Array, boundary: string, mimeType = 'application/pdf'): Uint8Array => {
+      const encoder = new TextEncoder();
+      const delimiter = `\r\n--${boundary}\r\n`;
+      const closeDelim = `\r\n--${boundary}--`;
+      const metaPart = `${delimiter}Content-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n${delimiter}Content-Type: ${mimeType}\r\n\r\n`;
+
+      const metaBytes = encoder.encode(metaPart);
+      const closeBytes = encoder.encode(closeDelim);
+
+      const totalLength = metaBytes.length + fileBytes.length + closeBytes.length;
+      const merged = new Uint8Array(totalLength);
+      merged.set(metaBytes, 0);
+      merged.set(fileBytes, metaBytes.length);
+      merged.set(closeBytes, metaBytes.length + fileBytes.length);
+      return merged;
+    };
+
+    // 8b. Upload PDF to Google Drive
+    if (pathname === '/api/google/upload-pdf' && request.method === 'POST') {
+      try {
+        const body = (await request.json().catch(() => ({}))) as any;
+        const { name, base64Data, mimeType = 'application/pdf' } = body;
+        if (!base64Data) {
+          return jsonResponse({ error: 'No PDF file data provided.' }, 400);
+        }
+
+        const cleanName = (name || 'Document.pdf').trim();
+        const finalName = cleanName.toLowerCase().endsWith('.pdf') ? cleanName : `${cleanName}.pdf`;
+        const fileBytes = parseBase64ToBytes(base64Data);
+
+        const boundary = '-------moyerCfUploadBoundary' + Math.random().toString(36).substring(2);
+        const metadata = { name: finalName, mimeType: 'application/pdf' };
+        const multipartBody = buildMultipartBody(metadata, fileBytes, boundary, mimeType);
+
+        const driveRes = await fetch(
+          'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink,size,createdTime',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${googleToken}`,
+              'Content-Type': `multipart/related; boundary=${boundary}`,
+              'Content-Length': String(multipartBody.length),
+            },
+            body: multipartBody,
+          }
+        );
+
+        const data = (await driveRes.json().catch(() => ({}))) as any;
+        if (!driveRes.ok) {
+          return jsonResponse({
+            error: data?.error?.message || `Google Drive upload error (${driveRes.status})`,
+            status: driveRes.status,
+            details: data?.error,
+            source: 'cloudflare_pages_api',
+          }, driveRes.status);
+        }
+
+        return jsonResponse(data, 200);
+      } catch (err: any) {
+        return jsonResponse({ error: err.message || 'Edge upload failed', source: 'cloudflare_pages_api' }, 500);
+      }
+    }
+
+    // 8c. Copy Drive File
+    if (pathname === '/api/google/copy-file' && request.method === 'POST') {
+      try {
+        const body = (await request.json().catch(() => ({}))) as any;
+        const { fileId, name } = body;
+        if (!fileId) {
+          return jsonResponse({ error: 'fileId is required.' }, 400);
+        }
+
+        const driveRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/copy?fields=id,name,webViewLink,webContentLink`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${googleToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ name: name || 'Copy' }),
+          }
+        );
+
+        const data = (await driveRes.json().catch(() => ({}))) as any;
+        if (!driveRes.ok) {
+          return jsonResponse({
+            error: data?.error?.message || `Failed to copy Drive file (${driveRes.status})`,
+            source: 'cloudflare_pages_api',
+          }, driveRes.status);
+        }
+
+        return jsonResponse(data, 200);
+      } catch (err: any) {
+        return jsonResponse({ error: err.message || 'Failed to copy Drive file.', source: 'cloudflare_pages_api' }, 500);
+      }
+    }
+
+    // 8d. Rename Drive File
+    if (pathname === '/api/google/rename-file' && (request.method === 'PATCH' || request.method === 'POST')) {
+      try {
+        const body = (await request.json().catch(() => ({}))) as any;
+        const { fileId, newName } = body;
+        if (!fileId) {
+          return jsonResponse({ error: 'fileId is required.' }, 400);
+        }
+
+        const cleanName = (newName || '').trim();
+        const finalName = cleanName.toLowerCase().endsWith('.pdf') ? cleanName : `${cleanName}.pdf`;
+
+        const driveRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,webViewLink,webContentLink`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${googleToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ name: finalName }),
+          }
+        );
+
+        const data = (await driveRes.json().catch(() => ({}))) as any;
+        if (!driveRes.ok) {
+          return jsonResponse({
+            error: data?.error?.message || `Google Drive rename error (${driveRes.status})`,
+            source: 'cloudflare_pages_api',
+          }, driveRes.status);
+        }
+
+        return jsonResponse(data, 200);
+      } catch (err: any) {
+        return jsonResponse({ error: err.message || 'Failed to rename file.', source: 'cloudflare_pages_api' }, 500);
+      }
+    }
+
+    // 8e. Delete Drive File
+    if (pathname === '/api/google/delete-file' && (request.method === 'DELETE' || request.method === 'POST')) {
+      try {
+        let fileId = url.searchParams.get('fileId') || '';
+        if (!fileId) {
+          const body = (await request.json().catch(() => ({}))) as any;
+          fileId = body?.fileId || '';
+        }
+
+        if (!fileId) {
+          return jsonResponse({ error: 'fileId is required.' }, 400);
+        }
+
+        const driveRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`,
+          {
+            method: 'DELETE',
+            headers: {
+              Authorization: `Bearer ${googleToken}`,
+            },
+          }
+        );
+
+        if (!driveRes.ok && driveRes.status !== 404) {
+          const data = (await driveRes.json().catch(() => ({}))) as any;
+          return jsonResponse({
+            error: data?.error?.message || `Failed to delete from Google Drive (${driveRes.status})`,
+            source: 'cloudflare_pages_api',
+          }, driveRes.status);
+        }
+
+        return jsonResponse({ success: true, fileId }, 200);
+      } catch (err: any) {
+        return jsonResponse({ error: err.message || 'Failed to delete file.', source: 'cloudflare_pages_api' }, 500);
+      }
+    }
+
+    // 8f. Search Google Drive for PDFs
+    if (pathname === '/api/google/search-drive-pdfs' && (request.method === 'GET' || request.method === 'POST')) {
+      try {
+        const keyword = (url.searchParams.get('keyword') || '').trim();
+        let queryClause = "mimeType = 'application/pdf' and trashed = false";
+        if (keyword) {
+          const escaped = keyword.replace(/'/g, "\\'");
+          queryClause += ` and name contains '${escaped}'`;
+        }
+
+        const driveRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(queryClause)}&fields=files(id,name,webViewLink,webContentLink,size,createdTime,modifiedTime)&pageSize=50&orderBy=modifiedTime desc`,
+          {
+            headers: {
+              Authorization: `Bearer ${googleToken}`,
+            },
+          }
+        );
+
+        const data = (await driveRes.json().catch(() => ({}))) as any;
+        if (!driveRes.ok) {
+          return jsonResponse({
+            error: data?.error?.message || `Failed to search Google Drive (${driveRes.status})`,
+            source: 'cloudflare_pages_api',
+          }, driveRes.status);
+        }
+
+        return jsonResponse(data, 200);
+      } catch (err: any) {
+        return jsonResponse({ error: err.message || 'Failed to search Google Drive files.', source: 'cloudflare_pages_api' }, 500);
+      }
+    }
+
+    // 8g. Replace File Content in Google Drive (uploadType=media)
+    if (pathname === '/api/google/replace-file-content' && (request.method === 'PATCH' || request.method === 'POST')) {
+      try {
+        const body = (await request.json().catch(() => ({}))) as any;
+        const { fileId, base64Data, mimeType = 'application/pdf' } = body;
+        if (!fileId) {
+          return jsonResponse({ error: 'fileId is required.' }, 400);
+        }
+        if (!base64Data) {
+          return jsonResponse({ error: 'No PDF file data provided.' }, 400);
+        }
+
+        const fileBytes = parseBase64ToBytes(base64Data);
+
+        const driveRes = await fetch(
+          `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(fileId)}?uploadType=media&fields=id,name,webViewLink,webContentLink,modifiedTime`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${googleToken}`,
+              'Content-Type': mimeType,
+              'Content-Length': String(fileBytes.length),
+            },
+            body: fileBytes,
+          }
+        );
+
+        const data = (await driveRes.json().catch(() => ({}))) as any;
+        if (!driveRes.ok) {
+          return jsonResponse({
+            error: data?.error?.message || `Failed to update file in Google Drive (${driveRes.status})`,
+            source: 'cloudflare_pages_api',
+          }, driveRes.status);
+        }
+
+        return jsonResponse(data, 200);
+      } catch (err: any) {
+        return jsonResponse({ error: err.message || 'Failed to replace file content in Google Drive.', source: 'cloudflare_pages_api' }, 500);
+      }
+    }
+  }
+
   // 404 for other API routes
   return jsonResponse({ error: 'Endpoint not found on Cloudflare Pages API', pathname }, 404);
 }

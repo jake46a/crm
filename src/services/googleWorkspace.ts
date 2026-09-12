@@ -533,17 +533,21 @@ export class GoogleWorkspaceService {
       }
       throw new Error(data.error || `Failed to copy Google Drive file (${res.status})`);
     } catch (err: any) {
+      console.warn('Proxy copy failed, falling back to direct Google Drive API:', err);
       // Fallback to direct call if proxy fails
-      const directRes = await fetch(`https://www.googleapis.com/drive/v3/files/${cleanFileId}/copy`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${cleanToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: cleanTitle,
-        }),
-      });
+      const directRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${cleanFileId}/copy?fields=id,name,webViewLink,webContentLink`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${cleanToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: cleanTitle,
+          }),
+        }
+      );
 
       if (!directRes.ok) {
         const directErr = await directRes.json().catch(() => ({}));
@@ -908,7 +912,10 @@ Management: ___________________________ Date: {{today_date}}
       reader.readAsDataURL(file);
     });
 
-    let res: Response;
+    let res: Response | null = null;
+    let proxySucceeded = false;
+    let data: any = null;
+
     try {
       res = await fetch('/api/google/upload-pdf', {
         method: 'POST',
@@ -922,22 +929,54 @@ Management: ___________________________ Date: {{today_date}}
           mimeType: file.type || 'application/pdf',
         }),
       });
-    } catch (networkErr: any) {
-      console.warn('Proxy fetch network error:', networkErr);
-      throw new Error(
-        `Network error communicating with upload service: ${networkErr.message || networkErr}. Please verify your connection.`
-      );
-    }
 
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      if (res.status === 401) {
+      if (res.ok) {
+        data = await res.json().catch(() => ({}));
+        proxySucceeded = true;
+      } else if (res.status === 401) {
         throw new Error(
           'Google Workspace OAuth session has expired or is unauthorized. Please click "Connect Google Drive" to re-authenticate.'
         );
+      } else {
+        console.warn(`Upload proxy returned HTTP ${res.status}. Falling back to direct Google Drive multipart upload...`);
       }
-      throw new Error(data.error || `Failed to upload PDF to Google Drive (${res.status})`);
+    } catch (networkErr: any) {
+      if (networkErr.message?.includes('OAuth') || networkErr.message?.includes('re-authenticate')) {
+        throw networkErr;
+      }
+      console.warn('Upload proxy failed, attempting direct Google Drive upload fallback:', networkErr);
+    }
+
+    // Direct Google Drive v3 multipart upload fallback
+    if (!proxySucceeded || !data?.id) {
+      const boundary = '-------moyerDriveDirectUpload' + Math.random().toString(36).substring(2);
+      const metadata = { name: cleanName, mimeType: 'application/pdf' };
+      const delimiter = `\r\n--${boundary}\r\n`;
+      const closeDelim = `\r\n--${boundary}--`;
+      const metaPart = `${delimiter}Content-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n${delimiter}Content-Type: ${file.type || 'application/pdf'}\r\n\r\n`;
+
+      const metaBlob = new Blob([metaPart], { type: 'text/plain' });
+      const closeBlob = new Blob([closeDelim], { type: 'text/plain' });
+      const multipartBlob = new Blob([metaBlob, file, closeBlob], { type: `multipart/related; boundary=${boundary}` });
+
+      const directRes = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink,size,createdTime',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${cleanToken}`,
+            'Content-Type': `multipart/related; boundary=${boundary}`,
+          },
+          body: multipartBlob,
+        }
+      );
+
+      if (!directRes.ok) {
+        const directErr = await directRes.json().catch(() => ({}));
+        throw new Error(directErr.error?.message || `Failed to upload PDF to Google Drive (${directRes.status})`);
+      }
+
+      data = await directRes.json();
     }
 
     return data;
@@ -1086,22 +1125,59 @@ Management: ___________________________ Date: {{today_date}}
       reader.readAsDataURL(file);
     });
 
-    const res = await fetch('/api/google/replace-file-content', {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${cleanToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        fileId: cleanFileId,
-        base64Data,
-        mimeType: 'application/pdf',
-      }),
-    });
+    let res: Response | null = null;
+    let proxySucceeded = false;
+    let data: any = null;
 
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.error || `Failed to replace PDF content in Google Drive (${res.status})`);
+    try {
+      res = await fetch('/api/google/replace-file-content', {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileId: cleanFileId,
+          base64Data,
+          mimeType: 'application/pdf',
+        }),
+      });
+
+      if (res.ok) {
+        data = await res.json().catch(() => ({}));
+        proxySucceeded = true;
+      } else if (res.status === 401) {
+        throw new Error('Google Workspace OAuth session has expired. Please reconnect Google Drive.');
+      } else {
+        console.warn(`Replace content proxy returned HTTP ${res.status}. Falling back to direct Google Drive media upload...`);
+      }
+    } catch (netErr: any) {
+      if (netErr.message?.includes('OAuth') || netErr.message?.includes('reconnect')) {
+        throw netErr;
+      }
+      console.warn('Replace content proxy failed, falling back to direct Google Drive media upload:', netErr);
+    }
+
+    // Direct Google Drive v3 media PATCH fallback
+    if (!proxySucceeded || !data) {
+      const directRes = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(cleanFileId)}?uploadType=media&fields=id,name,webViewLink,webContentLink,modifiedTime`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${cleanToken}`,
+            'Content-Type': file.type || 'application/pdf',
+          },
+          body: file, // Send File/Blob directly
+        }
+      );
+
+      if (!directRes.ok) {
+        const directErr = await directRes.json().catch(() => ({}));
+        throw new Error(directErr.error?.message || `Failed to replace PDF content in Google Drive (${directRes.status})`);
+      }
+
+      data = await directRes.json();
     }
 
     return data;

@@ -1325,6 +1325,25 @@ app.patch('/api/google/replace-file-content', async (req: Request, res: Response
   }
 });
 
+// Google Workspace / Drive Integration Status
+app.get('/api/google/status', (req, res) => {
+  const authHeader = (req.headers['authorization'] || '') as string;
+  const token = authHeader.replace(/^bearer\s+/i, '').trim();
+  res.json({
+    status: 'online',
+    platform: 'node-express',
+    hasToken: Boolean(token && token.length > 5),
+    endpoints: [
+      '/api/google/upload-pdf',
+      '/api/google/copy-file',
+      '/api/google/rename-file',
+      '/api/google/delete-file',
+      '/api/google/search-drive-pdfs',
+      '/api/google/replace-file-content',
+    ],
+  });
+});
+
 // ----------------------------------------------------
 // VITE MIDDLEWARE / STATIC ASSETS
 // ----------------------------------------------------
