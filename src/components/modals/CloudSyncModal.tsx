@@ -155,18 +155,34 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
 
       const cloudData = await FirebaseService.pullAllFromFirestore();
       
-      if (cloudData.properties.length > 0) StorageService.saveProperties(cloudData.properties);
-      if (cloudData.rooms.length > 0) StorageService.saveRooms(cloudData.rooms);
-      if (cloudData.renewals.length > 0) StorageService.saveLeaseRenewals(cloudData.renewals);
-      if (cloudData.workOrders.length > 0) StorageService.saveWorkOrders(cloudData.workOrders);
-      if (cloudData.leads.length > 0) StorageService.saveTenantLeads(cloudData.leads);
-      if (cloudData.contacts.length > 0) StorageService.saveContacts(cloudData.contacts);
-      if (cloudData.invoices.length > 0) StorageService.saveInvoices(cloudData.invoices);
+      // Merge helper that gives cloud documents precedence by ID while preserving any local items not yet in the cloud
+      const mergeRecords = <T extends { id: string }>(cloudItems: T[], localItems: T[]): T[] => {
+        const itemMap = new Map<string, T>();
+        localItems.forEach(item => itemMap.set(item.id, item));
+        cloudItems.forEach(item => itemMap.set(item.id, item));
+        return Array.from(itemMap.values());
+      };
+
+      const mergedProps = mergeRecords(cloudData.properties, StorageService.getProperties());
+      const mergedRooms = mergeRecords(cloudData.rooms, StorageService.getRooms());
+      const mergedRenewals = mergeRecords(cloudData.renewals, StorageService.getRenewals());
+      const mergedWorkOrders = mergeRecords(cloudData.workOrders, StorageService.getWorkOrders());
+      const mergedLeads = mergeRecords(cloudData.leads, StorageService.getTenantLeads());
+      const mergedContacts = mergeRecords(cloudData.contacts, StorageService.getContacts());
+      const mergedInvoices = mergeRecords(cloudData.invoices, StorageService.getInvoices());
+
+      if (mergedProps.length > 0) StorageService.saveProperties(mergedProps);
+      if (mergedRooms.length > 0) StorageService.saveRooms(mergedRooms);
+      if (mergedRenewals.length > 0) StorageService.saveLeaseRenewals(mergedRenewals);
+      if (mergedWorkOrders.length > 0) StorageService.saveWorkOrders(mergedWorkOrders);
+      if (mergedLeads.length > 0) StorageService.saveTenantLeads(mergedLeads);
+      if (mergedContacts.length > 0) StorageService.saveContacts(mergedContacts);
+      if (mergedInvoices.length > 0) StorageService.saveInvoices(mergedInvoices);
 
       loadCounts();
       setActionMessage({
         type: 'success',
-        text: `Restored ${cloudData.properties.length} properties and ${cloudData.rooms.length} rooms directly from Cloud Firestore!`
+        text: `Pulled from Cloud: ${cloudData.properties.length} properties, ${cloudData.rooms.length} rooms, ${cloudData.workOrders.length} work orders, and ${cloudData.contacts.length} contacts merged safely into CRM state!`
       });
       onDataReload?.();
     } catch (err: any) {

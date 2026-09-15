@@ -172,12 +172,21 @@ export default function App() {
             FirebaseService.deleteProperty(p.id).catch(() => {});
           }
         });
-        if (cleaned.length === 0 && INITIAL_PROPERTIES.length > 0) {
-          cleaned = INITIAL_PROPERTIES;
+        let finalProperties = cleaned;
+        // CRITICAL DATA INTEGRITY: Merge and preserve any local properties not yet in Firestore
+        const localProps = StorageService.getProperties();
+        const unsyncedProps = localProps.filter(lp => !finalProperties.some(p => p.id === lp.id));
+        if (unsyncedProps.length > 0) {
+          finalProperties = [...finalProperties, ...unsyncedProps];
+          unsyncedProps.forEach(p => FirebaseService.saveProperty(p).catch(() => {}));
+        }
+
+        if (finalProperties.length === 0 && INITIAL_PROPERTIES.length > 0) {
+          finalProperties = INITIAL_PROPERTIES;
           INITIAL_PROPERTIES.forEach(p => FirebaseService.saveProperty(p).catch(() => {}));
         }
-        setProperties(cleaned);
-        StorageService.saveProperties(cleaned);
+        setProperties(finalProperties);
+        StorageService.saveProperties(finalProperties);
       }
     });
 
@@ -201,6 +210,14 @@ export default function App() {
             FirebaseService.deleteRoom(r.id).catch(() => {});
           }
         });
+
+        // CRITICAL DATA INTEGRITY: Merge and preserve any local rooms not yet in Firestore
+        const localRooms = StorageService.getRooms();
+        const unsyncedRooms = localRooms.filter(lr => !cleaned.some(r => r.id === lr.id));
+        if (unsyncedRooms.length > 0) {
+          cleaned = [...cleaned, ...unsyncedRooms];
+          unsyncedRooms.forEach(r => FirebaseService.saveRoom(r).catch(() => {}));
+        }
 
         if (cleaned.length === 0 && INITIAL_ROOMS.length > 0) {
           cleaned = INITIAL_ROOMS;
@@ -246,7 +263,7 @@ export default function App() {
 
     const unsubRenewals = subscribeToRenewals((liveRenewals) => {
       if (liveRenewals) {
-        const cleaned = liveRenewals.filter(ren => 
+        let cleaned = liveRenewals.filter(ren => 
           !LEGACY_SAMPLE_RENEWAL_IDS.has(ren.id) && 
           !REJECTED_SAMPLE_RENEWAL_IDS.has(ren.id) &&
           !REJECTED_SAMPLE_TENANT_NAMES.has(typeof ren.tenantName === 'string' ? ren.tenantName.toLowerCase().trim() : '') &&
@@ -262,6 +279,15 @@ export default function App() {
             FirebaseService.deleteRenewal(ren.id).catch(() => {});
           }
         });
+
+        // CRITICAL DATA INTEGRITY: Merge and preserve any local renewals not yet in Firestore
+        const localRenewals = StorageService.getRenewals();
+        const unsyncedRenewals = localRenewals.filter(lr => !cleaned.some(r => r.id === lr.id));
+        if (unsyncedRenewals.length > 0) {
+          cleaned = [...cleaned, ...unsyncedRenewals];
+          unsyncedRenewals.forEach(r => FirebaseService.saveRenewal(r).catch(() => {}));
+        }
+
         let finalRenewals = cleaned;
         if (finalRenewals.length === 0 && INITIAL_RENEWALS.length > 0) {
           finalRenewals = INITIAL_RENEWALS;
@@ -274,12 +300,21 @@ export default function App() {
 
     const unsubWorkOrders = subscribeToWorkOrders((liveWOs) => {
       if (liveWOs) {
-        const cleaned = liveWOs.filter(wo => !LEGACY_SAMPLE_WORK_ORDER_IDS.has(wo.id) && wo.propertyId !== 'prop-1' && wo.propertyId !== 'prop-2' && wo.propertyId !== 'prop-3');
+        let cleaned = liveWOs.filter(wo => !LEGACY_SAMPLE_WORK_ORDER_IDS.has(wo.id) && wo.propertyId !== 'prop-1' && wo.propertyId !== 'prop-2' && wo.propertyId !== 'prop-3');
         liveWOs.forEach(wo => {
           if (LEGACY_SAMPLE_WORK_ORDER_IDS.has(wo.id) || wo.propertyId === 'prop-1' || wo.propertyId === 'prop-2' || wo.propertyId === 'prop-3') {
             FirebaseService.deleteWorkOrder(wo.id).catch(() => {});
           }
         });
+
+        // CRITICAL DATA INTEGRITY: Merge and preserve any local work orders not yet in Firestore
+        const localWOs = StorageService.getWorkOrders();
+        const unsyncedWOs = localWOs.filter(lwo => !cleaned.some(wo => wo.id === lwo.id));
+        if (unsyncedWOs.length > 0) {
+          cleaned = [...cleaned, ...unsyncedWOs];
+          unsyncedWOs.forEach(wo => FirebaseService.saveWorkOrder(wo).catch(() => {}));
+        }
+
         setWorkOrders(cleaned);
         StorageService.saveWorkOrders(cleaned);
       }
@@ -288,13 +323,22 @@ export default function App() {
     const unsubLeads = subscribeToLeads((liveLeads) => {
       if (liveLeads) {
         const legacyMockIds = new Set(['lead-1', 'lead-2', 'lead-3', 'lead-4', 'lead-5', 'lead-6', 'lead-7', 'lead-8']);
-        const cleaned = liveLeads.filter(l => !legacyMockIds.has(l.id));
+        let cleaned = liveLeads.filter(l => !legacyMockIds.has(l.id));
         // Delete any legacy demo leads from Firestore if they were previously seeded
         liveLeads.forEach(l => {
           if (legacyMockIds.has(l.id)) {
             FirebaseService.deleteLead(l.id).catch(() => {});
           }
         });
+
+        // CRITICAL DATA INTEGRITY: Merge and preserve any local leads not yet in Firestore
+        const localLeads = StorageService.getTenantLeads();
+        const unsyncedLeads = localLeads.filter(ll => !cleaned.some(l => l.id === ll.id));
+        if (unsyncedLeads.length > 0) {
+          cleaned = [...cleaned, ...unsyncedLeads];
+          unsyncedLeads.forEach(l => FirebaseService.saveLead(l).catch(() => {}));
+        }
+
         setLeads(cleaned);
         StorageService.saveTenantLeads(cleaned);
       }
@@ -302,7 +346,7 @@ export default function App() {
 
     const unsubContacts = subscribeToContacts((liveContacts) => {
       if (liveContacts) {
-        const cleaned = liveContacts.filter(c => 
+        let cleaned = liveContacts.filter(c => 
           !LEGACY_SAMPLE_CONTACT_IDS.has(c.id) &&
           !REJECTED_SAMPLE_CONTACT_IDS.has(c.id) &&
           !REJECTED_SAMPLE_TENANT_NAMES.has(typeof c.name === 'string' ? c.name.toLowerCase().trim() : '') &&
@@ -318,6 +362,15 @@ export default function App() {
             FirebaseService.deleteContact(c.id).catch(() => {});
           }
         });
+
+        // CRITICAL DATA INTEGRITY: Merge and preserve any local contacts not yet in Firestore
+        const localContacts = StorageService.getContacts();
+        const unsyncedContacts = localContacts.filter(lc => !cleaned.some(c => c.id === lc.id));
+        if (unsyncedContacts.length > 0) {
+          cleaned = [...cleaned, ...unsyncedContacts];
+          unsyncedContacts.forEach(c => FirebaseService.saveContact(c).catch(() => {}));
+        }
+
         let finalContacts = cleaned;
         if (finalContacts.length === 0 && INITIAL_CONTACTS.length > 0) {
           finalContacts = INITIAL_CONTACTS;
@@ -330,7 +383,7 @@ export default function App() {
 
     const unsubLogs = subscribeToActivityLogs((liveLogs) => {
       if (liveLogs) {
-        const cleaned = liveLogs.filter(a => !LEGACY_SAMPLE_ACTIVITY_LOG_IDS.has(a.id) && !a.message?.includes('Chloe Davenport') && !a.message?.includes('Liam O\'Connor') && !a.message?.includes('Highlands') && !a.message?.includes('Speer'));
+        let cleaned = liveLogs.filter(a => !LEGACY_SAMPLE_ACTIVITY_LOG_IDS.has(a.id) && !a.message?.includes('Chloe Davenport') && !a.message?.includes('Liam O\'Connor') && !a.message?.includes('Highlands') && !a.message?.includes('Speer'));
         liveLogs.forEach(a => {
           if (LEGACY_SAMPLE_ACTIVITY_LOG_IDS.has(a.id) || a.message?.includes('Chloe Davenport') || a.message?.includes('Liam O\'Connor') || a.message?.includes('Highlands') || a.message?.includes('Speer')) {
             FirebaseService.deleteActivityLog(a.id).catch(() => {});
@@ -343,8 +396,15 @@ export default function App() {
 
     const unsubInvoices = subscribeToInvoices((liveInvoices) => {
       if (liveInvoices) {
-        setInvoices(liveInvoices);
-        StorageService.saveInvoices(liveInvoices);
+        let finalInvoices = liveInvoices;
+        const localInvoices = StorageService.getInvoices();
+        const unsyncedInvoices = localInvoices.filter(li => !finalInvoices.some(inv => inv.id === li.id));
+        if (unsyncedInvoices.length > 0) {
+          finalInvoices = [...finalInvoices, ...unsyncedInvoices];
+          unsyncedInvoices.forEach(inv => FirebaseService.saveInvoice(inv).catch(() => {}));
+        }
+        setInvoices(finalInvoices);
+        StorageService.saveInvoices(finalInvoices);
       }
     });
 
@@ -1110,7 +1170,7 @@ export default function App() {
         onOpenAssistant={() => setIsAssistantOpen(true)}
         onOpenExportImport={() => setIsExportImportOpen(true)}
         onOpenPrintSchema={() => setIsPrintSchemaOpen(true)}
-        onResetData={handleResetDemoData}
+        onResetData={loadAllData}
         onQuickNavigate={(tab) => setActiveTab(tab)}
       >
         {/* Toast Notification */}

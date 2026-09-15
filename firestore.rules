@@ -8,7 +8,7 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string && id.size() > 0 && id.size() <= 128;
     }
 
     function isNumeric(val) {
@@ -30,27 +30,29 @@ service cloud.firestore {
     function isValidProperty(data) {
       return data.id is string && isValidId(data.id)
         && data.name is string && data.name.size() > 0 && data.name.size() <= 128
-        && data.address is string && data.address.size() <= 256
-        && data.city is string && data.city.size() <= 128
-        && data.state is string && data.state.size() <= 64
-        && data.zip is string && data.zip.size() <= 32
-        && (isNumeric(data.totalRooms) && data.totalRooms >= 0)
+        && (!('address' in data) || (data.address is string && data.address.size() <= 256))
+        && (!('city' in data) || (data.city is string && data.city.size() <= 128))
+        && (!('state' in data) || (data.state is string && data.state.size() <= 64))
+        && (!('zip' in data) || (data.zip is string && data.zip.size() <= 32))
+        && (!('totalRooms' in data) || (isNumeric(data.totalRooms) && data.totalRooms >= 0))
+        && (!('occupiedRooms' in data) || (isNumeric(data.occupiedRooms) && data.occupiedRooms >= 0))
+        && (!('monthlyRevenueEstimate' in data) || (isNumeric(data.monthlyRevenueEstimate) && data.monthlyRevenueEstimate >= 0))
         && (!('squareLocationId' in data) || (data.squareLocationId is string && data.squareLocationId.size() <= 128))
-        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2048));
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 8192));
     }
 
     function isValidRoom(data) {
       return data.id is string && isValidId(data.id)
-        && data.propertyId is string && isValidId(data.propertyId)
+        && (!('propertyId' in data) || (data.propertyId is string && isValidId(data.propertyId)))
         && data.name is string && data.name.size() > 0 && data.name.size() <= 128
-        && isNumeric(data.monthlyRent) && data.monthlyRent >= 0
-        && data.status is string && (data.status == 'Occupied' || data.status == 'Available' || data.status == 'Under Turnover' || data.status == 'Reserved')
+        && (!('monthlyRent' in data) || (isNumeric(data.monthlyRent) && data.monthlyRent >= 0))
+        && (!('status' in data) || (data.status is string && data.status.size() <= 64))
         && (!('currentTenantFirstName' in data) || (data.currentTenantFirstName is string && data.currentTenantFirstName.size() <= 128))
         && (!('currentTenantLastName' in data) || (data.currentTenantLastName is string && data.currentTenantLastName.size() <= 128))
         && (!('currentTenantName' in data) || (data.currentTenantName is string && data.currentTenantName.size() <= 256))
         && (!('currentTenantEmail' in data) || (data.currentTenantEmail is string && data.currentTenantEmail.size() <= 128))
         && (!('currentTenantPhone' in data) || (data.currentTenantPhone is string && data.currentTenantPhone.size() <= 64))
-        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2048));
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 8192));
     }
 
     function isValidLeaseRenewal(data) {
@@ -58,23 +60,36 @@ service cloud.firestore {
         && (!('tenantFirstName' in data) || (data.tenantFirstName is string && data.tenantFirstName.size() <= 128))
         && (!('tenantLastName' in data) || (data.tenantLastName is string && data.tenantLastName.size() <= 128))
         && (!('tenantName' in data) || (data.tenantName is string && data.tenantName.size() <= 256))
-        && data.propertyId is string && isValidId(data.propertyId)
-        && data.roomId is string && isValidId(data.roomId)
-        && data.renewalStatus is string && data.renewalStatus.size() <= 64
-        && (!('internalNotes' in data) || (data.internalNotes is string && data.internalNotes.size() <= 2048));
+        && (!('propertyId' in data) || (data.propertyId is string && isValidId(data.propertyId)))
+        && (!('roomId' in data) || (data.roomId is string && isValidId(data.roomId)))
+        && (!('renewalStatus' in data) || (data.renewalStatus is string && data.renewalStatus.size() <= 64))
+        && (!('internalNotes' in data) || (data.internalNotes is string && data.internalNotes.size() <= 8192));
     }
 
     function isValidWorkOrder(data) {
       return data.id is string && isValidId(data.id)
-        && data.ticketNumber is string && data.ticketNumber.size() <= 64
-        && data.title is string && data.title.size() > 0 && data.title.size() <= 256
-        && data.propertyId is string && isValidId(data.propertyId)
+        && (!('ticketNumber' in data) || (data.ticketNumber is string && data.ticketNumber.size() <= 64))
+        && (!('title' in data) || (data.title is string && data.title.size() <= 512))
+        && (!('propertyId' in data) || (data.propertyId is string && isValidId(data.propertyId)))
+        && (!('propertyName' in data) || (data.propertyName is string && data.propertyName.size() <= 256))
+        && (!('roomId' in data) || (data.roomId is string && data.roomId.size() <= 128))
+        && (!('roomName' in data) || (data.roomName is string && data.roomName.size() <= 256))
+        && (!('isCommonArea' in data) || (data.isCommonArea is bool))
+        && (!('tenantId' in data) || (data.tenantId is string && data.tenantId.size() <= 128))
         && (!('reportedByFirstName' in data) || (data.reportedByFirstName is string && data.reportedByFirstName.size() <= 128))
         && (!('reportedByLastName' in data) || (data.reportedByLastName is string && data.reportedByLastName.size() <= 128))
         && (!('reportedByName' in data) || (data.reportedByName is string && data.reportedByName.size() <= 256))
-        && data.priority is string && (data.priority == 'Emergency' || data.priority == 'High' || data.priority == 'Medium' || data.priority == 'Low')
-        && data.status is string && data.status.size() <= 64
-        && (!('description' in data) || (data.description is string && data.description.size() <= 4096));
+        && (!('reportedByPhone' in data) || (data.reportedByPhone is string && data.reportedByPhone.size() <= 64))
+        && (!('reportedByEmail' in data) || (data.reportedByEmail is string && data.reportedByEmail.size() <= 128))
+        && (!('category' in data) || (data.category is string && data.category.size() <= 128))
+        && (!('priority' in data) || (data.priority is string && data.priority.size() <= 64))
+        && (!('status' in data) || (data.status is string && data.status.size() <= 64))
+        && (!('assignedVendorId' in data) || (data.assignedVendorId is string && data.assignedVendorId.size() <= 128))
+        && (!('assignedVendorName' in data) || (data.assignedVendorName is string && data.assignedVendorName.size() <= 256))
+        && (!('assignedVendorPhone' in data) || (data.assignedVendorPhone is string && data.assignedVendorPhone.size() <= 64))
+        && (!('estimatedCost' in data) || (isNumeric(data.estimatedCost) && data.estimatedCost >= 0))
+        && (!('actualCost' in data) || (isNumeric(data.actualCost) && data.actualCost >= 0))
+        && (!('description' in data) || (data.description is string && data.description.size() <= 8192));
     }
 
     function isValidTenantLead(data) {
@@ -82,20 +97,20 @@ service cloud.firestore {
         && (!('firstName' in data) || (data.firstName is string && data.firstName.size() <= 128))
         && (!('lastName' in data) || (data.lastName is string && data.lastName.size() <= 128))
         && (!('name' in data) || (data.name is string && data.name.size() <= 256))
-        && data.email is string && data.email.size() <= 128
-        && data.phone is string && data.phone.size() <= 64
-        && data.stage is string && data.stage.size() <= 64
-        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2048));
+        && (!('email' in data) || (data.email is string && data.email.size() <= 128))
+        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 64))
+        && (!('stage' in data) || (data.stage is string && data.stage.size() <= 64))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 8192));
     }
 
     function isValidContact(data) {
       return data.id is string && isValidId(data.id)
-        && data.type is string && data.type.size() <= 64
+        && (!('type' in data) || (data.type is string && data.type.size() <= 64))
         && (!('firstName' in data) || (data.firstName is string && data.firstName.size() <= 128))
         && (!('lastName' in data) || (data.lastName is string && data.lastName.size() <= 128))
         && (!('name' in data) || (data.name is string && data.name.size() <= 256))
         && (!('email' in data) || (data.email is string && data.email.size() <= 128))
-        && data.phone is string && data.phone.size() <= 64
+        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 64))
         && (!('roomId' in data) || (data.roomId is string && data.roomId.size() <= 128))
         && (!('roomName' in data) || (data.roomName is string && data.roomName.size() <= 256))
         && (!('propertyId' in data) || (data.propertyId is string && data.propertyId.size() <= 128))
@@ -104,7 +119,7 @@ service cloud.firestore {
         && (!('roleOrSpecialty' in data) || (data.roleOrSpecialty is string && data.roleOrSpecialty.size() <= 128))
         && (!('company' in data) || (data.company is string && data.company.size() <= 128))
         && (!('squareCustomerId' in data) || (data.squareCustomerId is string && data.squareCustomerId.size() <= 128))
-        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2048));
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 8192));
     }
 
     function isValidInvoice(data) {

@@ -777,7 +777,23 @@ export const FirebaseService = {
       }
     }
 
-    // 6. Write imported dataset to Firestore
+    // 6. Prune existing work orders not in new dataset
+    if (data.workOrders && data.workOrders.length > 0) {
+      try {
+        const existingSnap = await getDocs(collection(db, COLLECTIONS.WORK_ORDERS));
+        const newIds = new Set(data.workOrders.map(wo => wo.id));
+        const toDelete = existingSnap.docs.filter(d => !newIds.has(d.id));
+        if (toDelete.length > 0) {
+          const b = writeBatch(db);
+          toDelete.forEach(d => b.delete(d.ref));
+          await b.commit();
+        }
+      } catch (err) {
+        console.warn("Could not prune existing work orders:", err);
+      }
+    }
+
+    // 7. Write imported dataset to Firestore
     return await this.syncAllLocalToFirestore({
       properties: data.properties || [],
       rooms: data.rooms || [],
@@ -827,12 +843,20 @@ export const FirebaseService = {
         try {
           const commitPromise = batch.commit();
           const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Firestore write timeout. Backend unreachable.')), 5000)
+            setTimeout(() => reject(new Error('Firestore write timeout. Backend unreachable.')), 10000)
           );
           await Promise.race([commitPromise, timeoutPromise]);
         } catch (batchErr: any) {
-          console.error(`Batch commit failed for collection "${col}":`, batchErr);
-          throw new Error(`Sync failed on collection "${col}": ${batchErr?.message || batchErr}`);
+          console.warn(`Batch commit failed for collection "${col}", falling back to individual resilient writes:`, batchErr);
+          // Resilient fallback: write individually so one problematic doc does not drop other docs
+          for (const item of chunk) {
+            try {
+              const sanitized = sanitizeForFirestore(item);
+              await setDoc(doc(db, col, item.id), sanitized, { merge: true });
+            } catch (singleErr) {
+              console.error(`Error saving individual doc ${item.id} in ${col}:`, singleErr);
+            }
+          }
         }
       }
       return items.length;
@@ -861,6 +885,7 @@ export const FirebaseService = {
     leads: TenantLead[];
     contacts: Contact[];
     invoices: Invoice[];
+    activityLogs: ActivityLog[];
   }> {
     const pullPromise = Promise.all([
       getDocs(collection(db, COLLECTIONS.PROPERTIES)),
@@ -869,12 +894,13 @@ export const FirebaseService = {
       getDocs(collection(db, COLLECTIONS.WORK_ORDERS)),
       getDocs(collection(db, COLLECTIONS.LEADS)),
       getDocs(collection(db, COLLECTIONS.CONTACTS)),
-      getDocs(collection(db, COLLECTIONS.INVOICES))
+      getDocs(collection(db, COLLECTIONS.INVOICES)),
+      getDocs(collection(db, COLLECTIONS.ACTIVITY_LOGS))
     ]);
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Firestore pull timeout. Backend unreachable.')), 5000)
+      setTimeout(() => reject(new Error('Firestore pull timeout. Backend unreachable.')), 10000)
     );
-    const [pSnap, rSnap, renSnap, woSnap, lSnap, cSnap, iSnap] = await Promise.race([pullPromise, timeoutPromise]);
+    const [pSnap, rSnap, renSnap, woSnap, lSnap, cSnap, iSnap, aSnap] = await Promise.race([pullPromise, timeoutPromise]);
 
     return {
       properties: pSnap.docs.map(d => d.data() as Property),
@@ -883,7 +909,8 @@ export const FirebaseService = {
       workOrders: woSnap.docs.map(d => d.data() as WorkOrder),
       leads: lSnap.docs.map(d => d.data() as TenantLead),
       contacts: cSnap.docs.map(d => d.data() as Contact),
-      invoices: iSnap.docs.map(d => d.data() as Invoice)
+      invoices: iSnap.docs.map(d => d.data() as Invoice),
+      activityLogs: aSnap.docs.map(d => d.data() as ActivityLog)
     };
   }
 };

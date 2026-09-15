@@ -40,7 +40,7 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
       const res = await FirebaseService.syncAllLocalToFirestore(data);
       if (res.success) {
         setStatusMsg({
-          text: `Cloud sync complete! Pushed ${res.counts.properties} properties, ${res.counts.rooms} rooms, and ${res.counts.renewals} renewals to Cloud Firestore.`,
+          text: `Cloud sync complete! Pushed ${res.counts.properties} properties, ${res.counts.rooms} rooms, ${res.counts.workOrders || 0} work orders, and ${res.counts.contacts || 0} contacts to Cloud Firestore.`,
           type: 'success'
         });
         onDataReload();
