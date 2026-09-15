@@ -74,11 +74,14 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
     setIsTesting(true);
     setTestResult(null);
     try {
-      const ok = await testFirestoreConnection();
+      const ok = await testFirestoreConnection(3000);
       if (ok) {
         setTestResult({ ok: true, msg: 'Connected to Firestore successfully! Real-time syncing is active.' });
       } else {
-        setTestResult({ ok: false, msg: 'Unable to reach Firestore database. Check network or firewall.' });
+        setTestResult({ 
+          ok: false, 
+          msg: 'Unable to reach Firestore database. The Cloud Firestore API may be disabled in Google Cloud Project gen-lang-client-0724686590.' 
+        });
       }
     } catch (err: any) {
       setTestResult({ ok: false, msg: err?.message || 'Connection test failed.' });
@@ -91,6 +94,17 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
     setIsPushing(true);
     setActionMessage(null);
     try {
+      // Fast pre-check to prevent hanging when offline
+      const reachable = await testFirestoreConnection(2500);
+      if (!reachable) {
+        setActionMessage({
+          type: 'error',
+          text: 'Firestore is currently unreachable. Push aborted to prevent hanging. All your data is safely preserved in Local Storage.'
+        });
+        setIsPushing(false);
+        return;
+      }
+
       const data = {
         properties: StorageService.getProperties(),
         rooms: StorageService.getRooms(),
@@ -112,9 +126,12 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
       }
     } catch (err: any) {
       console.error("Error pushing to cloud:", err);
+      const isPerm = err?.message?.toLowerCase().includes('permission') || err?.code === 'permission-denied';
       setActionMessage({
         type: 'error',
-        text: `Sync error: ${err?.message || 'Failed to push data to cloud Firestore.'}`
+        text: isPerm
+          ? 'Cloud write requires authentication. Please click "Sign In with Google" below to authenticate with your account and push data.'
+          : `Sync error: ${err?.message || 'Failed to push data to cloud Firestore.'}`
       });
     } finally {
       setIsPushing(false);
@@ -125,6 +142,17 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
     setIsPulling(true);
     setActionMessage(null);
     try {
+      // Fast pre-check to prevent hanging when offline
+      const reachable = await testFirestoreConnection(2500);
+      if (!reachable) {
+        setActionMessage({
+          type: 'error',
+          text: 'Firestore is currently unreachable. Cannot pull cloud data at this time. Continuing with local data.'
+        });
+        setIsPulling(false);
+        return;
+      }
+
       const cloudData = await FirebaseService.pullAllFromFirestore();
       
       if (cloudData.properties.length > 0) StorageService.saveProperties(cloudData.properties);

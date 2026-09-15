@@ -2,11 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Global Deny Catch-All
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
     // Common Hardened Helper Functions
     function isSignedIn() {
       return request.auth != null;
@@ -14,6 +9,10 @@ service cloud.firestore {
 
     function isValidId(id) {
       return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isNumeric(val) {
+      return (val is int || val is float);
     }
 
     function incoming() {
@@ -35,7 +34,7 @@ service cloud.firestore {
         && data.city is string && data.city.size() <= 128
         && data.state is string && data.state.size() <= 64
         && data.zip is string && data.zip.size() <= 32
-        && (data.totalRooms is number && data.totalRooms >= 0)
+        && (isNumeric(data.totalRooms) && data.totalRooms >= 0)
         && (!('squareLocationId' in data) || (data.squareLocationId is string && data.squareLocationId.size() <= 128))
         && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2048));
     }
@@ -44,7 +43,7 @@ service cloud.firestore {
       return data.id is string && isValidId(data.id)
         && data.propertyId is string && isValidId(data.propertyId)
         && data.name is string && data.name.size() > 0 && data.name.size() <= 128
-        && data.monthlyRent is number && data.monthlyRent >= 0
+        && isNumeric(data.monthlyRent) && data.monthlyRent >= 0
         && data.status is string && (data.status == 'Occupied' || data.status == 'Available' || data.status == 'Under Turnover' || data.status == 'Reserved')
         && (!('currentTenantFirstName' in data) || (data.currentTenantFirstName is string && data.currentTenantFirstName.size() <= 128))
         && (!('currentTenantLastName' in data) || (data.currentTenantLastName is string && data.currentTenantLastName.size() <= 128))
@@ -123,15 +122,15 @@ service cloud.firestore {
         && (!('subtask' in data) || (data.subtask is string && data.subtask.size() <= 64))
         && (!('month' in data) || (data.month is string && data.month.size() <= 64))
         && (!('billingMonth' in data) || (data.billingMonth is string && data.billingMonth.size() <= 64))
-        && (!('year' in data) || (data.year is number))
-        && (!('billingYear' in data) || (data.billingYear is number))
-        && (!('amount' in data) || (data.amount is number && data.amount >= 0))
-        && (!('rentAmount' in data) || (data.rentAmount is number && data.rentAmount >= 0))
-        && (!('utilityAmount' in data) || (data.utilityAmount is number && data.utilityAmount >= 0))
-        && (!('suppliesAmount' in data) || (data.suppliesAmount is number && data.suppliesAmount >= 0))
-        && (!('lateFeeAmount' in data) || (data.lateFeeAmount is number && data.lateFeeAmount >= 0))
-        && (!('specialAmount' in data) || (data.specialAmount is number && data.specialAmount >= 0))
-        && (!('totalAmount' in data) || (data.totalAmount is number && data.totalAmount >= 0))
+        && (!('year' in data) || isNumeric(data.year))
+        && (!('billingYear' in data) || isNumeric(data.billingYear))
+        && (!('amount' in data) || (isNumeric(data.amount) && data.amount >= 0))
+        && (!('rentAmount' in data) || (isNumeric(data.rentAmount) && data.rentAmount >= 0))
+        && (!('utilityAmount' in data) || (isNumeric(data.utilityAmount) && data.utilityAmount >= 0))
+        && (!('suppliesAmount' in data) || (isNumeric(data.suppliesAmount) && data.suppliesAmount >= 0))
+        && (!('lateFeeAmount' in data) || (isNumeric(data.lateFeeAmount) && data.lateFeeAmount >= 0))
+        && (!('specialAmount' in data) || (isNumeric(data.specialAmount) && data.specialAmount >= 0))
+        && (!('totalAmount' in data) || (isNumeric(data.totalAmount) && data.totalAmount >= 0))
         && (!('status' in data) || (data.status is string && data.status.size() <= 64))
         && (!('squareInvoiceId' in data) || (data.squareInvoiceId is string && data.squareInvoiceId.size() <= 128))
         && (!('squareOrderId' in data) || (data.squareOrderId is string && data.squareOrderId.size() <= 128))

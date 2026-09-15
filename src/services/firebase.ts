@@ -825,7 +825,11 @@ export const FirebaseService = {
           batch.set(doc(db, col, item.id), sanitized, { merge: true });
         });
         try {
-          await batch.commit();
+          const commitPromise = batch.commit();
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Firestore write timeout. Backend unreachable.')), 5000)
+          );
+          await Promise.race([commitPromise, timeoutPromise]);
         } catch (batchErr: any) {
           console.error(`Batch commit failed for collection "${col}":`, batchErr);
           throw new Error(`Sync failed on collection "${col}": ${batchErr?.message || batchErr}`);
@@ -858,7 +862,7 @@ export const FirebaseService = {
     contacts: Contact[];
     invoices: Invoice[];
   }> {
-    const [pSnap, rSnap, renSnap, woSnap, lSnap, cSnap, iSnap] = await Promise.all([
+    const pullPromise = Promise.all([
       getDocs(collection(db, COLLECTIONS.PROPERTIES)),
       getDocs(collection(db, COLLECTIONS.ROOMS)),
       getDocs(collection(db, COLLECTIONS.RENEWALS)),
@@ -867,6 +871,10 @@ export const FirebaseService = {
       getDocs(collection(db, COLLECTIONS.CONTACTS)),
       getDocs(collection(db, COLLECTIONS.INVOICES))
     ]);
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Firestore pull timeout. Backend unreachable.')), 5000)
+    );
+    const [pSnap, rSnap, renSnap, woSnap, lSnap, cSnap, iSnap] = await Promise.race([pullPromise, timeoutPromise]);
 
     return {
       properties: pSnap.docs.map(d => d.data() as Property),
