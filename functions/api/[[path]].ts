@@ -906,6 +906,7 @@ export async function onRequest(context: { request: Request; env: Env; params: a
           '/api/google/delete-file',
           '/api/google/search-drive-pdfs',
           '/api/google/replace-file-content',
+          '/api/google/create-contact',
         ],
       });
     }
@@ -1173,6 +1174,38 @@ export async function onRequest(context: { request: Request; env: Env; params: a
         return jsonResponse(data, 200);
       } catch (err: any) {
         return jsonResponse({ error: err.message || 'Failed to replace file content in Google Drive.', source: 'cloudflare_pages_api' }, 500);
+      }
+    }
+
+    // 8h. Create Google Contact (Google People API)
+    if (pathname === '/api/google/create-contact' && request.method === 'POST') {
+      try {
+        const body = await request.json().catch(() => ({})) as any;
+        if (!body || !body.names?.length) {
+          return jsonResponse({ error: 'Valid contact payload with name is required.', source: 'cloudflare_pages_api' }, 400);
+        }
+
+        const peopleRes = await fetch('https://people.googleapis.com/v1/people:createContact', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${googleToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        });
+
+        const data = (await peopleRes.json().catch(() => ({}))) as any;
+        if (!peopleRes.ok) {
+          return jsonResponse({
+            error: data?.error?.message || `Google People API error (${peopleRes.status})`,
+            details: data?.error,
+            source: 'cloudflare_pages_api',
+          }, peopleRes.status);
+        }
+
+        return jsonResponse(data, 200);
+      } catch (err: any) {
+        return jsonResponse({ error: err.message || 'Failed to create Google Contact.', source: 'cloudflare_pages_api' }, 500);
       }
     }
   }

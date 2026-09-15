@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Contact as ContactIcon, Plus, X, Trash2, AlertTriangle, CreditCard, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Contact as ContactIcon, Plus, X, Trash2, AlertTriangle, CreditCard, RefreshCw, CheckCircle2, AlertCircle, Share2, Check, ExternalLink } from 'lucide-react';
 import { Contact, ContactType, Property } from '../../types';
 import { splitFullName, formatFullName } from '../../utils/nameUtils';
 import { formatPhoneNumber, formatPhoneInput } from '../../utils/phoneUtils';
 import { SquareService } from '../../services/squareService';
+import { GoogleWorkspaceService } from '../../services/googleWorkspace';
 
 interface NewContactModalProps {
   isOpen: boolean;
@@ -42,10 +43,31 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
   const [squareSyncStatus, setSquareSyncStatus] = useState<{ type: 'success' | 'warning' | 'error' | 'info'; message: string } | null>(null);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState<boolean>(false);
 
+  // Google Contacts Sync state
+  const [syncToGoogleContacts, setSyncToGoogleContacts] = useState<boolean>(true);
+  const [isGoogleConnected, setIsGoogleConnected] = useState<boolean>(false);
+  const [googleEmail, setGoogleEmail] = useState<string>('');
+  const [isConnectingGoogle, setIsConnectingGoogle] = useState<boolean>(false);
+  const [isSyncingGoogle, setIsSyncingGoogle] = useState<boolean>(false);
+  const [googleSyncStatus, setGoogleSyncStatus] = useState<{ type: 'success' | 'warning' | 'error' | 'info'; message: string } | null>(null);
+
   useEffect(() => {
     if (isOpen) {
       setIsConfirmingDelete(false);
       setSquareSyncStatus(null);
+      setGoogleSyncStatus(null);
+
+      const gConnected = GoogleWorkspaceService.isConnected();
+      setIsGoogleConnected(gConnected);
+      setGoogleEmail(GoogleWorkspaceService.getConnectedEmail() || '');
+      setSyncToGoogleContacts(true);
+
+      if (editingContact?.googleContactSyncedAt) {
+        setGoogleSyncStatus({
+          type: 'success',
+          message: `Linked to Google Contacts (${editingContact.googleContactId || 'Synced'})`
+        });
+      }
       if (editingContact) {
         let fName = editingContact.firstName || '';
         let lName = editingContact.lastName || '';
@@ -90,6 +112,37 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
       }
     }
   }, [isOpen, editingContact]);
+
+  const handleConnectGoogle = async () => {
+    setIsConnectingGoogle(true);
+    setGoogleSyncStatus(null);
+    try {
+      await GoogleWorkspaceService.requestAccessTokenViaFirebaseAuth();
+      setIsGoogleConnected(true);
+      setGoogleEmail(GoogleWorkspaceService.getConnectedEmail() || '');
+      setGoogleSyncStatus({
+        type: 'success',
+        message: 'Google account connected! Contacts will sync directly.'
+      });
+    } catch (err: any) {
+      try {
+        await GoogleWorkspaceService.requestAccessToken();
+        setIsGoogleConnected(true);
+        setGoogleEmail(GoogleWorkspaceService.getConnectedEmail() || '');
+        setGoogleSyncStatus({
+          type: 'success',
+          message: 'Google account connected! Contacts will sync directly.'
+        });
+      } catch (gisErr: any) {
+        setGoogleSyncStatus({
+          type: 'error',
+          message: err.message || gisErr.message || 'Could not connect Google account.'
+        });
+      }
+    } finally {
+      setIsConnectingGoogle(false);
+    }
+  };
 
   const handleRefreshSquareCustomer = async () => {
     if (!email.trim()) {
@@ -207,7 +260,11 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         }
       }
 
-      const newContact: Contact = {
+      let googleContactId = editingContact?.googleContactId;
+      let googleContactResourceName = editingContact?.googleContactResourceName;
+      let googleContactSyncedAt = editingContact?.googleContactSyncedAt;
+
+      const candidateContact: Contact = {
         id: editingContact?.id || `con-${Date.now()}`,
         firstName: fName || undefined,
         lastName: lName || undefined,
@@ -228,6 +285,32 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         emergencyContactPhone: isTenant && emergencyContactPhone.trim() ? (formatPhoneNumber(emergencyContactPhone.trim()) || emergencyContactPhone.trim()) : undefined,
         squareCustomerId: isTenant && finalSquareId ? finalSquareId : undefined,
         avatarBg: editingContact?.avatarBg || (isAgent ? 'bg-indigo-600' : randomBg)
+      };
+
+      // Automatically create in Google Contacts if enabled and connected
+      if (syncToGoogleContacts && GoogleWorkspaceService.isConnected()) {
+        try {
+          setIsSyncingGoogle(true);
+          const gResult = await GoogleWorkspaceService.createGoogleContact(candidateContact);
+          if (gResult.success) {
+            googleContactId = gResult.googleContactId;
+            googleContactResourceName = gResult.resourceName;
+            googleContactSyncedAt = new Date().toISOString();
+          } else {
+            console.warn('Google Contact sync notice:', gResult.error);
+          }
+        } catch (gErr) {
+          console.warn('Google Contact sync error:', gErr);
+        } finally {
+          setIsSyncingGoogle(false);
+        }
+      }
+
+      const newContact: Contact = {
+        ...candidateContact,
+        googleContactId,
+        googleContactResourceName,
+        googleContactSyncedAt,
       };
 
       onSave(newContact);
@@ -544,6 +627,81 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* Google Contacts Automatic Sync Section */}
+          <div className="bg-sky-50/60 p-3 rounded-md border border-sky-200/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={syncToGoogleContacts}
+                  onChange={(e) => setSyncToGoogleContacts(e.target.checked)}
+                  className="w-4 h-4 rounded text-indigo-600 border-zinc-300 focus:ring-indigo-500"
+                />
+                <span className="font-bold text-zinc-900 text-xs flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                  </svg>
+                  Create in Google Contacts
+                </span>
+              </label>
+
+              {isGoogleConnected ? (
+                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1">
+                  <Check className="w-3 h-3 text-emerald-600 stroke-[2.5]" />
+                  Connected
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleConnectGoogle}
+                  disabled={isConnectingGoogle}
+                  className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-sm transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  {isConnectingGoogle ? (
+                    <>
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <span>Connect Google</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
+            <p className="text-[11px] text-zinc-600 leading-relaxed">
+              {isGoogleConnected ? (
+                <>
+                  Will automatically sync to your Google Contacts account ({googleEmail || 'Active Workspace'}). Available instantly on your phone, Gmail, and Google Contacts.
+                </>
+              ) : (
+                <>
+                  Connect your Google account so newly added contacts appear instantly in Google Contacts on your phone and in Gmail.
+                </>
+              )}
+            </p>
+
+            {googleSyncStatus && (
+              <div className={`p-2 rounded text-[11px] flex items-center gap-1.5 ${
+                googleSyncStatus.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
+                googleSyncStatus.type === 'error' ? 'bg-rose-50 text-rose-800 border border-rose-200' :
+                'bg-zinc-100 text-zinc-700'
+              }`}>
+                {googleSyncStatus.type === 'success' ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                ) : (
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-600" />
+                )}
+                <span>{googleSyncStatus.message}</span>
+              </div>
+            )}
+          </div>
 
           <div>
             <label className="block font-bold text-zinc-700 mb-1">Notes & Details</label>

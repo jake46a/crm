@@ -1340,8 +1340,49 @@ app.get('/api/google/status', (req, res) => {
       '/api/google/delete-file',
       '/api/google/search-drive-pdfs',
       '/api/google/replace-file-content',
+      '/api/google/create-contact',
     ],
   });
+});
+
+// Create Google Contact (Google People API)
+app.post('/api/google/create-contact', async (req, res) => {
+  try {
+    const authHeader = (req.headers['authorization'] || '') as string;
+    const token = authHeader.replace(/^bearer\s+/i, '').trim();
+
+    if (!token) {
+      return res.status(401).json({
+        error: 'Google Workspace access token is required. Please connect Google Contacts to authenticate.'
+      });
+    }
+
+    const contactPayload = req.body;
+    if (!contactPayload || !contactPayload.names?.length) {
+      return res.status(400).json({ error: 'Valid contact payload with name is required.' });
+    }
+
+    const peopleRes = await fetch('https://people.googleapis.com/v1/people:createContact', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(contactPayload),
+    });
+
+    const data = (await peopleRes.json().catch(() => ({}))) as any;
+    if (!peopleRes.ok) {
+      return res.status(peopleRes.status).json({
+        error: data?.error?.message || `Google People API error (${peopleRes.status})`,
+        details: data?.error,
+      });
+    }
+
+    return res.json(data);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to create Google Contact.' });
+  }
 });
 
 // ----------------------------------------------------

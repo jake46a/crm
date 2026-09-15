@@ -51,6 +51,7 @@ import {
   subscribeToInvoices
 } from './services/firebase';
 import { useFirebase } from './context/FirebaseContext';
+import { GoogleWorkspaceService } from './services/googleWorkspace';
 
 // Views
 import { Header } from './components/Header';
@@ -630,7 +631,30 @@ export default function App() {
     StorageService.saveContacts(nextContacts);
     FirebaseService.saveContact(contact).catch(err => console.warn("Firestore save contact err:", err));
     logActivity('System', `Contact Saved: ${contact.name} (${contact.type})`, contact.id);
-    showToast(`Contact saved: ${contact.name}`);
+
+    // If a new contact was created without googleContactSyncedAt and Google Workspace is connected, sync it in background
+    if (!isExisting && !contact.googleContactSyncedAt && GoogleWorkspaceService.isConnected()) {
+      GoogleWorkspaceService.createGoogleContact(contact)
+        .then(res => {
+          if (res.success && res.resourceName) {
+            const synced: Contact = {
+              ...contact,
+              googleContactId: res.googleContactId,
+              googleContactResourceName: res.resourceName,
+              googleContactSyncedAt: new Date().toISOString()
+            };
+            setContacts(prev => prev.map(c => c.id === contact.id ? synced : c));
+            StorageService.saveContacts(nextContacts.map(c => c.id === contact.id ? synced : c));
+            FirebaseService.saveContact(synced).catch(() => {});
+            showToast(`Contact saved & synced to Google Contacts: ${contact.name}`);
+          }
+        })
+        .catch(err => console.warn("Auto-sync contact to Google error:", err));
+    } else if (contact.googleContactSyncedAt) {
+      showToast(`Contact saved & synced to Google Contacts: ${contact.name}`);
+    } else {
+      showToast(`Contact saved: ${contact.name}`);
+    }
   };
 
   // Contact Delete

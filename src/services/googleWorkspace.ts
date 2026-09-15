@@ -1,11 +1,13 @@
-// Google Workspace (Docs & Drive) Integration Service
+// Google Workspace (Docs, Drive & Contacts) Integration Service
 // Supports both Firebase Auth (recommended for custom domains/Cloudflare) and Google Identity Services (GIS)
 import { auth } from './firebase';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { Contact } from '../types';
 
 export const SCOPES = [
   'https://www.googleapis.com/auth/documents',
   'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/contacts',
 ];
 
 export const DEFAULT_OAUTH_CLIENT_ID = '689729380510-3t4c9eghg2unsrh8e8d5iaoinadh5s09.apps.googleusercontent.com';
@@ -176,6 +178,21 @@ export class GoogleWorkspaceService {
       name: localStorage.getItem(STORAGE_KEY_USER_NAME) || email.split('@')[0],
       connectedAt: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Check if Google Workspace / People API is connected
+   */
+  static isConnected(): boolean {
+    return !!this.getActiveToken();
+  }
+
+  /**
+   * Get connected email or fallback
+   */
+  static getConnectedEmail(): string | null {
+    const user = this.getConnectedUser();
+    return user?.email || localStorage.getItem(STORAGE_KEY_EMAIL) || null;
   }
 
   /**
@@ -1280,5 +1297,186 @@ Management: ___________________________ Date: {{today_date}}
     const updated = list.filter(item => item.id !== id && item.driveFileId !== id);
     localStorage.setItem(STORAGE_KEY_DRIVE_PDFS, JSON.stringify(updated));
     return updated;
+  }
+
+  /**
+   * Builds the Google People API createContact payload from a CRM Contact
+   */
+  static buildPeopleContactPayload(contact: Contact) {
+    let givenName = (contact.firstName || '').trim();
+    let familyName = (contact.lastName || '').trim();
+
+    if (!givenName && !familyName && contact.name) {
+      const parts = contact.name.trim().split(/\s+/);
+      givenName = parts[0] || '';
+      familyName = parts.slice(1).join(' ') || '';
+    }
+
+    const payload: any = {
+      names: [
+        {
+          givenName: givenName || contact.name || 'Resident',
+          familyName: familyName || '',
+        },
+      ],
+    };
+
+    if (contact.email?.trim()) {
+      payload.emailAddresses = [
+        {
+          value: contact.email.trim(),
+          type: 'work',
+        },
+      ];
+    }
+
+    const phoneNumbers: any[] = [];
+    if (contact.phone?.trim()) {
+      phoneNumbers.push({
+        value: contact.phone.trim(),
+        type: 'mobile',
+      });
+    }
+    if (contact.secondaryPhone?.trim()) {
+      phoneNumbers.push({
+        value: contact.secondaryPhone.trim(),
+        type: 'work',
+      });
+    }
+    if (phoneNumbers.length > 0) {
+      payload.phoneNumbers = phoneNumbers;
+    }
+
+    const orgName = contact.company?.trim() || 'Moyer Property Management';
+    const roleTitle = contact.roleOrSpecialty?.trim() || contact.type || 'Tenant';
+    const dept = contact.propertyName?.trim()
+      ? (contact.roomName?.trim() ? `${contact.propertyName} - ${contact.roomName}` : contact.propertyName)
+      : undefined;
+
+    payload.organizations = [
+      {
+        name: orgName,
+        title: roleTitle,
+        department: dept,
+      },
+    ];
+
+    const notesParts: string[] = [];
+    if (contact.type) notesParts.push(`Type: ${contact.type}`);
+    if (contact.propertyName) {
+      notesParts.push(`Property: ${contact.propertyName}${contact.roomName ? ` (${contact.roomName})` : ''}`);
+    }
+    if (contact.emergencyContactName || contact.emergencyContactPhone) {
+      notesParts.push(`Emergency Contact: ${contact.emergencyContactName || 'N/A'} - ${contact.emergencyContactPhone || 'N/A'}`);
+    }
+    if (contact.notes) notesParts.push(`Notes: ${contact.notes}`);
+
+    if (notesParts.length > 0) {
+      payload.biographies = [
+        {
+          value: notesParts.join('\n'),
+          contentType: 'TEXT_PLAIN',
+        },
+      ];
+    }
+
+    payload.userDefined = [
+      { key: 'CRM_Source', value: 'Moyer Property Management' },
+      { key: 'Contact_Type', value: contact.type || 'Tenant' },
+    ];
+    if (contact.propertyName) {
+      payload.userDefined.push({ key: 'Property', value: contact.propertyName });
+    }
+    if (contact.roomName) {
+      payload.userDefined.push({ key: 'Room', value: contact.roomName });
+    }
+    if (contact.id) {
+      payload.userDefined.push({ key: 'CRM_ID', value: contact.id });
+    }
+
+    return payload;
+  }
+
+  /**
+   * Creates a contact in Google Contacts (Google People API)
+   * Tries Cloudflare/Node proxy first, falls back directly to Google People API
+   */
+  static async createGoogleContact(
+    contact: Contact,
+    tokenOverride?: string
+  ): Promise<{ success: boolean; googleContactId?: string; resourceName?: string; error?: string }> {
+    const token = (tokenOverride || this.getActiveToken() || '').trim();
+    if (!token) {
+      return {
+        success: false,
+        error: 'Google account is not connected. Connect Google Contacts to enable automatic sync.',
+      };
+    }
+
+    const payload = this.buildPeopleContactPayload(contact);
+
+    // 1. Try server/edge proxy first
+    try {
+      const res = await fetch('/api/google/create-contact', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const resourceName = data.resourceName || data.name;
+        const googleContactId = resourceName ? resourceName.replace('people/', '') : undefined;
+        return {
+          success: true,
+          resourceName,
+          googleContactId,
+        };
+      } else if (res.status === 401) {
+        return {
+          success: false,
+          error: 'Google authorization expired. Please reconnect your Google account.',
+        };
+      }
+      console.warn(`Proxy /api/google/create-contact returned ${res.status}. Falling back to direct People API...`);
+    } catch (proxyErr) {
+      console.warn('Proxy create contact failed, falling back to direct People API:', proxyErr);
+    }
+
+    // 2. Direct client-side Google People API fallback
+    try {
+      const directRes = await fetch('https://people.googleapis.com/v1/people:createContact', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const directData = await directRes.json().catch(() => ({}));
+      if (!directRes.ok) {
+        return {
+          success: false,
+          error: directData.error?.message || `Google Contacts error (${directRes.status})`,
+        };
+      }
+
+      const resourceName = directData.resourceName || directData.name;
+      const googleContactId = resourceName ? resourceName.replace('people/', '') : undefined;
+      return {
+        success: true,
+        resourceName,
+        googleContactId,
+      };
+    } catch (directErr: any) {
+      return {
+        success: false,
+        error: directErr.message || 'Failed to connect to Google People API.',
+      };
+    }
   }
 }

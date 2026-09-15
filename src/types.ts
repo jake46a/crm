@@ -281,6 +281,9 @@ export interface Contact {
   paymentStatus?: 'Current / Paid' | 'Payment Pending' | 'Past Due';
   avatarBg: string;
   squareCustomerId?: string; // Square Customer ID from searchCustomers or createCustomer
+  googleContactId?: string; // Google People API Contact ID
+  googleContactResourceName?: string; // Google People API resourceName (e.g. people/c123456789)
+  googleContactSyncedAt?: string; // Timestamp of last sync
 }
 
 export interface ActivityLog {
