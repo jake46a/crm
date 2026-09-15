@@ -181,22 +181,34 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
           <div className={`p-3.5 rounded-md border flex items-center justify-between ${
             syncStatus === 'connected' || isFirebaseConnected
               ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              : syncStatus === 'connecting'
+              ? 'bg-blue-50 text-blue-800 border-blue-200'
               : syncStatus === 'error'
-              ? 'bg-rose-50 text-rose-800 border-rose-200'
-              : 'bg-amber-50 text-amber-800 border-amber-200'
+              ? 'bg-amber-50 text-amber-800 border-amber-200'
+              : 'bg-zinc-100 text-zinc-800 border-zinc-250'
           }`}>
             <div className="flex items-center gap-2.5">
               <div className={`w-2.5 h-2.5 rounded-full ${
-                syncStatus === 'connected' || isFirebaseConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                syncStatus === 'connected' || isFirebaseConnected 
+                  ? 'bg-emerald-500 animate-pulse' 
+                  : syncStatus === 'connecting'
+                  ? 'bg-blue-500 animate-ping'
+                  : 'bg-zinc-400'
               }`} />
               <div>
                 <p className="font-bold text-xs">
-                  {syncStatus === 'connected' || isFirebaseConnected ? 'Real-Time Cloud Sync Active' : 'Connecting to Cloud...'}
+                  {syncStatus === 'connected' || isFirebaseConnected 
+                    ? 'Real-Time Cloud Sync Active' 
+                    : syncStatus === 'connecting'
+                    ? 'Connecting to Cloud...'
+                    : 'Local Storage Mode Active'}
                 </p>
                 <p className="text-[11px] opacity-80">
                   {syncStatus === 'connected' || isFirebaseConnected
                     ? 'All changes are automatically synchronized with Cloud Firestore'
-                    : 'Changes are cached locally and will sync as soon as connected'}
+                    : syncStatus === 'connecting'
+                    ? 'Checking Cloud Firestore connection...'
+                    : 'All CRM data is securely saved in browser Local Storage'}
                 </p>
               </div>
             </div>

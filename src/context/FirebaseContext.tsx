@@ -55,10 +55,10 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       console.warn("Redirect auth check err:", err);
     });
 
-    // 3. Test Connection
+    // 3. Test Connection with fast fallback
     const initDb = async () => {
       try {
-        const connected = await testFirestoreConnection();
+        const connected = await testFirestoreConnection(2500);
         setIsFirebaseConnected(connected);
         if (connected) {
           setSyncStatus('connected');
@@ -66,9 +66,9 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setSyncStatus('offline');
         }
       } catch (err) {
-        console.error("Firebase init error:", err);
-        setSyncStatus('error');
-        setErrorMessage(err instanceof Error ? err.message : String(err));
+        console.warn("Firebase init connection test:", err);
+        setIsFirebaseConnected(false);
+        setSyncStatus('offline');
       }
     };
 

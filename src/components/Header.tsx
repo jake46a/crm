@@ -26,7 +26,8 @@ import {
   Check,
   ExternalLink,
   Receipt,
-  HardDrive
+  HardDrive,
+  RefreshCw
 } from 'lucide-react';
 import { NavigationTab, LeaseRenewal, WorkOrder, TenantLead, Room, Property, Contact } from '../types';
 import { useFirebase } from '../context/FirebaseContext';
@@ -264,12 +265,24 @@ export const Header: React.FC<HeaderProps> = ({
             <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-sm ${
               syncStatus === 'connected'
                 ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
+                : syncStatus === 'connecting'
+                ? 'bg-blue-950 text-blue-400 border border-blue-800/60'
                 : syncStatus === 'error'
-                ? 'bg-rose-950 text-rose-400 border border-rose-800/60'
+                ? 'bg-amber-950 text-amber-400 border border-amber-800/60'
                 : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
             }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'connected' ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-400'}`} />
-              {syncStatus === 'connected' ? 'Firestore Live' : 'Offline Mode'}
+              <span className={`w-1.5 h-1.5 rounded-full ${
+                syncStatus === 'connected' 
+                  ? 'bg-emerald-400 animate-pulse' 
+                  : syncStatus === 'connecting'
+                  ? 'bg-blue-400 animate-ping'
+                  : 'bg-zinc-400'
+              }`} />
+              {syncStatus === 'connected' 
+                ? 'Firestore Live' 
+                : syncStatus === 'connecting'
+                ? 'Connecting...'
+                : 'Local Storage'}
             </span>
           </div>
           <p className="text-[11px] text-zinc-500">Admin: {user?.displayName || user?.email || 'Jake Moyer'}</p>
@@ -507,14 +520,41 @@ export const Header: React.FC<HeaderProps> = ({
             className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-medium border cursor-pointer hover:opacity-90 transition shadow-2xs ${
               syncStatus === 'connected'
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/70'
+                : syncStatus === 'connecting'
+                ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100/70'
                 : syncStatus === 'error'
-                ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100/70'
-                : 'bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-200/70'
+                ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100/70'
+                : 'bg-zinc-100 text-zinc-700 border-zinc-200 hover:bg-zinc-200/70'
             }`}
-            title="Click to view Cloud Firestore sync status or push/pull data"
+            title={
+              syncStatus === 'connected'
+                ? "Cloud Firestore connected & in real-time sync"
+                : syncStatus === 'connecting'
+                ? "Checking Cloud connection..."
+                : "Active in Local Storage mode (offline persistence). Click to view sync details."
+            }
           >
-            <Cloud className={`w-3.5 h-3.5 ${syncStatus === 'connected' ? 'text-emerald-600' : 'text-zinc-400'}`} />
-            <span className="text-[11px] hidden md:inline">{syncStatus === 'connected' ? 'Cloud Synced' : 'Syncing...'}</span>
+            {syncStatus === 'connected' ? (
+              <>
+                <Cloud className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-[11px] hidden md:inline">Cloud Synced</span>
+              </>
+            ) : syncStatus === 'connecting' ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 text-blue-600 animate-spin" />
+                <span className="text-[11px] hidden md:inline">Connecting...</span>
+              </>
+            ) : syncStatus === 'error' ? (
+              <>
+                <CloudOff className="w-3.5 h-3.5 text-amber-600" />
+                <span className="text-[11px] hidden md:inline">Local (Offline)</span>
+              </>
+            ) : (
+              <>
+                <HardDrive className="w-3.5 h-3.5 text-zinc-600" />
+                <span className="text-[11px] hidden md:inline">Local Storage</span>
+              </>
+            )}
           </button>
 
           {/* User Profile & Firebase Auth Dropdown */}

@@ -109,22 +109,33 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Test Connection
-export async function testFirestoreConnection(): Promise<boolean> {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-    return true;
-  } catch (error) {
+// Test Connection with timeout
+export async function testFirestoreConnection(timeoutMs: number = 2500): Promise<boolean> {
+  const timeoutPromise = new Promise<boolean>((_, reject) =>
+    setTimeout(() => reject(new Error('Firestore connection timeout')), timeoutMs)
+  );
+
+  const checkConnection = async (): Promise<boolean> => {
     try {
-      await setDoc(doc(db, 'test', 'connection'), {
-        connectedAt: new Date().toISOString(),
-        status: 'active'
-      }, { merge: true });
+      await getDocFromServer(doc(db, 'test', 'connection'));
       return true;
-    } catch (writeErr) {
-      console.warn("Firestore connection test error:", writeErr);
-      return false;
+    } catch (error) {
+      try {
+        await setDoc(doc(db, 'test', 'connection'), {
+          connectedAt: new Date().toISOString(),
+          status: 'active'
+        }, { merge: true });
+        return true;
+      } catch (writeErr) {
+        return false;
+      }
     }
+  };
+
+  try {
+    return await Promise.race([checkConnection(), timeoutPromise]);
+  } catch {
+    return false;
   }
 }
 
