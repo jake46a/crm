@@ -104,13 +104,20 @@ export const StorageService = {
     const raw = getItem<Room[]>(STORAGE_KEYS.ROOMS, INITIAL_ROOMS);
     const filtered = raw.filter(r => !LEGACY_SAMPLE_ROOM_IDS.has(r.id) && r.propertyId !== 'prop-1' && r.propertyId !== 'prop-2' && r.propertyId !== 'prop-3');
     let rooms = filtered;
-    // Guarantee 1070 Yank St rooms exist
+    // Ensure 1070 Yank St rooms exist
     const hasYankRooms = rooms.some(r => r.propertyId === 'prop-1070-yank' || r.propertyName?.includes('1070 Yank'));
     if (!hasYankRooms) {
       const yankRooms = INITIAL_ROOMS.filter(r => r.propertyId === 'prop-1070-yank');
       if (yankRooms.length > 0) {
         rooms = [...yankRooms, ...rooms];
       }
+    }
+
+    // If rooms list contains only available rooms but INITIAL_ROOMS has active residents, restore them
+    const hasOccupied = rooms.some(r => r.status === 'Occupied' || !!r.currentTenantName);
+    if (!hasOccupied && INITIAL_ROOMS.some(r => r.status === 'Occupied')) {
+      rooms = INITIAL_ROOMS;
+      this.saveRooms(rooms);
     }
 
     // Ensure Room 1 is named Bedroom suite, and strip any rejected sample tenant names
@@ -182,7 +189,10 @@ export const StorageService = {
       ren.propertyId !== 'prop-1' && ren.propertyId !== 'prop-2' && ren.propertyId !== 'prop-3'
     );
     let renewals = filtered;
-    if (renewals.length !== raw.length) {
+    if (renewals.length === 0 && INITIAL_RENEWALS.length > 0) {
+      renewals = INITIAL_RENEWALS;
+      this.saveRenewals(renewals);
+    } else if (renewals.length !== raw.length) {
       this.saveRenewals(renewals);
     }
     return renewals.map(renewal => {
@@ -322,7 +332,10 @@ export const StorageService = {
       c.propertyId !== 'prop-1' && c.propertyId !== 'prop-2' && c.propertyId !== 'prop-3'
     );
     let contacts = filtered;
-    if (contacts.length !== raw.length) {
+    if (contacts.length === 0 && INITIAL_CONTACTS.length > 0) {
+      contacts = INITIAL_CONTACTS;
+      this.saveContacts(contacts);
+    } else if (contacts.length !== raw.length) {
       this.saveContacts(contacts);
     }
     return contacts.map(contact => {

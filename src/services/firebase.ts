@@ -50,7 +50,7 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // CRITICAL: Initialize Firestore with auto-detect long polling so that WebSocket drops
 // or iframe sandbox proxy restrictions gracefully fall back to HTTP long polling.
-const customDbId = (firebaseConfig as any).firestoreDatabaseId;
+const customDbId = (firebaseConfig as any).firestoreDatabaseId || 'ai-studio-moyerpropertyman-6a0128de-4dfa-4662-b505-5ed7bb5e4c27';
 export const db = (() => {
   try {
     return initializeFirestore(app, {

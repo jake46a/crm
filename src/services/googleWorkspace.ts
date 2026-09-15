@@ -3,6 +3,7 @@
 import { auth } from './firebase';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { Contact } from '../types';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 export const SCOPES = [
   'https://www.googleapis.com/auth/documents',
@@ -10,7 +11,7 @@ export const SCOPES = [
   'https://www.googleapis.com/auth/contacts',
 ];
 
-export const DEFAULT_OAUTH_CLIENT_ID = '689729380510-3t4c9eghg2unsrh8e8d5iaoinadh5s09.apps.googleusercontent.com';
+export const DEFAULT_OAUTH_CLIENT_ID = (firebaseConfig as any).oAuthClientId || '548380806773-hdq24r2dsgepaou44519hjdfaclh3e0b.apps.googleusercontent.com';
 
 const STORAGE_KEY_TOKEN = 'moyer_crm_gworkspace_token';
 const STORAGE_KEY_EXPIRES = 'moyer_crm_gworkspace_expires_at';

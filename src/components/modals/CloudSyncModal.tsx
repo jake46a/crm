@@ -306,6 +306,25 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
             </button>
           </div>
 
+          <div className="pt-1">
+            <button
+              onClick={() => {
+                StorageService.resetToDemoData();
+                loadCounts();
+                setActionMessage({
+                  type: 'success',
+                  text: 'Restored 1070 Yank St active portfolio (William Jacobs & 4 room residents, contacts & lease)! Click "Sync Now" to push to Firestore.'
+                });
+                onDataReload?.();
+              }}
+              disabled={isPushing || isPulling}
+              className="w-full bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-semibold py-2 px-3 rounded-md flex items-center justify-center gap-2 transition disabled:opacity-50 text-[11px]"
+            >
+              <Database className="w-3.5 h-3.5 text-amber-700" />
+              <span>Restore 1070 Yank Portfolio (William Jacobs & Active Residents)</span>
+            </button>
+          </div>
+
           {/* Auth Section */}
           <div className="pt-2 border-t border-zinc-100 flex items-center justify-between">
             <div>

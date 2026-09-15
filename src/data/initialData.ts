@@ -41,7 +41,7 @@ export const INITIAL_PROPERTIES: Property[] = [
 ];
 
 export const INITIAL_ROOMS: Room[] = [
-  // 1070 Yank St (7 Rooms, clean slate, all Available)
+  // 1070 Yank St - 7 Rooms with 4 Active Residents
   {
     id: 'room-yank-1',
     propertyId: 'prop-1070-yank',
@@ -55,11 +55,20 @@ export const INITIAL_ROOMS: Room[] = [
     monthlyRent: 950,
     securityDeposit: 950,
     utilitiesIncluded: ['Water', 'Gas', 'Electricity', 'Gigabit WiFi', 'Trash & Recycling', 'Bi-Weekly Cleaning'],
-    status: 'Available',
+    status: 'Occupied',
     leaseType: 'Month-to-Month',
+    currentTenantId: 'tenant-william-jacobs',
+    currentTenantFirstName: 'William',
+    currentTenantLastName: 'Jacobs',
+    currentTenantName: 'William Jacobs',
+    currentTenantPhone: '(303) 555-0100',
+    currentTenantEmail: 'jake@proweb.agency',
+    squareCustomerId: '5H7TD7HACMVSVZQFSJ557GW5XW',
+    leaseStartDate: '2025-01-01',
+    leaseEndDate: '2026-12-31',
     amenities: ['Private Ensuite Bath', 'King Bed', 'Executive Desk', 'Walk-in Closet'],
     roomFeatures: ['Private Full Bathroom', 'Spacious Bedroom Suite'],
-    notes: 'Bedroom suite with private ensuite bathroom at 1070 Yank St.',
+    notes: 'Resident in Bedroom suite. Active tenant on file.',
     turnoverChecklist: [
       { id: 't-suite-1', task: 'Sanitize private ensuite bathroom & shower', isDone: true },
       { id: 't-suite-2', task: 'Inspect desk, mattress, and closet surfaces', isDone: true },
@@ -79,11 +88,20 @@ export const INITIAL_ROOMS: Room[] = [
     monthlyRent: 850,
     securityDeposit: 850,
     utilitiesIncluded: ['Water', 'Gas', 'Electricity', 'Gigabit WiFi', 'Trash & Recycling', 'Bi-Weekly Cleaning'],
-    status: 'Available',
+    status: 'Occupied',
     leaseType: 'Month-to-Month',
+    currentTenantId: 'tenant-carlos-rea',
+    currentTenantFirstName: 'Carlos Adrian',
+    currentTenantLastName: 'Rea',
+    currentTenantName: 'Carlos Adrian Rea',
+    currentTenantPhone: '(720) 555-0144',
+    currentTenantEmail: 'carlosrea@live.com',
+    squareCustomerId: 'AKJ2CWZ97H76E6XG95WP3J35G8',
+    leaseStartDate: '2025-09-01',
+    leaseEndDate: '2026-09-01',
     amenities: ['Full Memory Foam Bed', 'Study Desk', 'Ample Natural Light'],
     roomFeatures: ['Overlooks Back Garden'],
-    notes: 'Room 2 on main level.',
+    notes: 'Resident in Room 2. Prompt payer via Square.',
     turnoverChecklist: [
       { id: 't-yank-2-1', task: 'Window sanitization and screen check', isDone: true },
       { id: 't-yank-2-2', task: 'Desk and furniture inspection', isDone: true }
@@ -102,11 +120,20 @@ export const INITIAL_ROOMS: Room[] = [
     monthlyRent: 850,
     securityDeposit: 850,
     utilitiesIncluded: ['Water', 'Gas', 'Electricity', 'Gigabit WiFi', 'Trash & Recycling', 'Bi-Weekly Cleaning'],
-    status: 'Available',
+    status: 'Occupied',
     leaseType: 'Month-to-Month',
+    currentTenantId: 'tenant-jordan-bends',
+    currentTenantFirstName: 'Jordan',
+    currentTenantLastName: 'Bends',
+    currentTenantName: 'Jordan Bends',
+    currentTenantPhone: '(303) 555-0178',
+    currentTenantEmail: 'jordanbends@yahoo.com',
+    squareCustomerId: 'BS5346WC6GYXYR7KP7V5QKV2ZG',
+    leaseStartDate: '2025-06-01',
+    leaseEndDate: '2026-06-01',
     amenities: ['Queen Bed', 'Dual Monitors Desk', 'Walk-in Closet'],
     roomFeatures: ['Morning Sunlight Exposure'],
-    notes: 'Room 3 on main level.',
+    notes: 'Resident in Room 3.',
     turnoverChecklist: [
       { id: 't-yank-3-1', task: 'Sanitize desk, mattress, and closet surfaces', isDone: true },
       { id: 't-yank-3-2', task: 'Test electrical outlets and lighting fixtures', isDone: true }
@@ -125,11 +152,20 @@ export const INITIAL_ROOMS: Room[] = [
     monthlyRent: 850,
     securityDeposit: 850,
     utilitiesIncluded: ['Water', 'Gas', 'Electricity', 'Gigabit WiFi', 'Trash & Recycling', 'Bi-Weekly Cleaning'],
-    status: 'Available',
+    status: 'Occupied',
     leaseType: 'Month-to-Month',
+    currentTenantId: 'tenant-daniel-oliveira',
+    currentTenantFirstName: 'Daniel',
+    currentTenantLastName: 'Oliveira',
+    currentTenantName: 'Daniel Oliveira',
+    currentTenantPhone: '(720) 555-0193',
+    currentTenantEmail: 'bacaliam28@gmail.com',
+    squareCustomerId: 'NVKKA892W8959GTGYWKJ3F2NZ8',
+    leaseStartDate: '2025-12-01',
+    leaseEndDate: '2026-12-01',
     amenities: ['Comfortable Bed', 'Study Area', 'Closet Storage'],
     roomFeatures: ['Cool Summer Temperature', 'Quiet Lower Level'],
-    notes: 'Room 4 on lower level.',
+    notes: 'Resident in Room 4.',
     turnoverChecklist: [
       { id: 't-yank-4-1', task: 'Baseboard and heating element check', isDone: true },
       { id: 't-yank-4-2', task: 'Carpet steam cleaning', isDone: true }
@@ -206,13 +242,134 @@ export const INITIAL_ROOMS: Room[] = [
   }
 ];
 
-export const INITIAL_RENEWALS: LeaseRenewal[] = [];
+export const INITIAL_RENEWALS: LeaseRenewal[] = [
+  {
+    id: 'ren-william-jacobs-1',
+    tenantId: 'tenant-william-jacobs',
+    tenantFirstName: 'William',
+    tenantLastName: 'Jacobs',
+    tenantName: 'William Jacobs',
+    tenantEmail: 'jake@proweb.agency',
+    tenantPhone: '(303) 555-0100',
+    propertyId: 'prop-1070-yank',
+    propertyName: '1070 Yank St',
+    roomId: 'room-yank-1',
+    roomName: 'Bedroom suite',
+    currentMonthlyRent: 950,
+    proposedMonthlyRent: 950,
+    leaseStartDate: '2025-01-01',
+    currentLeaseEndDate: '2026-12-31',
+    anniversaryDate: '2026-12-31',
+    negotiationStartDate: '2026-10-01',
+    decisionDeadline: '2026-11-15',
+    daysUntilExpiration: 113,
+    renewalStatus: 'Review Pending',
+    renewalTermMonths: 12,
+    proposedTermMonths: 12,
+    leaseType: 'Month-to-Month',
+    noticeSentDate: '2026-09-01',
+    lastContactDate: '2026-09-01',
+    tenantResponseNotes: 'Active renewal on file for Bedroom suite.',
+    internalNotes: 'Bedroom suite renewal record.'
+  }
+];
 
 export const INITIAL_WORK_ORDERS: WorkOrder[] = [];
 
 export const INITIAL_LEADS: TenantLead[] = [];
 
-export const INITIAL_CONTACTS: Contact[] = [];
+export const INITIAL_CONTACTS: Contact[] = [
+  {
+    id: 'cont-william-jacobs',
+    type: 'Tenant',
+    firstName: 'William',
+    lastName: 'Jacobs',
+    name: 'William Jacobs',
+    email: 'jake@proweb.agency',
+    phone: '(303) 555-0100',
+    propertyId: 'prop-1070-yank',
+    propertyName: '1070 Yank St',
+    roomId: 'room-yank-1',
+    roomName: 'Bedroom suite',
+    status: 'Active',
+    paymentStatus: 'Current / Paid',
+    avatarBg: 'bg-indigo-600',
+    notes: 'Resident in Bedroom suite. Active tenant on file.'
+  },
+  {
+    id: 'cont-carlos-rea',
+    type: 'Tenant',
+    firstName: 'Carlos Adrian',
+    lastName: 'Rea',
+    name: 'Carlos Adrian Rea',
+    email: 'carlosrea@live.com',
+    phone: '(720) 555-0144',
+    propertyId: 'prop-1070-yank',
+    propertyName: '1070 Yank St',
+    roomId: 'room-yank-2',
+    roomName: 'Room 2',
+    status: 'Active',
+    paymentStatus: 'Current / Paid',
+    avatarBg: 'bg-emerald-600',
+    notes: 'Resident in Room 2. Prompt payer via Square.'
+  },
+  {
+    id: 'cont-jordan-bends',
+    type: 'Tenant',
+    firstName: 'Jordan',
+    lastName: 'Bends',
+    name: 'Jordan Bends',
+    email: 'jordanbends@yahoo.com',
+    phone: '(303) 555-0178',
+    propertyId: 'prop-1070-yank',
+    propertyName: '1070 Yank St',
+    roomId: 'room-yank-3',
+    roomName: 'Room 3',
+    status: 'Active',
+    paymentStatus: 'Current / Paid',
+    avatarBg: 'bg-blue-600',
+    notes: 'Resident in Room 3.'
+  },
+  {
+    id: 'cont-daniel-oliveira',
+    type: 'Tenant',
+    firstName: 'Daniel',
+    lastName: 'Oliveira',
+    name: 'Daniel Oliveira',
+    email: 'bacaliam28@gmail.com',
+    phone: '(720) 555-0193',
+    propertyId: 'prop-1070-yank',
+    propertyName: '1070 Yank St',
+    roomId: 'room-yank-4',
+    roomName: 'Room 4',
+    status: 'Active',
+    paymentStatus: 'Current / Paid',
+    avatarBg: 'bg-amber-600',
+    notes: 'Resident in Room 4.'
+  },
+  {
+    id: 'cont-4',
+    type: 'Vendor / Contractor',
+    name: 'Apex Mile High Plumbing',
+    company: 'Apex Mile High Mechanical LLC',
+    email: 'dispatch@apexmilehighplumbing.com',
+    phone: '(303) 555-0199',
+    status: 'Active',
+    avatarBg: 'bg-cyan-700',
+    notes: 'Preferred plumbing & drain vendor for 1070 Yank St.'
+  },
+  {
+    id: 'cont-5',
+    type: 'Vendor / Contractor',
+    name: 'Highland Sparkle Cleaners',
+    company: 'Highland Sparkle Professional Cleaning',
+    email: 'service@highlandclean.com',
+    phone: '(303) 555-0172',
+    status: 'Active',
+    avatarBg: 'bg-pink-700',
+    notes: 'Bi-weekly common area turnover resets & deep cleaning.'
+  }
+];
 
 export const INITIAL_ACTIVITY_LOGS: ActivityLog[] = [
   {
