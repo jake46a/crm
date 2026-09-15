@@ -166,33 +166,38 @@ export default function App() {
     // 3. Real-time Firebase Sync Listeners
     const unsubProperties = subscribeToProperties((liveProps) => {
       if (liveProps) {
-        let cleaned = liveProps.filter(p => !LEGACY_SAMPLE_PROPERTY_IDS.has(p.id) && !p.name.includes('Speer') && !p.name.includes('Capitol Hill') && !p.name.includes('Highlands'));
+        let cleaned = liveProps.filter(p => 
+          !StorageService.isDeleted(p.id) &&
+          !LEGACY_SAMPLE_PROPERTY_IDS.has(p.id) && 
+          !p.name.includes('Speer') && 
+          !p.name.includes('Capitol Hill') && 
+          !p.name.includes('Highlands')
+        );
         liveProps.forEach(p => {
-          if (LEGACY_SAMPLE_PROPERTY_IDS.has(p.id) || p.name.includes('Speer') || p.name.includes('Capitol Hill') || p.name.includes('Highlands')) {
+          if (
+            StorageService.isDeleted(p.id) ||
+            LEGACY_SAMPLE_PROPERTY_IDS.has(p.id) || 
+            p.name.includes('Speer') || 
+            p.name.includes('Capitol Hill') || 
+            p.name.includes('Highlands')
+          ) {
             FirebaseService.deleteProperty(p.id).catch(() => {});
           }
         });
-        let finalProperties = cleaned;
-        // CRITICAL DATA INTEGRITY: Merge and preserve any local properties not yet in Firestore
-        const localProps = StorageService.getProperties();
-        const unsyncedProps = localProps.filter(lp => !finalProperties.some(p => p.id === lp.id));
-        if (unsyncedProps.length > 0) {
-          finalProperties = [...finalProperties, ...unsyncedProps];
-          unsyncedProps.forEach(p => FirebaseService.saveProperty(p).catch(() => {}));
-        }
 
-        if (finalProperties.length === 0 && INITIAL_PROPERTIES.length > 0) {
-          finalProperties = INITIAL_PROPERTIES;
-          INITIAL_PROPERTIES.forEach(p => FirebaseService.saveProperty(p).catch(() => {}));
+        if (cleaned.length === 0 && INITIAL_PROPERTIES.length > 0) {
+          cleaned = INITIAL_PROPERTIES.filter(p => !StorageService.isDeleted(p.id));
+          cleaned.forEach(p => FirebaseService.saveProperty(p).catch(() => {}));
         }
-        setProperties(finalProperties);
-        StorageService.saveProperties(finalProperties);
+        setProperties(cleaned);
+        StorageService.saveProperties(cleaned);
       }
     });
 
     const unsubRooms = subscribeToRooms((liveRooms) => {
       if (liveRooms) {
         let cleaned = liveRooms.filter(r => 
+          !StorageService.isDeleted(r.id) &&
           !LEGACY_SAMPLE_ROOM_IDS.has(r.id) && 
           !/^Room [2-7]$/i.test(r.name) &&
           r.propertyId !== 'prop-1' && 
@@ -201,6 +206,7 @@ export default function App() {
         );
         liveRooms.forEach(r => {
           if (
+            StorageService.isDeleted(r.id) ||
             LEGACY_SAMPLE_ROOM_IDS.has(r.id) || 
             /^Room [2-7]$/i.test(r.name) ||
             r.propertyId === 'prop-1' || 
@@ -211,17 +217,9 @@ export default function App() {
           }
         });
 
-        // CRITICAL DATA INTEGRITY: Merge and preserve any local rooms not yet in Firestore
-        const localRooms = StorageService.getRooms();
-        const unsyncedRooms = localRooms.filter(lr => !cleaned.some(r => r.id === lr.id));
-        if (unsyncedRooms.length > 0) {
-          cleaned = [...cleaned, ...unsyncedRooms];
-          unsyncedRooms.forEach(r => FirebaseService.saveRoom(r).catch(() => {}));
-        }
-
         if (cleaned.length === 0 && INITIAL_ROOMS.length > 0) {
-          cleaned = INITIAL_ROOMS;
-          INITIAL_ROOMS.forEach(r => FirebaseService.saveRoom(r).catch(() => {}));
+          cleaned = INITIAL_ROOMS.filter(r => !StorageService.isDeleted(r.id));
+          cleaned.forEach(r => FirebaseService.saveRoom(r).catch(() => {}));
         }
 
         // Ensure Room 1 is named Bedroom suite if it exists
@@ -264,6 +262,7 @@ export default function App() {
     const unsubRenewals = subscribeToRenewals((liveRenewals) => {
       if (liveRenewals) {
         let cleaned = liveRenewals.filter(ren => 
+          !StorageService.isDeleted(ren.id) &&
           !LEGACY_SAMPLE_RENEWAL_IDS.has(ren.id) && 
           !REJECTED_SAMPLE_RENEWAL_IDS.has(ren.id) &&
           !REJECTED_SAMPLE_TENANT_NAMES.has(typeof ren.tenantName === 'string' ? ren.tenantName.toLowerCase().trim() : '') &&
@@ -271,6 +270,7 @@ export default function App() {
         );
         liveRenewals.forEach(ren => {
           if (
+            StorageService.isDeleted(ren.id) ||
             LEGACY_SAMPLE_RENEWAL_IDS.has(ren.id) ||
             REJECTED_SAMPLE_RENEWAL_IDS.has(ren.id) ||
             REJECTED_SAMPLE_TENANT_NAMES.has(typeof ren.tenantName === 'string' ? ren.tenantName.toLowerCase().trim() : '') ||
@@ -280,40 +280,31 @@ export default function App() {
           }
         });
 
-        // CRITICAL DATA INTEGRITY: Merge and preserve any local renewals not yet in Firestore
-        const localRenewals = StorageService.getRenewals();
-        const unsyncedRenewals = localRenewals.filter(lr => !cleaned.some(r => r.id === lr.id));
-        if (unsyncedRenewals.length > 0) {
-          cleaned = [...cleaned, ...unsyncedRenewals];
-          unsyncedRenewals.forEach(r => FirebaseService.saveRenewal(r).catch(() => {}));
-        }
-
-        let finalRenewals = cleaned;
-        if (finalRenewals.length === 0 && INITIAL_RENEWALS.length > 0) {
-          finalRenewals = INITIAL_RENEWALS;
-          INITIAL_RENEWALS.forEach(ren => FirebaseService.saveRenewal(ren).catch(() => {}));
-        }
-        setRenewals(finalRenewals);
-        StorageService.saveLeaseRenewals(finalRenewals);
+        setRenewals(cleaned);
+        StorageService.saveLeaseRenewals(cleaned);
       }
     });
 
     const unsubWorkOrders = subscribeToWorkOrders((liveWOs) => {
       if (liveWOs) {
-        let cleaned = liveWOs.filter(wo => !LEGACY_SAMPLE_WORK_ORDER_IDS.has(wo.id) && wo.propertyId !== 'prop-1' && wo.propertyId !== 'prop-2' && wo.propertyId !== 'prop-3');
+        let cleaned = liveWOs.filter(wo => 
+          !StorageService.isDeleted(wo.id) &&
+          !LEGACY_SAMPLE_WORK_ORDER_IDS.has(wo.id) && 
+          wo.propertyId !== 'prop-1' && 
+          wo.propertyId !== 'prop-2' && 
+          wo.propertyId !== 'prop-3'
+        );
         liveWOs.forEach(wo => {
-          if (LEGACY_SAMPLE_WORK_ORDER_IDS.has(wo.id) || wo.propertyId === 'prop-1' || wo.propertyId === 'prop-2' || wo.propertyId === 'prop-3') {
+          if (
+            StorageService.isDeleted(wo.id) ||
+            LEGACY_SAMPLE_WORK_ORDER_IDS.has(wo.id) || 
+            wo.propertyId === 'prop-1' || 
+            wo.propertyId === 'prop-2' || 
+            wo.propertyId === 'prop-3'
+          ) {
             FirebaseService.deleteWorkOrder(wo.id).catch(() => {});
           }
         });
-
-        // CRITICAL DATA INTEGRITY: Merge and preserve any local work orders not yet in Firestore
-        const localWOs = StorageService.getWorkOrders();
-        const unsyncedWOs = localWOs.filter(lwo => !cleaned.some(wo => wo.id === lwo.id));
-        if (unsyncedWOs.length > 0) {
-          cleaned = [...cleaned, ...unsyncedWOs];
-          unsyncedWOs.forEach(wo => FirebaseService.saveWorkOrder(wo).catch(() => {}));
-        }
 
         setWorkOrders(cleaned);
         StorageService.saveWorkOrders(cleaned);
@@ -323,21 +314,12 @@ export default function App() {
     const unsubLeads = subscribeToLeads((liveLeads) => {
       if (liveLeads) {
         const legacyMockIds = new Set(['lead-1', 'lead-2', 'lead-3', 'lead-4', 'lead-5', 'lead-6', 'lead-7', 'lead-8']);
-        let cleaned = liveLeads.filter(l => !legacyMockIds.has(l.id));
-        // Delete any legacy demo leads from Firestore if they were previously seeded
+        let cleaned = liveLeads.filter(l => !StorageService.isDeleted(l.id) && !legacyMockIds.has(l.id));
         liveLeads.forEach(l => {
-          if (legacyMockIds.has(l.id)) {
+          if (StorageService.isDeleted(l.id) || legacyMockIds.has(l.id)) {
             FirebaseService.deleteLead(l.id).catch(() => {});
           }
         });
-
-        // CRITICAL DATA INTEGRITY: Merge and preserve any local leads not yet in Firestore
-        const localLeads = StorageService.getTenantLeads();
-        const unsyncedLeads = localLeads.filter(ll => !cleaned.some(l => l.id === ll.id));
-        if (unsyncedLeads.length > 0) {
-          cleaned = [...cleaned, ...unsyncedLeads];
-          unsyncedLeads.forEach(l => FirebaseService.saveLead(l).catch(() => {}));
-        }
 
         setLeads(cleaned);
         StorageService.saveTenantLeads(cleaned);
@@ -347,6 +329,9 @@ export default function App() {
     const unsubContacts = subscribeToContacts((liveContacts) => {
       if (liveContacts) {
         let cleaned = liveContacts.filter(c => 
+          !StorageService.isDeleted(c.id) &&
+          c.id !== 'con-1726390000000' &&
+          (!c.name || typeof c.name !== 'string' || c.name.toLowerCase().trim() !== 'jane doe') &&
           !LEGACY_SAMPLE_CONTACT_IDS.has(c.id) &&
           !REJECTED_SAMPLE_CONTACT_IDS.has(c.id) &&
           !REJECTED_SAMPLE_TENANT_NAMES.has(typeof c.name === 'string' ? c.name.toLowerCase().trim() : '') &&
@@ -354,6 +339,9 @@ export default function App() {
         );
         liveContacts.forEach(c => {
           if (
+            StorageService.isDeleted(c.id) ||
+            c.id === 'con-1726390000000' ||
+            (c.name && typeof c.name === 'string' && c.name.toLowerCase().trim() === 'jane doe') ||
             LEGACY_SAMPLE_CONTACT_IDS.has(c.id) ||
             REJECTED_SAMPLE_CONTACT_IDS.has(c.id) ||
             REJECTED_SAMPLE_TENANT_NAMES.has(typeof c.name === 'string' ? c.name.toLowerCase().trim() : '') ||
@@ -363,21 +351,8 @@ export default function App() {
           }
         });
 
-        // CRITICAL DATA INTEGRITY: Merge and preserve any local contacts not yet in Firestore
-        const localContacts = StorageService.getContacts();
-        const unsyncedContacts = localContacts.filter(lc => !cleaned.some(c => c.id === lc.id));
-        if (unsyncedContacts.length > 0) {
-          cleaned = [...cleaned, ...unsyncedContacts];
-          unsyncedContacts.forEach(c => FirebaseService.saveContact(c).catch(() => {}));
-        }
-
-        let finalContacts = cleaned;
-        if (finalContacts.length === 0 && INITIAL_CONTACTS.length > 0) {
-          finalContacts = INITIAL_CONTACTS;
-          INITIAL_CONTACTS.forEach(c => FirebaseService.saveContact(c).catch(() => {}));
-        }
-        setContacts(finalContacts);
-        StorageService.saveContacts(finalContacts);
+        setContacts(cleaned);
+        StorageService.saveContacts(cleaned);
       }
     });
 
@@ -396,15 +371,14 @@ export default function App() {
 
     const unsubInvoices = subscribeToInvoices((liveInvoices) => {
       if (liveInvoices) {
-        let finalInvoices = liveInvoices;
-        const localInvoices = StorageService.getInvoices();
-        const unsyncedInvoices = localInvoices.filter(li => !finalInvoices.some(inv => inv.id === li.id));
-        if (unsyncedInvoices.length > 0) {
-          finalInvoices = [...finalInvoices, ...unsyncedInvoices];
-          unsyncedInvoices.forEach(inv => FirebaseService.saveInvoice(inv).catch(() => {}));
-        }
-        setInvoices(finalInvoices);
-        StorageService.saveInvoices(finalInvoices);
+        const cleaned = liveInvoices.filter(inv => !StorageService.isDeleted(inv.id));
+        liveInvoices.forEach(inv => {
+          if (StorageService.isDeleted(inv.id)) {
+            FirebaseService.deleteInvoice(inv.id).catch(() => {});
+          }
+        });
+        setInvoices(cleaned);
+        StorageService.saveInvoices(cleaned);
       }
     });
 
@@ -588,16 +562,16 @@ export default function App() {
     const associatedRooms = rooms.filter(r => r.propertyId === propertyId);
 
     // 1. Remove property
+    StorageService.deleteProperty(propertyId);
     const nextProperties = properties.filter(p => p.id !== propertyId);
     setProperties(nextProperties);
-    StorageService.saveProperties(nextProperties);
     FirebaseService.deleteProperty(propertyId).catch(err => console.warn("Firestore delete prop err:", err));
 
     // 2. Cascade remove all rooms belonging to this property
     const nextRooms = rooms.filter(r => r.propertyId !== propertyId);
     setRooms(nextRooms);
-    StorageService.saveRooms(nextRooms);
     associatedRooms.forEach(r => {
+      StorageService.deleteRoom(r.id);
       FirebaseService.deleteRoom(r.id).catch(err => console.warn("Firestore delete room err:", err));
     });
 
@@ -605,8 +579,8 @@ export default function App() {
     const associatedWOs = workOrders.filter(w => w.propertyId === propertyId);
     const nextWorkOrders = workOrders.filter(w => w.propertyId !== propertyId);
     setWorkOrders(nextWorkOrders);
-    StorageService.saveWorkOrders(nextWorkOrders);
     associatedWOs.forEach(w => {
+      StorageService.deleteWorkOrder(w.id);
       FirebaseService.deleteWorkOrder(w.id).catch(err => console.warn("Firestore delete wo err:", err));
     });
 
@@ -614,8 +588,8 @@ export default function App() {
     const associatedRenewals = renewals.filter(ren => ren.propertyId === propertyId);
     const nextRenewals = renewals.filter(ren => ren.propertyId !== propertyId);
     setRenewals(nextRenewals);
-    StorageService.saveLeaseRenewals(nextRenewals);
     associatedRenewals.forEach(ren => {
+      StorageService.deleteRenewal(ren.id);
       FirebaseService.deleteRenewal(ren.id).catch(err => console.warn("Firestore delete renewal err:", err));
     });
 
@@ -628,9 +602,9 @@ export default function App() {
     const targetRoom = rooms.find(r => r.id === roomId);
     if (!targetRoom) return;
 
+    StorageService.deleteRoom(roomId);
     const nextRooms = rooms.filter(r => r.id !== roomId);
     setRooms(nextRooms);
-    StorageService.saveRooms(nextRooms);
     FirebaseService.deleteRoom(roomId).catch(err => console.warn("Firestore delete room err:", err));
 
     // Recalculate property totals
@@ -658,6 +632,7 @@ export default function App() {
 
   // Lease Renewal Save / Update
   const handleSaveRenewal = (ren: LeaseRenewal) => {
+    StorageService.removeDeletedId(ren.id);
     const isExisting = renewals.some(r => r.id === ren.id);
     let nextRenewals: LeaseRenewal[];
     if (isExisting) {
@@ -692,9 +667,9 @@ export default function App() {
   const handleDeleteRenewal = (renewalId: string) => {
     const target = renewals.find(r => r.id === renewalId);
     const name = target?.tenantName || 'Lease';
+    StorageService.deleteRenewal(renewalId);
     const nextRenewals = renewals.filter(r => r.id !== renewalId);
     setRenewals(nextRenewals);
-    StorageService.saveLeaseRenewals(nextRenewals);
     FirebaseService.deleteRenewal(renewalId).catch(err => console.warn("Firestore delete renewal err:", err));
     logActivity('Lease', `Deleted Lease Renewal Card for: ${name}`, renewalId);
     showToast(`Deleted renewal card for ${name}`);
@@ -704,9 +679,9 @@ export default function App() {
   const handleDeleteDuplicateRenewals = (idsToDelete: string[]) => {
     if (idsToDelete.length === 0) return;
     const idSet = new Set(idsToDelete);
+    idsToDelete.forEach(id => StorageService.deleteRenewal(id));
     const nextRenewals = renewals.filter(r => !idSet.has(r.id));
     setRenewals(nextRenewals);
-    StorageService.saveLeaseRenewals(nextRenewals);
     idsToDelete.forEach(id => {
       FirebaseService.deleteRenewal(id).catch(err => console.warn("Firestore delete duplicate renewal err:", err));
     });
@@ -716,6 +691,7 @@ export default function App() {
 
   // Work Order Save / Update
   const handleSaveWorkOrder = (wo: WorkOrder) => {
+    StorageService.removeDeletedId(wo.id);
     const isExisting = workOrders.some(w => w.id === wo.id);
     let nextWorkOrders: WorkOrder[];
     if (isExisting) {
@@ -734,9 +710,9 @@ export default function App() {
   const handleDeleteWorkOrder = (workOrderId: string) => {
     const target = workOrders.find(w => w.id === workOrderId);
     const title = target?.title || 'Work Order';
+    StorageService.deleteWorkOrder(workOrderId);
     const nextWorkOrders = workOrders.filter(w => w.id !== workOrderId);
     setWorkOrders(nextWorkOrders);
-    StorageService.saveWorkOrders(nextWorkOrders);
     FirebaseService.deleteWorkOrder(workOrderId).catch(err => console.warn("Firestore delete work order err:", err));
     logActivity('Maintenance', `Deleted Work Order: ${title}`, workOrderId);
     showToast(`Deleted work order: ${title}`);
@@ -744,6 +720,7 @@ export default function App() {
 
   // Tenant Lead Save / Update
   const handleSaveLead = (lead: TenantLead) => {
+    StorageService.removeDeletedId(lead.id);
     const isExisting = leads.some(l => l.id === lead.id);
     let nextLeads: TenantLead[];
     if (isExisting) {
@@ -765,9 +742,9 @@ export default function App() {
   const handleDeleteLead = (leadId: string) => {
     const targetLead = leads.find(l => l.id === leadId);
     const leadName = targetLead?.name || 'Lead';
+    StorageService.deleteLead(leadId);
     const nextLeads = leads.filter(l => l.id !== leadId);
     setLeads(nextLeads);
-    StorageService.saveTenantLeads(nextLeads);
     FirebaseService.deleteLead(leadId).catch(err => console.warn("Firestore delete lead err:", err));
     if (selectedLeadDetail?.id === leadId) {
       setSelectedLeadDetail(null);
@@ -778,6 +755,7 @@ export default function App() {
 
   // Clear All Leads
   const handleClearAllLeads = async () => {
+    leads.forEach(l => StorageService.recordDeletedId(l.id));
     StorageService.clearLeads();
     setLeads([]);
     try {
@@ -794,6 +772,7 @@ export default function App() {
 
   // Contact Save / Update
   const handleSaveContact = (contact: Contact) => {
+    StorageService.removeDeletedId(contact.id);
     const isExisting = contacts.some(c => c.id === contact.id);
     let nextContacts: Contact[];
     if (isExisting) {
@@ -864,10 +843,41 @@ export default function App() {
   const handleDeleteContact = (contactId: string) => {
     const targetContact = contacts.find(c => c.id === contactId);
     const contactName = targetContact?.name || 'Contact';
-    const nextContacts = contacts.filter(c => c.id !== contactId);
-    setContacts(nextContacts);
+
+    // 1. Record tombstone and persist deletion to local storage
     StorageService.deleteContact(contactId);
+
+    // 2. Update React state immediately
+    setContacts(prev => prev.filter(c => c.id !== contactId));
+
+    // 3. Delete from Firestore
     FirebaseService.deleteContact(contactId).catch(err => console.warn("Firestore delete contact err:", err));
+
+    // 4. Release room if assigned to this contact
+    if (targetContact?.roomId) {
+      setRooms(prevRooms => {
+        const nextRooms = prevRooms.map(r => {
+          if (r.id === targetContact.roomId) {
+            const released: Room = {
+              ...r,
+              status: 'Available',
+              currentTenantId: undefined,
+              currentTenantFirstName: undefined,
+              currentTenantLastName: undefined,
+              currentTenantName: undefined,
+              currentTenantPhone: undefined,
+              currentTenantEmail: undefined
+            };
+            FirebaseService.saveRoom(released).catch(() => {});
+            return released;
+          }
+          return r;
+        });
+        StorageService.saveRooms(nextRooms);
+        return nextRooms;
+      });
+    }
+
     logActivity('System', `Deleted Contact: ${contactName}`, contactId);
     showToast(`Deleted contact: ${contactName}`);
   };

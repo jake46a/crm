@@ -155,11 +155,19 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
 
       const cloudData = await FirebaseService.pullAllFromFirestore();
       
-      // Merge helper that gives cloud documents precedence by ID while preserving any local items not yet in the cloud
+      // Merge helper that gives cloud documents precedence by ID while filtering out any items marked as deleted
       const mergeRecords = <T extends { id: string }>(cloudItems: T[], localItems: T[]): T[] => {
         const itemMap = new Map<string, T>();
-        localItems.forEach(item => itemMap.set(item.id, item));
-        cloudItems.forEach(item => itemMap.set(item.id, item));
+        localItems.forEach(item => {
+          if (!StorageService.isDeleted(item.id)) {
+            itemMap.set(item.id, item);
+          }
+        });
+        cloudItems.forEach(item => {
+          if (!StorageService.isDeleted(item.id)) {
+            itemMap.set(item.id, item);
+          }
+        });
         return Array.from(itemMap.values());
       };
 
@@ -168,7 +176,10 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
       const mergedRenewals = mergeRecords(cloudData.renewals, StorageService.getRenewals());
       const mergedWorkOrders = mergeRecords(cloudData.workOrders, StorageService.getWorkOrders());
       const mergedLeads = mergeRecords(cloudData.leads, StorageService.getTenantLeads());
-      const mergedContacts = mergeRecords(cloudData.contacts, StorageService.getContacts());
+      const mergedContacts = mergeRecords(cloudData.contacts, StorageService.getContacts()).filter(c => 
+        c.id !== 'con-1726390000000' && 
+        (!c.name || typeof c.name !== 'string' || c.name.toLowerCase().trim() !== 'jane doe')
+      );
       const mergedInvoices = mergeRecords(cloudData.invoices, StorageService.getInvoices());
 
       if (mergedProps.length > 0) StorageService.saveProperties(mergedProps);

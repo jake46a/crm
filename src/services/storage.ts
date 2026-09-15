@@ -19,7 +19,8 @@ const STORAGE_KEYS = {
   LEADS: 'moyer_crm_leads_v3',
   CONTACTS: 'moyer_crm_contacts_v3',
   INVOICES: 'moyer_crm_invoices_v3',
-  ACTIVITY_LOGS: 'moyer_crm_activity_logs_v3'
+  ACTIVITY_LOGS: 'moyer_crm_activity_logs_v3',
+  DELETED_IDS: 'moyer_crm_deleted_ids_v1'
 };
 
 const LEGACY_SAMPLE_LEAD_IDS = new Set([
@@ -83,10 +84,35 @@ function setItem<T>(key: string, value: T): void {
 }
 
 export const StorageService = {
+  // Tombstone support for permanent deletions across tabs and cloud sync
+  getDeletedIds(): Set<string> {
+    const raw = getItem<string[]>(STORAGE_KEYS.DELETED_IDS, ['con-1726390000000']);
+    return new Set(raw);
+  },
+  recordDeletedId(id: string): void {
+    if (!id) return;
+    const current = this.getDeletedIds();
+    current.add(id);
+    setItem(STORAGE_KEYS.DELETED_IDS, Array.from(current));
+  },
+  isDeleted(id: string): boolean {
+    if (!id) return false;
+    return this.getDeletedIds().has(id);
+  },
+  removeDeletedId(id: string): void {
+    if (!id) return;
+    const current = this.getDeletedIds();
+    current.delete(id);
+    setItem(STORAGE_KEYS.DELETED_IDS, Array.from(current));
+  },
+  clearDeletedIds(): void {
+    setItem(STORAGE_KEYS.DELETED_IDS, []);
+  },
+
   // Properties
   getProperties(): Property[] {
     const raw = getItem<Property[]>(STORAGE_KEYS.PROPERTIES, INITIAL_PROPERTIES);
-    const filtered = raw.filter(p => !LEGACY_SAMPLE_PROPERTY_IDS.has(p.id) && !p.name.includes('Speer') && !p.name.includes('Capitol Hill') && !p.name.includes('Highlands'));
+    const filtered = raw.filter(p => !this.isDeleted(p.id) && !LEGACY_SAMPLE_PROPERTY_IDS.has(p.id) && !p.name.includes('Speer') && !p.name.includes('Capitol Hill') && !p.name.includes('Highlands'));
     if (filtered.length !== raw.length) {
       this.saveProperties(filtered);
     }
@@ -103,11 +129,17 @@ export const StorageService = {
   saveProperties(properties: Property[]): void {
     setItem(STORAGE_KEYS.PROPERTIES, properties);
   },
+  deleteProperty(propertyId: string): void {
+    this.recordDeletedId(propertyId);
+    const nextProps = this.getProperties().filter(p => p.id !== propertyId);
+    this.saveProperties(nextProps);
+  },
   
   // Rooms
   getRooms(): Room[] {
     const raw = getItem<Room[]>(STORAGE_KEYS.ROOMS, INITIAL_ROOMS);
     const filtered = raw.filter(r => 
+      !this.isDeleted(r.id) &&
       !LEGACY_SAMPLE_ROOM_IDS.has(r.id) && 
       !/^Room [2-7]$/i.test(r.name) &&
       r.propertyId !== 'prop-1' && 
@@ -178,11 +210,17 @@ export const StorageService = {
     });
     setItem(STORAGE_KEYS.ROOMS, normalized);
   },
+  deleteRoom(roomId: string): void {
+    this.recordDeletedId(roomId);
+    const nextRooms = this.getRooms().filter(r => r.id !== roomId);
+    this.saveRooms(nextRooms);
+  },
 
   // Renewals
   getRenewals(): LeaseRenewal[] {
     const raw = getItem<LeaseRenewal[]>(STORAGE_KEYS.RENEWALS, INITIAL_RENEWALS);
     const filtered = raw.filter(ren => 
+      !this.isDeleted(ren.id) &&
       !LEGACY_SAMPLE_RENEWAL_IDS.has(ren.id) && 
       !REJECTED_SAMPLE_RENEWAL_IDS.has(ren.id) &&
       !REJECTED_SAMPLE_TENANT_NAMES.has(typeof ren.tenantName === 'string' ? ren.tenantName.toLowerCase().trim() : '') &&
@@ -228,11 +266,16 @@ export const StorageService = {
   saveLeaseRenewals(renewals: LeaseRenewal[]): void {
     this.saveRenewals(renewals);
   },
+  deleteRenewal(renewalId: string): void {
+    this.recordDeletedId(renewalId);
+    const nextRenewals = this.getRenewals().filter(r => r.id !== renewalId);
+    this.saveRenewals(nextRenewals);
+  },
 
   // Work Orders
   getWorkOrders(): WorkOrder[] {
     const raw = getItem<WorkOrder[]>(STORAGE_KEYS.WORK_ORDERS, INITIAL_WORK_ORDERS);
-    const filtered = raw.filter(wo => !LEGACY_SAMPLE_WORK_ORDER_IDS.has(wo.id) && wo.propertyId !== 'prop-1' && wo.propertyId !== 'prop-2' && wo.propertyId !== 'prop-3');
+    const filtered = raw.filter(wo => !this.isDeleted(wo.id) && !LEGACY_SAMPLE_WORK_ORDER_IDS.has(wo.id) && wo.propertyId !== 'prop-1' && wo.propertyId !== 'prop-2' && wo.propertyId !== 'prop-3');
     if (filtered.length !== raw.length) {
       this.saveWorkOrders(filtered);
     }
@@ -263,12 +306,17 @@ export const StorageService = {
     });
     setItem(STORAGE_KEYS.WORK_ORDERS, normalized);
   },
+  deleteWorkOrder(workOrderId: string): void {
+    this.recordDeletedId(workOrderId);
+    const nextWOs = this.getWorkOrders().filter(wo => wo.id !== workOrderId);
+    this.saveWorkOrders(nextWOs);
+  },
 
   // Leads
   getLeads(): TenantLead[] {
     const raw = getItem<TenantLead[]>(STORAGE_KEYS.LEADS, INITIAL_LEADS);
-    // Filter out any legacy sample IDs
-    const filtered = raw.filter(l => !LEGACY_SAMPLE_LEAD_IDS.has(l.id));
+    // Filter out any legacy sample IDs or deleted IDs
+    const filtered = raw.filter(l => !this.isDeleted(l.id) && !LEGACY_SAMPLE_LEAD_IDS.has(l.id));
     if (filtered.length !== raw.length) {
       this.saveLeads(filtered);
     }
@@ -306,6 +354,7 @@ export const StorageService = {
     this.saveLeads(leads);
   },
   deleteLead(leadId: string): void {
+    this.recordDeletedId(leadId);
     const nextLeads = this.getLeads().filter(l => l.id !== leadId);
     this.saveLeads(nextLeads);
   },
@@ -326,6 +375,9 @@ export const StorageService = {
   getContacts(): Contact[] {
     const raw = getItem<Contact[]>(STORAGE_KEYS.CONTACTS, INITIAL_CONTACTS);
     const filtered = raw.filter(c => 
+      !this.isDeleted(c.id) &&
+      c.id !== 'con-1726390000000' &&
+      (!c.name || typeof c.name !== 'string' || c.name.toLowerCase().trim() !== 'jane doe') &&
       !LEGACY_SAMPLE_CONTACT_IDS.has(c.id) && 
       !REJECTED_SAMPLE_CONTACT_IDS.has(c.id) &&
       !REJECTED_SAMPLE_TENANT_NAMES.has(typeof c.name === 'string' ? c.name.toLowerCase().trim() : '') &&
@@ -333,7 +385,7 @@ export const StorageService = {
     );
     let contacts = filtered;
     if (contacts.length === 0 && INITIAL_CONTACTS.length > 0) {
-      contacts = INITIAL_CONTACTS;
+      contacts = INITIAL_CONTACTS.filter(c => !this.isDeleted(c.id));
       this.saveContacts(contacts);
     } else if (contacts.length !== raw.length) {
       this.saveContacts(contacts);
@@ -366,18 +418,21 @@ export const StorageService = {
     setItem(STORAGE_KEYS.CONTACTS, normalized);
   },
   deleteContact(contactId: string): void {
+    this.recordDeletedId(contactId);
     const nextContacts = this.getContacts().filter(c => c.id !== contactId);
     this.saveContacts(nextContacts);
   },
 
   // Invoices
   getInvoices(): Invoice[] {
-    return getItem<Invoice[]>(STORAGE_KEYS.INVOICES, []);
+    const raw = getItem<Invoice[]>(STORAGE_KEYS.INVOICES, []);
+    return raw.filter(inv => !this.isDeleted(inv.id));
   },
   saveInvoices(invoices: Invoice[]): void {
     setItem(STORAGE_KEYS.INVOICES, invoices);
   },
   deleteInvoice(invoiceId: string): void {
+    this.recordDeletedId(invoiceId);
     const next = this.getInvoices().filter(inv => inv.id !== invoiceId);
     this.saveInvoices(next);
   },
