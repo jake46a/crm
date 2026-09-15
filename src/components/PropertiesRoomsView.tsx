@@ -21,7 +21,7 @@ import {
   Check,
   X
 } from 'lucide-react';
-import { Property, Room, RoomStatus, RoomBathroomType, TenantLead } from '../types';
+import { Property, Room, RoomStatus, RoomBathroomType, TenantLead, WorkOrder, Contact } from '../types';
 import { RoomStatusBadge, BathroomTypeBadge } from './common/Badges';
 import { getTenantFullName } from '../utils/nameUtils';
 import { formatPhoneNumber } from '../utils/phoneUtils';
@@ -30,6 +30,8 @@ interface PropertiesRoomsViewProps {
   properties: Property[];
   rooms: Room[];
   leads: TenantLead[];
+  workOrders?: WorkOrder[];
+  contacts?: Contact[];
   onUpdateRoom: (room: Room) => void;
   onOpenNewRoomModal: (defaultPropertyId?: string) => void;
   onOpenNewPropertyModal: () => void;
@@ -39,12 +41,17 @@ interface PropertiesRoomsViewProps {
   onOpenEditRoomModal: (room: Room) => void;
   onOpenEditPropertyModal: (property: Property) => void;
   onDeleteRoom?: (roomId: string) => void;
+  onOpenAssignVendorModal?: (workOrder: WorkOrder) => void;
+  onCreateTurnoverWorkOrder?: (room: Room) => void;
+  onUpdateWorkOrder?: (workOrder: WorkOrder) => void;
 }
 
 export const PropertiesRoomsView: React.FC<PropertiesRoomsViewProps> = ({
   properties,
   rooms,
   leads,
+  workOrders = [],
+  contacts = [],
   onUpdateRoom,
   onOpenNewRoomModal,
   onOpenNewPropertyModal,
@@ -53,7 +60,10 @@ export const PropertiesRoomsView: React.FC<PropertiesRoomsViewProps> = ({
   onOpenAssignLeadModal,
   onOpenEditRoomModal,
   onOpenEditPropertyModal,
-  onDeleteRoom
+  onDeleteRoom,
+  onOpenAssignVendorModal,
+  onCreateTurnoverWorkOrder,
+  onUpdateWorkOrder
 }) => {
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -124,6 +134,26 @@ export const PropertiesRoomsView: React.FC<PropertiesRoomsViewProps> = ({
       turnoverChecklist: updatedChecklist,
       status: newStatus
     });
+
+    // Also sync with active turnover work order if present
+    if (onUpdateWorkOrder && workOrders.length > 0) {
+      const activeWO = workOrders.find(
+        w => w.roomId === room.id && 
+        (w.category === 'Turnover & Prep' || w.category === 'Deep Cleaning' || w.title.toLowerCase().includes('turnover')) &&
+        w.status !== 'Completed' && 
+        w.status !== 'Cancelled'
+      );
+      if (activeWO) {
+        const syncedTurnoverTasks = updatedChecklist;
+        const woAllDone = syncedTurnoverTasks.every(t => t.isDone);
+        onUpdateWorkOrder({
+          ...activeWO,
+          turnoverTasks: syncedTurnoverTasks,
+          status: woAllDone ? 'Completed' : activeWO.status,
+          dateCompleted: woAllDone ? new Date().toISOString().split('T')[0] : activeWO.dateCompleted
+        });
+      }
+    }
   };
 
   // Quick change room status
@@ -500,35 +530,171 @@ export const PropertiesRoomsView: React.FC<PropertiesRoomsViewProps> = ({
                     Match / Assign Lead
                   </button>
                 </div>
-              ) : room.status === 'Under Turnover' ? (
-                <div className="bg-amber-50/90 p-3 rounded-sm border border-amber-200 text-xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-amber-900 text-xs uppercase tracking-tight">Turnover Checklist</span>
-                    <span className="text-[10px] font-bold text-amber-800 bg-amber-200/70 px-1.5 py-0.5 rounded-sm font-mono">
-                      {room.turnoverChecklist.filter(t => t.isDone).length}/{room.turnoverChecklist.length} Done
-                    </span>
-                  </div>
+              ) : room.status === 'Under Turnover' ? (() => {
+                const turnoverWorkOrder = workOrders.find(
+                  w => w.roomId === room.id && 
+                  (w.category === 'Turnover & Prep' || w.category === 'Deep Cleaning' || w.title.toLowerCase().includes('turnover')) &&
+                  w.status !== 'Completed' && 
+                  w.status !== 'Cancelled'
+                );
+                const vendors = contacts.filter(c => c.type === 'Vendor / Contractor');
 
-                  <div className="space-y-1.5 pt-1">
-                    {room.turnoverChecklist.map(item => (
-                      <div 
-                        key={item.id}
-                        onClick={() => handleToggleTurnoverTask(room, item.id)}
-                        className="flex items-center gap-2 cursor-pointer text-[11px] text-zinc-700 hover:text-zinc-900 select-none"
-                      >
-                        {item.isDone ? (
-                          <CheckSquare className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        ) : (
-                          <Square className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                        )}
-                        <span className={item.isDone ? 'line-through text-zinc-400' : 'font-medium'}>
-                          {item.task}
+                return (
+                  <div className="bg-amber-50/95 p-3 rounded-sm border border-amber-200 text-xs space-y-2.5">
+                    {/* Turnover Work Order Header */}
+                    <div className="flex items-center justify-between pb-1.5 border-b border-amber-200/80">
+                      <div className="flex items-center gap-1.5">
+                        <Wrench className="w-3.5 h-3.5 text-amber-700" />
+                        <span className="font-bold text-amber-900 text-[11px] uppercase tracking-wider">
+                          Turnover Work Order
                         </span>
                       </div>
-                    ))}
+                      {turnoverWorkOrder ? (
+                        <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
+                          {turnoverWorkOrder.ticketNumber} • {turnoverWorkOrder.status}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-amber-700">
+                          Prep In-Progress
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Vendor Assignment Box */}
+                    {turnoverWorkOrder ? (
+                      <div className="bg-white p-2 rounded-sm border border-amber-200/90 text-xs">
+                        {turnoverWorkOrder.assignedVendorName ? (
+                          <div className="flex items-center justify-between gap-2">
+                            <div>
+                              <div className="text-[10px] font-bold text-zinc-500 uppercase">Assigned Contractor</div>
+                              <div className="font-bold text-zinc-900 text-xs flex items-center gap-1">
+                                <span>🛠️</span>
+                                <span className="truncate">{turnoverWorkOrder.assignedVendorName}</span>
+                              </div>
+                              {turnoverWorkOrder.assignedVendorPhone && (
+                                <a 
+                                  href={`tel:${turnoverWorkOrder.assignedVendorPhone}`}
+                                  className="text-[10px] text-zinc-600 hover:text-indigo-600 font-mono flex items-center gap-1 mt-0.5"
+                                >
+                                  📞 {turnoverWorkOrder.assignedVendorPhone}
+                                </a>
+                              )}
+                            </div>
+                            {onOpenAssignVendorModal && (
+                              <button
+                                onClick={() => onOpenAssignVendorModal(turnoverWorkOrder)}
+                                className="px-2 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded text-[10px] font-semibold uppercase tracking-tight transition shrink-0"
+                              >
+                                Reassign
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold uppercase text-amber-800 flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                <span>Vendor Not Assigned</span>
+                              </span>
+                              {onOpenAssignVendorModal && (
+                                <button
+                                  onClick={() => onOpenAssignVendorModal(turnoverWorkOrder)}
+                                  className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-[10px] font-bold transition flex items-center gap-1 shadow-xs"
+                                >
+                                  <UserCheck className="w-3 h-3" />
+                                  <span>Assign Vendor</span>
+                                </button>
+                              )}
+                            </div>
+                            {vendors.length > 0 && onUpdateWorkOrder && (
+                              <select
+                                defaultValue=""
+                                onChange={(e) => {
+                                  const selectedV = vendors.find(v => v.id === e.target.value);
+                                  if (selectedV && turnoverWorkOrder) {
+                                    const vendorDisplay = selectedV.company 
+                                      ? `${selectedV.name} (${selectedV.company})` 
+                                      : selectedV.name;
+                                    onUpdateWorkOrder({
+                                      ...turnoverWorkOrder,
+                                      assignedVendorId: selectedV.id,
+                                      assignedVendorName: vendorDisplay,
+                                      assignedVendorPhone: selectedV.phone,
+                                      status: 'Assigned',
+                                      timeline: [
+                                        ...(turnoverWorkOrder.timeline || []),
+                                        {
+                                          id: `tl-${Date.now()}`,
+                                          timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
+                                          status: 'Assigned',
+                                          note: `Quick assigned to ${vendorDisplay} via Room Card.`,
+                                          author: 'Property Manager'
+                                        }
+                                      ]
+                                    });
+                                  }
+                                }}
+                                className="w-full text-[11px] bg-zinc-50 border border-zinc-300 rounded p-1 text-zinc-700 focus:outline-none"
+                              >
+                                <option value="" disabled>-- Quick Select Vendor --</option>
+                                {vendors.map(v => (
+                                  <option key={v.id} value={v.id}>
+                                    {v.name} {v.company ? `(${v.company})` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="bg-white p-2 rounded-sm border border-amber-200 flex items-center justify-between gap-2">
+                        <span className="text-[10px] text-amber-800 font-medium">
+                          No active work order linked
+                        </span>
+                        {onCreateTurnoverWorkOrder && (
+                          <button
+                            onClick={() => onCreateTurnoverWorkOrder(room)}
+                            className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[10px] font-bold transition flex items-center gap-1"
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>Create Work Order</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Turnover Checklist Tasks */}
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-center justify-between text-[10px] font-bold text-amber-900 uppercase tracking-tight">
+                        <span>Items Needed To Be Done</span>
+                        <span className="text-amber-800 font-mono">
+                          {room.turnoverChecklist.filter(t => t.isDone).length}/{room.turnoverChecklist.length} Done
+                        </span>
+                      </div>
+
+                      <div className="space-y-1 max-h-36 overflow-y-auto pr-0.5">
+                        {room.turnoverChecklist.map(item => (
+                          <div 
+                            key={item.id}
+                            onClick={() => handleToggleTurnoverTask(room, item.id)}
+                            className="flex items-center gap-2 cursor-pointer text-[11px] text-zinc-700 hover:text-zinc-900 select-none bg-white/70 hover:bg-white p-1 rounded border border-amber-100 transition"
+                          >
+                            {item.isDone ? (
+                              <CheckSquare className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            ) : (
+                              <Square className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                            )}
+                            <span className={item.isDone ? 'line-through text-zinc-400' : 'font-medium leading-tight'}>
+                              {item.task}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ) : (
+                );
+              })() : (
                 <div className="bg-purple-50 p-3 rounded-sm border border-purple-200 text-xs">
                   <p className="font-bold text-purple-900 uppercase tracking-tight text-[11px]">Reserved for Approved Lead</p>
                   <p className="text-purple-700 text-[11px] mt-1">Pending deposit verification and lease signing.</p>

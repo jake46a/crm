@@ -139,7 +139,8 @@ export type WorkOrderCategory =
   | 'Common Area' 
   | 'Room Fixtures' 
   | 'Pest Control' 
-  | 'Deep Cleaning';
+  | 'Deep Cleaning'
+  | 'Turnover & Prep';
 
 export interface WorkOrderComment {
   id: string;
@@ -187,6 +188,7 @@ export interface WorkOrder {
   accessInstructions?: string;
   entryPermission?: boolean;
   photos?: string[]; // Image URLs or Base64 uploaded images
+  turnoverTasks?: TurnoverTask[];
   comments?: WorkOrderComment[];
   timeline?: WorkOrderTimelineEvent[];
   internalNotes?: string;

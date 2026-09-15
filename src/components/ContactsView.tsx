@@ -17,12 +17,16 @@ import {
   DollarSign,
   Briefcase,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  DoorClosed,
+  Bed,
+  Key
 } from 'lucide-react';
 import { Contact, ContactType, Property, Room } from '../types';
 import { formatFullName } from '../utils/nameUtils';
 import { formatPhoneNumber, getPhoneTelHref } from '../utils/phoneUtils';
 import { QuickSmsModal, QuickSmsRecipient } from './modals/QuickSmsModal';
+import { AssignRoomModal } from './modals/AssignRoomModal';
 
 interface ContactsViewProps {
   contacts: Contact[];
@@ -32,6 +36,17 @@ interface ContactsViewProps {
   onDeleteContact: (contactId: string) => void;
   onOpenNewContactModal: () => void;
   onOpenEditContactModal: (contact: Contact) => void;
+  onAssignRoom?: (
+    contact: Contact,
+    selectedProperty: Property | null,
+    selectedRoom: Room | null,
+    leaseDetails?: {
+      startDate?: string;
+      endDate?: string;
+      rent?: number;
+      updateRoomOccupancy?: boolean;
+    }
+  ) => void;
 }
 
 export const ContactsView: React.FC<ContactsViewProps> = ({
@@ -41,7 +56,8 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
   onUpdateContact,
   onDeleteContact,
   onOpenNewContactModal,
-  onOpenEditContactModal
+  onOpenEditContactModal,
+  onAssignRoom
 }) => {
   const [activeTab, setActiveTab] = useState<string>('all');
   const [propertyFilter, setPropertyFilter] = useState<string>('all');
@@ -53,6 +69,8 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
   const [connectedEmail, setConnectedEmail] = useState<string>(GoogleWorkspaceService.getConnectedEmail() || '');
   const [isConnectingGoogle, setIsConnectingGoogle] = useState<boolean>(false);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+  const [contactForRoomAssign, setContactForRoomAssign] = useState<Contact | null>(null);
+  const [isAssignRoomModalOpen, setIsAssignRoomModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     setIsGoogleConnected(GoogleWorkspaceService.isConnected());
@@ -392,8 +410,58 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                 </div>
               )}
 
-              {/* Property & Room if tenant or owner */}
-              {contact.propertyName && (
+              {/* Property & Room assignment section */}
+              {contact.roomName ? (
+                <div className="text-xs bg-zinc-50 p-2.5 rounded-sm border border-zinc-200 text-zinc-700 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold text-zinc-400">
+                      {contact.type === 'Property Owner' ? 'Owned Property' : 'Assigned Residence'}
+                    </span>
+                    <span className="font-semibold text-zinc-900 truncate max-w-[170px]" title={contact.propertyName}>
+                      {contact.propertyName || 'Coliving Residence'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-zinc-200/60 text-[11px]">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <DoorClosed className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                      <span className="font-semibold text-indigo-950 truncate">{contact.roomName}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setContactForRoomAssign(contact);
+                        setIsAssignRoomModalOpen(true);
+                      }}
+                      className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold hover:underline shrink-0 transition"
+                      title="Change or unassign room"
+                    >
+                      Change Room
+                    </button>
+                  </div>
+                </div>
+              ) : (contact.type === 'Tenant' || contact.type === 'Lead') ? (
+                <div className="text-xs bg-amber-50/70 p-2.5 rounded-sm border border-amber-200/80 text-zinc-700 flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-amber-900/60 block">Residence & Room</span>
+                    <span className="text-[11px] text-amber-900 font-medium flex items-center gap-1 mt-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                      <span>No room assigned</span>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setContactForRoomAssign(contact);
+                      setIsAssignRoomModalOpen(true);
+                    }}
+                    className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-sm text-[11px] font-bold transition shadow-xs flex items-center gap-1 shrink-0"
+                    title="Assign a room to this contact"
+                  >
+                    <DoorClosed className="w-3 h-3" />
+                    <span>Assign Room</span>
+                  </button>
+                </div>
+              ) : contact.propertyName ? (
                 <div className="text-xs bg-zinc-50 p-2 rounded-sm border border-zinc-200 text-zinc-700">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] uppercase font-bold text-zinc-400">
@@ -401,14 +469,21 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                     </span>
                     <span className="font-semibold text-zinc-900">{contact.propertyName}</span>
                   </div>
-                  {contact.roomName && (
-                    <div className="flex items-center justify-between mt-1 pt-1 border-t border-zinc-200/60 text-[11px]">
-                      <span className="text-zinc-400">Room:</span>
-                      <span className="font-medium text-zinc-800">{contact.roomName}</span>
-                    </div>
-                  )}
+                  <div className="flex items-center justify-between mt-1 pt-1 border-t border-zinc-200/60 text-[11px]">
+                    <span className="text-zinc-400">Room:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setContactForRoomAssign(contact);
+                        setIsAssignRoomModalOpen(true);
+                      }}
+                      className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold hover:underline"
+                    >
+                      + Assign Room
+                    </button>
+                  </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Contact numbers */}
               <div className="space-y-1 text-xs text-zinc-600 pt-1 border-t border-zinc-100">
@@ -466,6 +541,21 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
                 >
                   <Mail className="w-3.5 h-3.5" />
                 </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setContactForRoomAssign(contact);
+                    setIsAssignRoomModalOpen(true);
+                  }}
+                  className={`p-1.5 rounded-sm transition-colors ${
+                    contact.roomName
+                      ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200'
+                      : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700'
+                  }`}
+                  title={contact.roomName ? `Assigned to ${contact.roomName} (Click to change/unassign)` : 'Assign Room to Contact'}
+                >
+                  <DoorClosed className="w-3.5 h-3.5" />
+                </button>
                 <button
                   onClick={() => handleSyncSingleContact(contact)}
                   disabled={syncingContactId === contact.id}
@@ -588,6 +678,33 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
           roomName: quickSmsModalContact.roomName
         } : null}
         defaultTemplateId="general"
+      />
+
+      {/* Assign Room Modal */}
+      <AssignRoomModal
+        isOpen={isAssignRoomModalOpen}
+        onClose={() => {
+          setIsAssignRoomModalOpen(false);
+          setContactForRoomAssign(null);
+        }}
+        contact={contactForRoomAssign}
+        properties={properties}
+        rooms={rooms}
+        onAssignRoom={(c, p, r, leaseDetails) => {
+          if (onAssignRoom) {
+            onAssignRoom(c, p, r, leaseDetails);
+          } else {
+            const updated: Contact = {
+              ...c,
+              propertyId: p?.id,
+              propertyName: p?.name,
+              roomId: r?.id,
+              roomName: r?.name,
+              type: c.type === 'Lead' && r ? 'Tenant' : c.type
+            };
+            onUpdateContact(updated);
+          }
+        }}
       />
     </div>
   );

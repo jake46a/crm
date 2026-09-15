@@ -261,8 +261,9 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
                 <option value="Locks & Access">Locks & Access</option>
                 <option value="Common Area">Common Area</option>
                 <option value="Room Fixtures">Room Fixtures</option>
-                <option value="Pest Control">Pest Control</option>
+                <option value="Turnover & Prep">Turnover & Prep</option>
                 <option value="Deep Cleaning">Deep Cleaning</option>
+                <option value="Pest Control">Pest Control</option>
               </select>
             </div>
 

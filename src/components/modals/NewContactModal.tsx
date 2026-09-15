@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Contact as ContactIcon, Plus, X, Trash2, AlertTriangle, CreditCard, RefreshCw, CheckCircle2, AlertCircle, Share2, Check, ExternalLink } from 'lucide-react';
-import { Contact, ContactType, Property } from '../../types';
+import { Contact, ContactType, Property, Room } from '../../types';
 import { splitFullName, formatFullName } from '../../utils/nameUtils';
 import { formatPhoneNumber, formatPhoneInput } from '../../utils/phoneUtils';
 import { SquareService } from '../../services/squareService';
@@ -10,6 +10,7 @@ interface NewContactModalProps {
   isOpen: boolean;
   onClose: () => void;
   properties: Property[];
+  rooms?: Room[];
   onSave: (contact: Contact) => void;
   editingContact?: Contact | null;
   onDeleteContact?: (contactId: string) => void;
@@ -19,6 +20,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
   isOpen,
   onClose,
   properties,
+  rooms = [],
   onSave,
   editingContact,
   onDeleteContact
@@ -32,6 +34,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
   const [roleOrSpecialty, setRoleOrSpecialty] = useState<string>('');
   const [hourlyRate, setHourlyRate] = useState<number | undefined>(undefined);
   const [propertyId, setPropertyId] = useState<string>('');
+  const [roomId, setRoomId] = useState<string>('');
   const [licenseNumber, setLicenseNumber] = useState<string>('');
   const [commissionRate, setCommissionRate] = useState<string>('');
   const [status, setStatus] = useState<'Active' | 'Past' | 'Prospect' | 'Available 24/7' | 'On Leave' | 'Inactive'>('Active');
@@ -85,6 +88,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         setRoleOrSpecialty(editingContact.roleOrSpecialty || '');
         setHourlyRate(editingContact.hourlyRate);
         setPropertyId(editingContact.propertyId || '');
+        setRoomId(editingContact.roomId || '');
         setLicenseNumber(editingContact.licenseNumber || '');
         setCommissionRate(editingContact.commissionRate || '');
         setStatus(editingContact.status || 'Active');
@@ -102,6 +106,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         setRoleOrSpecialty('Senior Leasing Agent');
         setHourlyRate(undefined);
         setPropertyId('');
+        setRoomId('');
         setLicenseNumber('');
         setCommissionRate('');
         setStatus('Active');
@@ -280,6 +285,8 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         commissionRate: isAgent && commissionRate.trim() ? commissionRate.trim() : undefined,
         propertyId: (isTenant || isOwner || isAgent) && propertyId ? propertyId : undefined,
         propertyName: (isTenant || isOwner || isAgent) ? prop?.name : undefined,
+        roomId: isTenant && roomId ? roomId : undefined,
+        roomName: isTenant && roomId ? (rooms.find(r => r.id === roomId)?.name || (editingContact?.roomId === roomId ? editingContact?.roomName : undefined)) : undefined,
         notes: notes.trim() || '',
         emergencyContactName: isTenant && emergencyContactName.trim() ? emergencyContactName.trim() : undefined,
         emergencyContactPhone: isTenant && emergencyContactPhone.trim() ? (formatPhoneNumber(emergencyContactPhone.trim()) || emergencyContactPhone.trim()) : undefined,
@@ -505,7 +512,11 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
                 <label className="block text-[11px] text-zinc-500">Assigned House</label>
                 <select
                   value={propertyId}
-                  onChange={(e) => setPropertyId(e.target.value)}
+                  onChange={(e) => {
+                    const newPropId = e.target.value;
+                    setPropertyId(newPropId);
+                    setRoomId('');
+                  }}
                   className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 >
                   <option value="">-- Select House --</option>
@@ -514,6 +525,29 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
                   ))}
                 </select>
               </div>
+
+              {propertyId && (
+                <div>
+                  <label className="block text-[11px] text-zinc-500">Assigned Room</label>
+                  <select
+                    value={roomId}
+                    onChange={(e) => setRoomId(e.target.value)}
+                    className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  >
+                    <option value="">-- No Specific Room (Unassigned) --</option>
+                    {rooms
+                      .filter(r => r.propertyId === propertyId)
+                      .map(r => (
+                        <option key={r.id} value={r.id}>
+                          {r.name} ({r.status}) - ${r.monthlyRent}/mo
+                        </option>
+                      ))}
+                  </select>
+                  {rooms.filter(r => r.propertyId === propertyId).length === 0 && (
+                    <p className="text-[10px] text-zinc-400 mt-1">No rooms found for this property.</p>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>

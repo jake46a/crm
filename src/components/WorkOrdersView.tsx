@@ -16,7 +16,9 @@ import {
   Tag,
   Key,
   MessageSquare,
-  Printer
+  Printer,
+  UserCheck,
+  ListChecks
 } from 'lucide-react';
 import { WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderCategory, Property, Room, Contact } from '../types';
 import { PriorityBadge, WorkOrderStatusBadge } from './common/Badges';
@@ -30,6 +32,7 @@ interface WorkOrdersViewProps {
   onOpenNewWorkOrderModal: (defaultRoom?: Room) => void;
   onOpenEditWorkOrderModal: (workOrder: WorkOrder) => void;
   onPrintWorkOrder?: (workOrder: WorkOrder) => void;
+  onOpenAssignVendorModal?: (workOrder: WorkOrder) => void;
 }
 
 export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
@@ -40,7 +43,8 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
   onUpdateWorkOrder,
   onOpenNewWorkOrderModal,
   onOpenEditWorkOrderModal,
-  onPrintWorkOrder
+  onPrintWorkOrder,
+  onOpenAssignVendorModal
 }) => {
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
@@ -204,6 +208,8 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
             className="text-xs bg-zinc-50 border border-zinc-300 rounded-sm px-2.5 py-1.5 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
             <option value="all">All Categories</option>
+            <option value="Turnover & Prep">Turnover & Prep</option>
+            <option value="Deep Cleaning">Deep Cleaning</option>
             <option value="Plumbing">Plumbing</option>
             <option value="HVAC / Heating">HVAC / Heating</option>
             <option value="Electrical">Electrical</option>
@@ -303,6 +309,19 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                           <p className="text-zinc-600 truncate">{wo.roomName || 'Common Area'}</p>
                         </div>
 
+                        {/* Turnover Tasks Indicator if present */}
+                        {wo.turnoverTasks && wo.turnoverTasks.length > 0 && (
+                          <div className="bg-amber-50/90 border border-amber-200 rounded px-2 py-1 flex items-center justify-between text-[10px] text-amber-900 font-medium">
+                            <span className="flex items-center gap-1">
+                              <ListChecks className="w-3.5 h-3.5 text-amber-700" />
+                              <span>Turnover Tasks</span>
+                            </span>
+                            <span className="font-mono font-bold text-amber-800">
+                              {wo.turnoverTasks.filter(t => t.isDone).length}/{wo.turnoverTasks.length} Done
+                            </span>
+                          </div>
+                        )}
+
                         {/* Category & Cost */}
                         <div className="pt-2 border-t border-zinc-100 flex items-center justify-between text-[11px]">
                           <span className="bg-zinc-100 text-zinc-700 px-1.5 py-0.5 rounded-sm text-[10px] font-medium uppercase tracking-tight">
@@ -313,15 +332,54 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                           </span>
                         </div>
 
-                        {/* Photo indicator & Vendor Assignment */}
-                        <div className="flex items-center justify-between text-[11px] bg-zinc-50 p-1.5 rounded-sm border border-zinc-200 text-zinc-600">
-                          <span className="font-medium text-zinc-800 truncate">
-                            {wo.assignedVendorName ? `🔧 ${wo.assignedVendorName}` : 'Unassigned'}
-                          </span>
-                          {wo.photos && wo.photos.length > 0 && (
-                            <span className="bg-indigo-100 text-indigo-800 text-[10px] px-1 rounded-sm font-semibold flex items-center gap-0.5">
-                              📷 {wo.photos.length}
-                            </span>
+                        {/* Vendor Assignment Box */}
+                        <div className="bg-zinc-50 p-2 rounded-sm border border-zinc-200 text-xs">
+                          {wo.assignedVendorName ? (
+                            <div className="flex items-center justify-between gap-1">
+                              <div className="truncate">
+                                <div className="text-[9px] uppercase font-bold text-zinc-400">Assigned Vendor</div>
+                                <div className="font-bold text-zinc-800 text-[11px] truncate flex items-center gap-1">
+                                  <span>🛠️</span>
+                                  <span>{wo.assignedVendorName}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                {wo.assignedVendorPhone && (
+                                  <a 
+                                    href={`tel:${wo.assignedVendorPhone}`} 
+                                    className="p-1 hover:bg-zinc-200 rounded text-emerald-600 transition" 
+                                    title="Call Vendor"
+                                  >
+                                    <Phone className="w-3 h-3" />
+                                  </a>
+                                )}
+                                {onOpenAssignVendorModal && (
+                                  <button
+                                    onClick={() => onOpenAssignVendorModal(wo)}
+                                    className="p-1 hover:bg-zinc-200 rounded text-zinc-600 transition"
+                                    title="Reassign Vendor"
+                                  >
+                                    <UserCheck className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+                              <span className="text-[10px] text-amber-700 font-semibold flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                <span>Unassigned</span>
+                              </span>
+                              {onOpenAssignVendorModal && (
+                                <button
+                                  onClick={() => onOpenAssignVendorModal(wo)}
+                                  className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-[10px] font-bold transition flex items-center gap-1 shadow-xs"
+                                >
+                                  <UserCheck className="w-3 h-3" />
+                                  <span>Assign Vendor</span>
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
 
@@ -376,15 +434,54 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                     <td className="px-4 py-3">
                       <p className="font-bold text-zinc-900">{wo.title}</p>
                       <p className="text-[11px] text-zinc-500">{wo.propertyName} • {wo.roomName || 'Common Area'}</p>
+                      {wo.turnoverTasks && wo.turnoverTasks.length > 0 && (
+                        <span className="inline-block mt-1 text-[10px] text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded font-medium">
+                          📋 {wo.turnoverTasks.filter(t => t.isDone).length}/{wo.turnoverTasks.length} tasks done
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3"><PriorityBadge priority={wo.priority} /></td>
                     <td className="px-4 py-3 font-medium text-zinc-700">{wo.category}</td>
                     <td className="px-4 py-3"><WorkOrderStatusBadge status={wo.status} /></td>
-                    <td className="px-4 py-3 text-zinc-700 font-medium">{wo.assignedVendorName || 'Unassigned'}</td>
+                    <td className="px-4 py-3 text-zinc-700 font-medium" onClick={(e) => e.stopPropagation()}>
+                      {wo.assignedVendorName ? (
+                        <div className="flex items-center gap-1.5">
+                          <span>🛠️ {wo.assignedVendorName}</span>
+                          {onOpenAssignVendorModal && (
+                            <button
+                              onClick={() => onOpenAssignVendorModal(wo)}
+                              className="text-[10px] text-indigo-600 hover:text-indigo-800 underline ml-1"
+                            >
+                              Edit
+                            </button>
+                          )}
+                        </div>
+                      ) : onOpenAssignVendorModal ? (
+                        <button
+                          onClick={() => onOpenAssignVendorModal(wo)}
+                          className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-[10px] font-bold transition flex items-center gap-1 shadow-xs"
+                        >
+                          <UserCheck className="w-3 h-3" />
+                          <span>Assign</span>
+                        </button>
+                      ) : (
+                        <span className="text-zinc-400 italic">Unassigned</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 font-mono font-semibold">${wo.actualCost || wo.estimatedCost}</td>
                     <td className="px-4 py-3 text-zinc-500 font-mono">{wo.dateReported}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        {onOpenAssignVendorModal && !wo.assignedVendorName && (
+                          <button
+                            onClick={() => onOpenAssignVendorModal(wo)}
+                            className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-sm font-semibold text-[11px] flex items-center gap-1 transition shadow-xs"
+                            title="Assign Vendor"
+                          >
+                            <UserCheck className="w-3 h-3" />
+                            <span>Assign</span>
+                          </button>
+                        )}
                         {onPrintWorkOrder && (
                           <button
                             onClick={() => onPrintWorkOrder(wo)}

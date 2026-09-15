@@ -77,9 +77,12 @@ import { NewContactModal } from './components/modals/NewContactModal';
 import { ConvertLeadModal } from './components/modals/ConvertLeadModal';
 import { RenewalNoticeLetterModal } from './components/modals/RenewalNoticeLetterModal';
 import { PrintWorkOrderModal } from './components/modals/PrintWorkOrderModal';
+import { AssignVendorModal } from './components/modals/AssignVendorModal';
 import { LeadDetailModal } from './components/modals/LeadDetailModal';
 import { ExportImportModal } from './components/modals/ExportImportModal';
 import { PrintSchemaModal } from './components/modals/PrintSchemaModal';
+import { splitFullName } from './utils/nameUtils';
+import { ensureRoomTurnoverChecklist, generateTurnoverWorkOrder, assignVendorToWorkOrder } from './utils/turnoverAutomation';
 
 export default function App() {
   // Navigation State
@@ -106,6 +109,8 @@ export default function App() {
   const [editingWorkOrder, setEditingWorkOrder] = useState<WorkOrder | null>(null);
   const [defaultRoomForWO, setDefaultRoomForWO] = useState<Room | null>(null);
   const [selectedWorkOrderForPrint, setSelectedWorkOrderForPrint] = useState<WorkOrder | null>(null);
+  const [isAssignVendorModalOpen, setIsAssignVendorModalOpen] = useState<boolean>(false);
+  const [workOrderForVendorAssign, setWorkOrderForVendorAssign] = useState<WorkOrder | null>(null);
 
   // Lead Modal & Detail
   const [isNewLeadModalOpen, setIsNewLeadModalOpen] = useState<boolean>(false);
@@ -385,16 +390,43 @@ export default function App() {
 
   // Room Update & Recalculate Property Stats
   const handleSaveRoom = (updatedRoom: Room) => {
-    const isExisting = rooms.some(r => r.id === updatedRoom.id);
+    const existingRoom = rooms.find(r => r.id === updatedRoom.id);
+    const isExisting = Boolean(existingRoom);
+
+    // Detect if room is entering turnover
+    const isEnteringTurnover = updatedRoom.status === 'Under Turnover' && (!existingRoom || existingRoom.status !== 'Under Turnover');
+
+    let processedRoom = { ...updatedRoom };
+    let createdTurnoverWO: WorkOrder | null = null;
+
+    if (isEnteringTurnover) {
+      // 1. Ensure turnover checklist is populated and reset for fresh turnover cycle
+      const tasks = ensureRoomTurnoverChecklist(processedRoom);
+      processedRoom.turnoverChecklist = tasks;
+
+      // 2. Check if an active turnover work order already exists for this room to prevent duplicates
+      const existingActiveWO = workOrders.find(
+        w => w.roomId === processedRoom.id &&
+        (w.category === 'Turnover & Prep' || w.category === 'Deep Cleaning' || w.title.toLowerCase().includes('turnover')) &&
+        w.status !== 'Completed' &&
+        w.status !== 'Cancelled'
+      );
+
+      if (!existingActiveWO) {
+        const targetProp = properties.find(p => p.id === processedRoom.propertyId);
+        createdTurnoverWO = generateTurnoverWorkOrder(processedRoom, targetProp, tasks);
+      }
+    }
+
     let nextRooms: Room[];
     if (isExisting) {
-      nextRooms = rooms.map(r => r.id === updatedRoom.id ? updatedRoom : r);
+      nextRooms = rooms.map(r => r.id === processedRoom.id ? processedRoom : r);
     } else {
-      nextRooms = [...rooms, updatedRoom];
+      nextRooms = [...rooms, processedRoom];
     }
     setRooms(nextRooms);
     StorageService.saveRooms(nextRooms);
-    FirebaseService.saveRoom(updatedRoom).catch(err => console.warn("Firestore save room err:", err));
+    FirebaseService.saveRoom(processedRoom).catch(err => console.warn("Firestore save room err:", err));
 
     // Recalculate property totals
     const nextProperties = properties.map(p => {
@@ -407,7 +439,7 @@ export default function App() {
         occupiedRooms: occupied,
         monthlyRevenueEstimate: totalRev
       };
-      if (p.id === updatedRoom.propertyId) {
+      if (p.id === processedRoom.propertyId) {
         FirebaseService.saveProperty(updatedP).catch(err => console.warn("Firestore save prop err:", err));
       }
       return updatedP;
@@ -415,8 +447,73 @@ export default function App() {
     setProperties(nextProperties);
     StorageService.saveProperties(nextProperties);
 
-    logActivity('Room', `Room ${updatedRoom.name} status is now ${updatedRoom.status} at $${updatedRoom.monthlyRent}/mo`, updatedRoom.id);
-    showToast(`Saved room: ${updatedRoom.name}`);
+    // If turnover work order was created, save it and open vendor assignment modal!
+    if (createdTurnoverWO) {
+      const nextWorkOrders = [createdTurnoverWO, ...workOrders];
+      setWorkOrders(nextWorkOrders);
+      StorageService.saveWorkOrders(nextWorkOrders);
+      FirebaseService.saveWorkOrder(createdTurnoverWO).catch(err => console.warn("Firestore save turnover work order err:", err));
+
+      logActivity(
+        'Maintenance',
+        `Turnover Work Order ${createdTurnoverWO.ticketNumber} automatically created for ${processedRoom.name} with ${createdTurnoverWO.turnoverTasks?.length || 0} tasks`,
+        createdTurnoverWO.id
+      );
+
+      // Prompt vendor assignment modal immediately!
+      setWorkOrderForVendorAssign(createdTurnoverWO);
+      setIsAssignVendorModalOpen(true);
+
+      showToast(`Room in Turnover: Created Work Order ${createdTurnoverWO.ticketNumber}`);
+    } else {
+      logActivity('Room', `Room ${processedRoom.name} status is now ${processedRoom.status} at $${processedRoom.monthlyRent}/mo`, processedRoom.id);
+      showToast(`Saved room: ${processedRoom.name}`);
+    }
+  };
+
+  // Assign Vendor to Work Order Handler
+  const handleAssignVendor = (
+    wo: WorkOrder,
+    vendor: Contact,
+    scheduledDate?: string,
+    dispatchNote?: string,
+    estimatedCost?: number
+  ) => {
+    let updatedWO = assignVendorToWorkOrder(wo, vendor, scheduledDate, dispatchNote);
+    if (estimatedCost !== undefined) {
+      updatedWO.estimatedCost = estimatedCost;
+    }
+    handleSaveWorkOrder(updatedWO);
+    logActivity('Maintenance', `Work Order ${updatedWO.ticketNumber} assigned to ${vendor.name} (${vendor.company || 'Vendor'})`, updatedWO.id);
+    showToast(`Assigned ${updatedWO.ticketNumber} to ${vendor.name}`);
+  };
+
+  // Manual trigger for creating turnover work order for room
+  const handleCreateTurnoverWorkOrderForRoom = (room: Room) => {
+    const targetProp = properties.find(p => p.id === room.propertyId);
+    const tasks = ensureRoomTurnoverChecklist(room);
+    const newWO = generateTurnoverWorkOrder(room, targetProp, tasks);
+
+    const updatedRoom: Room = {
+      ...room,
+      status: 'Under Turnover',
+      turnoverChecklist: tasks
+    };
+
+    const nextRooms = rooms.map(r => r.id === updatedRoom.id ? updatedRoom : r);
+    setRooms(nextRooms);
+    StorageService.saveRooms(nextRooms);
+    FirebaseService.saveRoom(updatedRoom).catch(err => console.warn("Firestore save room err:", err));
+
+    const nextWorkOrders = [newWO, ...workOrders];
+    setWorkOrders(nextWorkOrders);
+    StorageService.saveWorkOrders(nextWorkOrders);
+    FirebaseService.saveWorkOrder(newWO).catch(err => console.warn("Firestore save work order err:", err));
+
+    logActivity('Maintenance', `Turnover Work Order ${newWO.ticketNumber} created for ${room.name} with ${tasks.length} items`, newWO.id);
+    setWorkOrderForVendorAssign(newWO);
+    setIsAssignVendorModalOpen(true);
+    showToast(`Created Turnover Work Order ${newWO.ticketNumber}`);
   };
 
   // Property Save
@@ -660,6 +757,35 @@ export default function App() {
     FirebaseService.saveContact(contact).catch(err => console.warn("Firestore save contact err:", err));
     logActivity('System', `Contact Saved: ${contact.name} (${contact.type})`, contact.id);
 
+    // Keep room tenant link aligned if contact has room assigned
+    if (contact.roomId) {
+      setRooms(prevRooms => {
+        let changed = false;
+        const updated = prevRooms.map(r => {
+          if (r.id === contact.roomId && r.currentTenantId !== contact.id) {
+            changed = true;
+            const upRoom: Room = {
+              ...r,
+              status: 'Occupied',
+              currentTenantId: contact.id,
+              currentTenantFirstName: contact.firstName,
+              currentTenantLastName: contact.lastName,
+              currentTenantName: contact.name,
+              currentTenantPhone: contact.phone,
+              currentTenantEmail: contact.email
+            };
+            FirebaseService.saveRoom(upRoom).catch(() => {});
+            return upRoom;
+          }
+          return r;
+        });
+        if (changed) {
+          StorageService.saveRooms(updated);
+        }
+        return changed ? updated : prevRooms;
+      });
+    }
+
     // If a new contact was created without googleContactSyncedAt and Google Workspace is connected, sync it in background
     if (!isExisting && !contact.googleContactSyncedAt && GoogleWorkspaceService.isConnected()) {
       GoogleWorkspaceService.createGoogleContact(contact)
@@ -695,6 +821,117 @@ export default function App() {
     FirebaseService.deleteContact(contactId).catch(err => console.warn("Firestore delete contact err:", err));
     logActivity('System', `Deleted Contact: ${contactName}`, contactId);
     showToast(`Deleted contact: ${contactName}`);
+  };
+
+  // Assign or Unassign Room to Contact
+  const handleAssignRoomToContact = (
+    contact: Contact,
+    selectedProperty: Property | null,
+    selectedRoom: Room | null,
+    leaseDetails?: {
+      startDate?: string;
+      endDate?: string;
+      rent?: number;
+      updateRoomOccupancy?: boolean;
+    }
+  ) => {
+    const prevRoomId = contact.roomId;
+    let nextRooms = [...rooms];
+
+    // 1. If previously assigned to another room, release previous room
+    if (prevRoomId && (!selectedRoom || prevRoomId !== selectedRoom.id)) {
+      nextRooms = nextRooms.map(r => {
+        if (r.id === prevRoomId) {
+          const releasedRoom: Room = {
+            ...r,
+            status: 'Available',
+            currentTenantId: undefined,
+            currentTenantFirstName: undefined,
+            currentTenantLastName: undefined,
+            currentTenantName: undefined,
+            currentTenantPhone: undefined,
+            currentTenantEmail: undefined
+          };
+          FirebaseService.saveRoom(releasedRoom).catch(err => console.warn("Firestore release room err:", err));
+          return releasedRoom;
+        }
+        return r;
+      });
+    }
+
+    // 2. If a new room is chosen, occupy it and sync tenant details
+    if (selectedRoom && selectedProperty) {
+      const split = splitFullName(contact.name);
+      const fName = contact.firstName || split.firstName;
+      const lName = contact.lastName || split.lastName;
+
+      nextRooms = nextRooms.map(r => {
+        if (r.id === selectedRoom.id) {
+          const updatedRoom: Room = {
+            ...r,
+            status: leaseDetails?.updateRoomOccupancy !== false ? 'Occupied' : r.status,
+            currentTenantId: contact.id,
+            currentTenantFirstName: fName,
+            currentTenantLastName: lName,
+            currentTenantName: contact.name,
+            currentTenantPhone: contact.phone,
+            currentTenantEmail: contact.email,
+            squareCustomerId: contact.squareCustomerId || r.squareCustomerId,
+            leaseStartDate: leaseDetails?.startDate || r.leaseStartDate,
+            leaseEndDate: leaseDetails?.endDate || r.leaseEndDate,
+            monthlyRent: (leaseDetails?.rent && leaseDetails.rent > 0) ? leaseDetails.rent : r.monthlyRent
+          };
+          FirebaseService.saveRoom(updatedRoom).catch(err => console.warn("Firestore occupy room err:", err));
+          return updatedRoom;
+        }
+        return r;
+      });
+
+      // Update Contact with the new room and property
+      const updatedContact: Contact = {
+        ...contact,
+        type: contact.type === 'Lead' ? 'Tenant' : contact.type,
+        propertyId: selectedProperty.id,
+        propertyName: selectedProperty.name,
+        roomId: selectedRoom.id,
+        roomName: selectedRoom.name
+      };
+
+      handleSaveContact(updatedContact);
+      logActivity('Room', `Assigned ${contact.name} to ${selectedProperty.name} (${selectedRoom.name})`, contact.id);
+      showToast(`Assigned ${contact.name} to ${selectedRoom.name}`);
+    } else {
+      // Unassigning
+      const updatedContact: Contact = {
+        ...contact,
+        propertyId: undefined,
+        propertyName: undefined,
+        roomId: undefined,
+        roomName: undefined
+      };
+
+      handleSaveContact(updatedContact);
+      logActivity('Room', `Unassigned ${contact.name} from room`, contact.id);
+      showToast(`Unassigned room for ${contact.name}`);
+    }
+
+    setRooms(nextRooms);
+    StorageService.saveRooms(nextRooms);
+
+    // Update properties occupied counts
+    const nextProperties = properties.map(p => {
+      const propRooms = nextRooms.filter(r => r.propertyId === p.id);
+      const occupied = propRooms.filter(r => r.status === 'Occupied').length;
+      const totalRev = propRooms.reduce((sum, r) => sum + r.monthlyRent, 0);
+      return {
+        ...p,
+        totalRooms: propRooms.length,
+        occupiedRooms: occupied,
+        monthlyRevenueEstimate: totalRev
+      };
+    });
+    setProperties(nextProperties);
+    StorageService.saveProperties(nextProperties);
   };
 
   // Convert Lead to Resident
@@ -929,7 +1166,15 @@ export default function App() {
             properties={properties}
             rooms={rooms}
             leads={leads}
+            workOrders={workOrders}
+            contacts={contacts}
             onUpdateRoom={handleSaveRoom}
+            onUpdateWorkOrder={handleSaveWorkOrder}
+            onOpenAssignVendorModal={(wo) => {
+              setWorkOrderForVendorAssign(wo);
+              setIsAssignVendorModalOpen(true);
+            }}
+            onCreateTurnoverWorkOrder={handleCreateTurnoverWorkOrderForRoom}
             onOpenNewRoomModal={(defaultPropId) => {
               setEditingRoom(null);
               setDefaultPropertyIdForRoom(defaultPropId);
@@ -1043,6 +1288,10 @@ export default function App() {
               setIsNewWorkOrderModalOpen(true);
             }}
             onPrintWorkOrder={(wo) => setSelectedWorkOrderForPrint(wo)}
+            onOpenAssignVendorModal={(wo) => {
+              setWorkOrderForVendorAssign(wo);
+              setIsAssignVendorModalOpen(true);
+            }}
           />
         )}
 
@@ -1082,6 +1331,7 @@ export default function App() {
               setEditingContact(contact);
               setIsNewContactModalOpen(true);
             }}
+            onAssignRoom={handleAssignRoomToContact}
           />
         )}
       </Header>
@@ -1126,6 +1376,21 @@ export default function App() {
         properties={properties}
         rooms={rooms}
         contacts={contacts}
+      />
+
+      {/* Assign Vendor to Work Order Modal */}
+      <AssignVendorModal
+        isOpen={isAssignVendorModalOpen}
+        onClose={() => {
+          setIsAssignVendorModalOpen(false);
+          setWorkOrderForVendorAssign(null);
+        }}
+        workOrder={workOrderForVendorAssign}
+        contacts={contacts}
+        properties={properties}
+        rooms={rooms}
+        onAssignVendor={handleAssignVendor}
+        onOpenNewContactModal={() => setIsNewContactModalOpen(true)}
       />
 
       {/* New / Edit Tenant Lead Modal */}
@@ -1249,6 +1514,7 @@ export default function App() {
           setEditingContact(null);
         }}
         properties={properties}
+        rooms={rooms}
         onSave={handleSaveContact}
         editingContact={editingContact}
         onDeleteContact={handleDeleteContact}
