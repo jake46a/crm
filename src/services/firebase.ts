@@ -679,6 +679,107 @@ export const FirebaseService = {
   },
 
   /**
+   * Restores a full backup into Cloud Firestore:
+   * First removes obsolete records (especially legacy demo rooms like room-yank-2..7),
+   * then writes the entire imported dataset into Firestore.
+   */
+  async restoreBackupToFirestore(data: {
+    properties?: Property[];
+    rooms?: Room[];
+    renewals?: LeaseRenewal[];
+    workOrders?: WorkOrder[];
+    leads?: TenantLead[];
+    contacts?: Contact[];
+    invoices?: Invoice[];
+    activityLogs?: ActivityLog[];
+  }): Promise<{ success: boolean; counts: Record<string, number> }> {
+    // 1. Explicitly delete obsolete legacy rooms
+    const obsoleteRoomIds = [
+      'room-yank-2', 'room-yank-3', 'room-yank-4', 'room-yank-5', 'room-yank-6', 'room-yank-7',
+      'room-101', 'room-102', 'room-103', 'room-104', 'room-201', 'room-202', 'room-203', 'room-204', 'room-301', 'room-302', 'room-303'
+    ];
+    for (const rId of obsoleteRoomIds) {
+      deleteDoc(doc(db, COLLECTIONS.ROOMS, rId)).catch(() => {});
+    }
+
+    // 2. Prune existing rooms not in new dataset
+    if (data.rooms && data.rooms.length > 0) {
+      try {
+        const existingSnap = await getDocs(collection(db, COLLECTIONS.ROOMS));
+        const newIds = new Set(data.rooms.map(r => r.id));
+        const toDelete = existingSnap.docs.filter(d => !newIds.has(d.id));
+        if (toDelete.length > 0) {
+          const b = writeBatch(db);
+          toDelete.forEach(d => b.delete(d.ref));
+          await b.commit();
+        }
+      } catch (err) {
+        console.warn("Could not prune existing rooms:", err);
+      }
+    }
+
+    // 3. Prune existing contacts not in new dataset
+    if (data.contacts && data.contacts.length > 0) {
+      try {
+        const existingSnap = await getDocs(collection(db, COLLECTIONS.CONTACTS));
+        const newIds = new Set(data.contacts.map(c => c.id));
+        const toDelete = existingSnap.docs.filter(d => !newIds.has(d.id));
+        if (toDelete.length > 0) {
+          const b = writeBatch(db);
+          toDelete.forEach(d => b.delete(d.ref));
+          await b.commit();
+        }
+      } catch (err) {
+        console.warn("Could not prune existing contacts:", err);
+      }
+    }
+
+    // 4. Prune existing renewals not in new dataset
+    if (data.renewals && data.renewals.length > 0) {
+      try {
+        const existingSnap = await getDocs(collection(db, COLLECTIONS.RENEWALS));
+        const newIds = new Set(data.renewals.map(r => r.id));
+        const toDelete = existingSnap.docs.filter(d => !newIds.has(d.id));
+        if (toDelete.length > 0) {
+          const b = writeBatch(db);
+          toDelete.forEach(d => b.delete(d.ref));
+          await b.commit();
+        }
+      } catch (err) {
+        console.warn("Could not prune existing renewals:", err);
+      }
+    }
+
+    // 5. Prune existing leads not in new dataset
+    if (data.leads && data.leads.length > 0) {
+      try {
+        const existingSnap = await getDocs(collection(db, COLLECTIONS.LEADS));
+        const newIds = new Set(data.leads.map(l => l.id));
+        const toDelete = existingSnap.docs.filter(d => !newIds.has(d.id));
+        if (toDelete.length > 0) {
+          const b = writeBatch(db);
+          toDelete.forEach(d => b.delete(d.ref));
+          await b.commit();
+        }
+      } catch (err) {
+        console.warn("Could not prune existing leads:", err);
+      }
+    }
+
+    // 6. Write imported dataset to Firestore
+    return await this.syncAllLocalToFirestore({
+      properties: data.properties || [],
+      rooms: data.rooms || [],
+      renewals: data.renewals || [],
+      workOrders: data.workOrders || [],
+      leads: data.leads || [],
+      contacts: data.contacts || [],
+      invoices: data.invoices || [],
+      activityLogs: data.activityLogs || []
+    });
+  },
+
+  /**
    * Pushes all local in-memory/localStorage data directly to Cloud Firestore.
    * Ensures every property, room, renewal, work order, lead, contact, and invoice is backed up.
    */

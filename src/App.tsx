@@ -183,9 +183,21 @@ export default function App() {
 
     const unsubRooms = subscribeToRooms((liveRooms) => {
       if (liveRooms) {
-        let cleaned = liveRooms.filter(r => !LEGACY_SAMPLE_ROOM_IDS.has(r.id) && r.propertyId !== 'prop-1' && r.propertyId !== 'prop-2' && r.propertyId !== 'prop-3');
+        let cleaned = liveRooms.filter(r => 
+          !LEGACY_SAMPLE_ROOM_IDS.has(r.id) && 
+          !/^Room [2-7]$/i.test(r.name) &&
+          r.propertyId !== 'prop-1' && 
+          r.propertyId !== 'prop-2' && 
+          r.propertyId !== 'prop-3'
+        );
         liveRooms.forEach(r => {
-          if (LEGACY_SAMPLE_ROOM_IDS.has(r.id) || r.propertyId === 'prop-1' || r.propertyId === 'prop-2' || r.propertyId === 'prop-3') {
+          if (
+            LEGACY_SAMPLE_ROOM_IDS.has(r.id) || 
+            /^Room [2-7]$/i.test(r.name) ||
+            r.propertyId === 'prop-1' || 
+            r.propertyId === 'prop-2' || 
+            r.propertyId === 'prop-3'
+          ) {
             FirebaseService.deleteRoom(r.id).catch(() => {});
           }
         });
@@ -193,27 +205,17 @@ export default function App() {
         if (cleaned.length === 0 && INITIAL_ROOMS.length > 0) {
           cleaned = INITIAL_ROOMS;
           INITIAL_ROOMS.forEach(r => FirebaseService.saveRoom(r).catch(() => {}));
-        } else if (cleaned.length > 0 && !cleaned.some(r => r.status === 'Occupied' || !!r.currentTenantName)) {
-          // If Firestore rooms have no tenant info, merge with active tenants from INITIAL_ROOMS
-          const initialOccupied = INITIAL_ROOMS.filter(r => r.status === 'Occupied');
-          cleaned = cleaned.map(r => {
-            const match = initialOccupied.find(init => init.id === r.id);
-            return match || r;
-          });
-          cleaned.forEach(r => FirebaseService.saveRoom(r).catch(() => {}));
         }
 
-        // Ensure Room 1 is named Bedroom suite
-        const suite = cleaned.find(r => r.id === 'room-yank-1' || r.roomNumber === '1');
-        if (!suite) {
-          const defaultSuite = INITIAL_ROOMS.find(r => r.id === 'room-yank-1')!;
-          cleaned = [defaultSuite, ...cleaned];
-          FirebaseService.saveRoom(defaultSuite).catch(() => {});
-        } else if (suite.name !== 'Bedroom suite') {
-          const updated: Room = { ...suite, name: 'Bedroom suite' };
-          cleaned = cleaned.map(r => r.id === suite.id ? updated : r);
-          FirebaseService.saveRoom(updated).catch(() => {});
-        }
+        // Ensure Room 1 is named Bedroom suite if it exists
+        cleaned = cleaned.map(r => {
+          if (r.id === 'room-yank-1' && r.name !== 'Bedroom suite') {
+            const updated: Room = { ...r, name: 'Bedroom suite' };
+            FirebaseService.saveRoom(updated).catch(() => {});
+            return updated;
+          }
+          return r;
+        });
 
         // Clean up any rooms that still have rejected sample tenants
         cleaned = cleaned.map(r => {
@@ -264,12 +266,6 @@ export default function App() {
         if (finalRenewals.length === 0 && INITIAL_RENEWALS.length > 0) {
           finalRenewals = INITIAL_RENEWALS;
           INITIAL_RENEWALS.forEach(ren => FirebaseService.saveRenewal(ren).catch(() => {}));
-        } else {
-          const hasWilliam = finalRenewals.some(r => r.tenantName?.toLowerCase().includes('william jacobs') || r.id === 'ren-william-jacobs-1');
-          if (!hasWilliam && INITIAL_RENEWALS.length > 0) {
-            finalRenewals = [...INITIAL_RENEWALS, ...finalRenewals];
-            INITIAL_RENEWALS.forEach(ren => FirebaseService.saveRenewal(ren).catch(() => {}));
-          }
         }
         setRenewals(finalRenewals);
         StorageService.saveLeaseRenewals(finalRenewals);
@@ -326,13 +322,6 @@ export default function App() {
         if (finalContacts.length === 0 && INITIAL_CONTACTS.length > 0) {
           finalContacts = INITIAL_CONTACTS;
           INITIAL_CONTACTS.forEach(c => FirebaseService.saveContact(c).catch(() => {}));
-        } else {
-          const hasWilliam = finalContacts.some(c => c.name?.toLowerCase().includes('william jacobs') || c.id === 'cont-william-jacobs');
-          if (!hasWilliam && INITIAL_CONTACTS.length > 0) {
-            const williamContact = INITIAL_CONTACTS.find(c => c.id === 'cont-william-jacobs')!;
-            finalContacts = [williamContact, ...finalContacts];
-            FirebaseService.saveContact(williamContact).catch(() => {});
-          }
         }
         setContacts(finalContacts);
         StorageService.saveContacts(finalContacts);

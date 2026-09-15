@@ -20,6 +20,7 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [isClearing, setIsClearing] = useState<boolean>(false);
   const [isSyncingCloud, setIsSyncingCloud] = useState<boolean>(false);
+  const [isRestoring, setIsRestoring] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
@@ -69,17 +70,69 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
     setStatusMsg({ text: 'CRM portfolio exported successfully!', type: 'success' });
   };
 
-  const handleImport = () => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content) {
+        setImportJson(content);
+        setStatusMsg({ text: `Backup file "${file.name}" loaded (${(file.size / 1024).toFixed(1)} KB). Click "Restore from JSON" to apply.`, type: 'success' });
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImport = async () => {
     if (!importJson.trim()) return;
-    const ok = StorageService.importData(importJson);
-    if (ok) {
-      setStatusMsg({ text: 'Data imported and synced successfully!', type: 'success' });
+    setIsRestoring(true);
+    setStatusMsg(null);
+    try {
+      let parsedData: any;
+      try {
+        parsedData = JSON.parse(importJson);
+      } catch {
+        setStatusMsg({ text: 'Invalid JSON format. Please verify the backup structure.', type: 'error' });
+        setIsRestoring(false);
+        return;
+      }
+
+      // 1. Save to local storage
+      const ok = StorageService.importData(importJson);
+      if (!ok) {
+        setStatusMsg({ text: 'Invalid JSON format. Please verify the backup structure.', type: 'error' });
+        setIsRestoring(false);
+        return;
+      }
+
+      // 2. Overwrite and sync Cloud Firestore so real-time listeners do not revert to old database records
+      setStatusMsg({ text: 'Restoring data and synchronizing with Cloud Firestore...', type: 'success' });
+      try {
+        await FirebaseService.restoreBackupToFirestore({
+          properties: parsedData.properties || [],
+          rooms: parsedData.rooms || [],
+          renewals: parsedData.renewals || [],
+          workOrders: parsedData.workOrders || [],
+          leads: parsedData.leads || [],
+          contacts: parsedData.contacts || [],
+          invoices: parsedData.invoices || [],
+          activityLogs: parsedData.activityLogs || []
+        });
+      } catch (cloudErr) {
+        console.warn("Cloud sync warning during restore:", cloudErr);
+      }
+
+      setStatusMsg({ text: 'Backup restored and synchronized with Cloud Firestore successfully!', type: 'success' });
+      onDataReload();
       setTimeout(() => {
-        onDataReload();
         onClose();
-      }, 1000);
-    } else {
-      setStatusMsg({ text: 'Invalid JSON format. Please verify the backup structure.', type: 'error' });
+      }, 1200);
+    } catch (e: any) {
+      console.error('Import error:', e);
+      setStatusMsg({ text: `Import error: ${e?.message || 'Failed to restore'}`, type: 'error' });
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -288,22 +341,46 @@ export const ExportImportModal: React.FC<ExportImportModalProps> = ({
 
           {/* Import section */}
           <div className="border border-zinc-200 p-4 rounded-md space-y-2">
-            <h3 className="font-bold text-zinc-900 text-xs">Import JSON Backup</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-zinc-900 text-xs">Import JSON Backup</h3>
+              <label className="cursor-pointer text-[11px] font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                <FileText className="w-3.5 h-3.5" />
+                <span>Upload JSON file</span>
+                <input 
+                  type="file" 
+                  accept=".json,application/json" 
+                  className="hidden" 
+                  onChange={handleFileUpload} 
+                />
+              </label>
+            </div>
             <textarea
               rows={3}
-              placeholder="Paste previously exported CRM JSON payload here..."
+              placeholder="Paste previously exported CRM JSON payload here or upload file above..."
               value={importJson}
               onChange={(e) => setImportJson(e.target.value)}
               className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md font-mono text-[11px] focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />
-            <div className="flex justify-end">
+            <div className="flex justify-between items-center">
+              <span className="text-[11px] text-zinc-500">
+                Restoring overwrites current data and syncs directly to Cloud Firestore.
+              </span>
               <button
                 onClick={handleImport}
-                disabled={!importJson.trim()}
-                className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-900 disabled:opacity-50 text-white rounded-md font-bold shadow-xs transition"
+                disabled={!importJson.trim() || isRestoring}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-900 disabled:opacity-50 text-white rounded-md font-bold shadow-xs transition"
               >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Restore from JSON</span>
+                {isRestoring ? (
+                  <>
+                    <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Syncing & Restoring...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Restore from JSON</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

@@ -31,16 +31,21 @@ export const LEGACY_SAMPLE_PROPERTY_IDS = new Set(['prop-1', 'prop-2', 'prop-3']
 export const LEGACY_SAMPLE_ROOM_IDS = new Set([
   'room-101', 'room-102', 'room-103', 'room-104',
   'room-201', 'room-202', 'room-203', 'room-204',
-  'room-301', 'room-302', 'room-303'
+  'room-301', 'room-302', 'room-303',
+  'room-yank-2', 'room-yank-3', 'room-yank-4', 'room-yank-5', 'room-yank-6', 'room-yank-7'
 ]);
 
 export const LEGACY_SAMPLE_RENEWAL_IDS = new Set([
-  'ren-001', 'ren-002', 'ren-003', 'ren-004', 'ren-005', 'ren-006', 'ren-007', 'ren-008'
+  'ren-001', 'ren-002', 'ren-003', 'ren-004', 'ren-005', 'ren-006', 'ren-007', 'ren-008',
+  'ren-william-jacobs-1'
 ]);
 
 export const LEGACY_SAMPLE_WORK_ORDER_IDS = new Set(['wo-101', 'wo-102']);
 
-export const LEGACY_SAMPLE_CONTACT_IDS = new Set(['cont-1', 'cont-2', 'cont-3']);
+export const LEGACY_SAMPLE_CONTACT_IDS = new Set([
+  'cont-1', 'cont-2', 'cont-3',
+  'cont-william-jacobs', 'cont-carlos-rea', 'cont-jordan-bends', 'cont-daniel-oliveira'
+]);
 
 export const LEGACY_SAMPLE_ACTIVITY_LOG_IDS = new Set(['act-001', 'act-002', 'act-003', 'act-004']);
 
@@ -102,20 +107,15 @@ export const StorageService = {
   // Rooms
   getRooms(): Room[] {
     const raw = getItem<Room[]>(STORAGE_KEYS.ROOMS, INITIAL_ROOMS);
-    const filtered = raw.filter(r => !LEGACY_SAMPLE_ROOM_IDS.has(r.id) && r.propertyId !== 'prop-1' && r.propertyId !== 'prop-2' && r.propertyId !== 'prop-3');
+    const filtered = raw.filter(r => 
+      !LEGACY_SAMPLE_ROOM_IDS.has(r.id) && 
+      !/^Room [2-7]$/i.test(r.name) &&
+      r.propertyId !== 'prop-1' && 
+      r.propertyId !== 'prop-2' && 
+      r.propertyId !== 'prop-3'
+    );
     let rooms = filtered;
-    // Ensure 1070 Yank St rooms exist
-    const hasYankRooms = rooms.some(r => r.propertyId === 'prop-1070-yank' || r.propertyName?.includes('1070 Yank'));
-    if (!hasYankRooms) {
-      const yankRooms = INITIAL_ROOMS.filter(r => r.propertyId === 'prop-1070-yank');
-      if (yankRooms.length > 0) {
-        rooms = [...yankRooms, ...rooms];
-      }
-    }
-
-    // If rooms list contains only available rooms but INITIAL_ROOMS has active residents, restore them
-    const hasOccupied = rooms.some(r => r.status === 'Occupied' || !!r.currentTenantName);
-    if (!hasOccupied && INITIAL_ROOMS.some(r => r.status === 'Occupied')) {
+    if (rooms.length === 0 && INITIAL_ROOMS.length > 0) {
       rooms = INITIAL_ROOMS;
       this.saveRooms(rooms);
     }
