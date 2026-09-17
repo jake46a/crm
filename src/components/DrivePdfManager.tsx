@@ -37,6 +37,7 @@ import {
   MasterPdfTemplate,
 } from './modals/MasterPdfWorkflowModal';
 import { EditMasterTemplateModal } from './modals/EditMasterTemplateModal';
+import { generateMasterPdfBlob } from '../utils/pdfGenerator';
 
 interface DrivePdfManagerProps {
   properties: Property[];
@@ -429,18 +430,62 @@ export const DrivePdfManager: React.FC<DrivePdfManagerProps> = ({
   };
 
   // Open PDF in Chrome
-  const handleOpenInChrome = (record: DrivePdfRecord) => {
-    const url = record.webViewLink || `https://drive.google.com/file/d/${record.driveFileId}/view`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+  const handleOpenInChrome = async (record: DrivePdfRecord) => {
+    if (record.webViewLink && !record.webViewLink.includes('drive.google.com/file/d/local-')) {
+      window.open(record.webViewLink, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (!record.driveFileId.startsWith('local-')) {
+      const url = `https://drive.google.com/file/d/${record.driveFileId}/view`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    // For local record without valid link, generate genuine blob and open
+    try {
+      const blob = await generateMasterPdfBlob({
+        templateName: record.name,
+        category: record.docCategory,
+        propertyName: record.propertyName,
+        roomName: record.roomName,
+        tenantName: record.tenantName,
+        notes: record.notes,
+      });
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+    } catch (e) {
+      console.warn('Could not open local PDF:', e);
+      handleResumeWorkflowForRecord(record);
+    }
   };
 
   // Print PDF in Chrome
-  const handlePrintPdf = (record: DrivePdfRecord) => {
+  const handlePrintPdf = async (record: DrivePdfRecord) => {
     if (record.webViewLink && record.webViewLink.startsWith('blob:')) {
       const printWin = window.open(record.webViewLink, '_blank');
       if (printWin) {
         printWin.focus();
         printWin.print();
+      }
+      return;
+    }
+    if (record.driveFileId.startsWith('local-')) {
+      try {
+        const blob = await generateMasterPdfBlob({
+          templateName: record.name,
+          category: record.docCategory,
+          propertyName: record.propertyName,
+          roomName: record.roomName,
+          tenantName: record.tenantName,
+          notes: record.notes,
+        });
+        const blobUrl = URL.createObjectURL(blob);
+        const printWin = window.open(blobUrl, '_blank');
+        if (printWin) {
+          printWin.focus();
+          printWin.print();
+        }
+      } catch (e) {
+        console.warn('Could not print local PDF:', e);
       }
       return;
     }

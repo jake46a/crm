@@ -267,12 +267,32 @@ export const PdfTagRenameModal: React.FC<PdfTagRenameModalProps> = ({
 
   // Open in Chrome / Drive viewer
   const handleOpenInChrome = () => {
+    if (pdfRecord.driveFileId.startsWith('local-')) {
+      if (pdfRecord.webViewLink && !pdfRecord.webViewLink.includes('drive.google.com/file/d/local-')) {
+        window.open(pdfRecord.webViewLink, '_blank', 'noopener,noreferrer');
+      } else {
+        alert('This document is currently saved in your local PDF Vault.');
+      }
+      return;
+    }
     const url = pdfRecord.webViewLink || `https://drive.google.com/file/d/${pdfRecord.driveFileId}/view`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   // Print PDF directly
   const handlePrint = () => {
+    if (pdfRecord.webViewLink && pdfRecord.webViewLink.startsWith('blob:')) {
+      const printWin = window.open(pdfRecord.webViewLink, '_blank');
+      if (printWin) {
+        printWin.focus();
+        printWin.print();
+      }
+      return;
+    }
+    if (pdfRecord.driveFileId.startsWith('local-')) {
+      alert('To print this local file, please open it in Chrome or upload to Google Drive.');
+      return;
+    }
     const printUrl = `https://drive.google.com/file/d/${pdfRecord.driveFileId}/preview`;
     window.open(printUrl, '_blank', 'noopener,noreferrer');
   };

@@ -27,6 +27,7 @@ import {
   GoogleWorkspaceService,
 } from '../../services/googleWorkspace';
 import { getTenantFullName, formatFullName } from '../../utils/nameUtils';
+import { generateMasterPdfBlob } from '../../utils/pdfGenerator';
 
 export interface MasterPdfTemplate {
   id: string;
@@ -301,32 +302,74 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
       const cleanFileName = finalGeneratedName.trim() || `[1070 Yank] ${templateName}`;
 
       let driveFileId = 'local-' + Date.now();
-      let webViewLink = `https://drive.google.com/file/d/${driveFileId}/view`;
+      let webViewLink = '';
       let webContentLink = '';
       let cloudCopySuccess = false;
 
-      // If user has token and template has a real Drive file ID, call /api/google/copy-file
-      if (token && selectedTemplate?.driveFileId && !selectedTemplate.driveFileId.startsWith('local-')) {
-        try {
-          const copyRes = await GoogleWorkspaceService.copyDriveFile(
-            selectedTemplate.driveFileId,
-            cleanFileName,
-            token
-          );
-          if (copyRes?.id) {
-            driveFileId = copyRes.id;
-            webViewLink = copyRes.webViewLink || `https://drive.google.com/file/d/${driveFileId}/view`;
-            webContentLink = copyRes.webContentLink || '';
-            cloudCopySuccess = true;
-          }
-        } catch (copyErr: any) {
-          console.warn('Could not copy file directly in Google Drive cloud:', copyErr);
-          if (GoogleWorkspaceService.isAuthError(copyErr)) {
-            setAuthExpired(true);
-          } else {
-            console.info('Master template remote file not accessible; creating tracked copy in PDF Vault.');
+      // Generate a genuine, standard-compliant PDF blob for this master template & property/tenant
+      const pdfBlob = await generateMasterPdfBlob({
+        templateName: cleanFileName,
+        category: formPurpose || selectedTemplate?.category || 'Colorado Court Form / Notice',
+        propertyName: targetProp?.name || '1070 Yank Street',
+        roomName: targetRoom?.name || '',
+        tenantName: tenantNameInput.trim() || undefined,
+        notes: notes.trim() || undefined,
+      });
+
+      // If user has token, ensure real file is created/copied in user's Google Drive
+      if (token) {
+        // Option 1: Copy existing remote Drive template if it has a real file ID
+        if (
+          selectedTemplate?.driveFileId &&
+          !selectedTemplate.driveFileId.startsWith('local-') &&
+          !selectedTemplate.driveFileId.startsWith('tpl-')
+        ) {
+          try {
+            const copyRes = await GoogleWorkspaceService.copyDriveFile(
+              selectedTemplate.driveFileId,
+              cleanFileName,
+              token
+            );
+            if (copyRes?.id) {
+              driveFileId = copyRes.id;
+              webViewLink = copyRes.webViewLink || `https://drive.google.com/file/d/${driveFileId}/view`;
+              webContentLink = copyRes.webContentLink || '';
+              cloudCopySuccess = true;
+            }
+          } catch (copyErr: any) {
+            console.warn('Direct Google Drive copy was not possible for this template, falling back to direct upload:', copyErr);
+            if (GoogleWorkspaceService.isAuthError(copyErr)) {
+              setAuthExpired(true);
+            }
           }
         }
+
+        // Option 2: Upload genuine master PDF directly into user's Google Drive account
+        if (!cloudCopySuccess && !authExpired) {
+          try {
+            const uploadRes = await GoogleWorkspaceService.uploadDrivePdf(
+              pdfBlob,
+              cleanFileName,
+              token
+            );
+            if (uploadRes?.id) {
+              driveFileId = uploadRes.id;
+              webViewLink = uploadRes.webViewLink || `https://drive.google.com/file/d/${driveFileId}/view`;
+              webContentLink = uploadRes.webContentLink || '';
+              cloudCopySuccess = true;
+            }
+          } catch (uploadErr: any) {
+            console.warn('Could not upload master PDF directly to Google Drive:', uploadErr);
+            if (GoogleWorkspaceService.isAuthError(uploadErr)) {
+              setAuthExpired(true);
+            }
+          }
+        }
+      }
+
+      // If cloud copy/upload was not completed (no token or auth expired), use local Blob URL
+      if (!cloudCopySuccess) {
+        webViewLink = URL.createObjectURL(pdfBlob);
       }
 
       const newRecord: DrivePdfRecord = {
@@ -355,7 +398,7 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
       setActiveRecord(newRecord);
 
       if (cloudCopySuccess) {
-        setSuccessMessage(`Created copy in Google Drive: "${cleanFileName}"! Ready to fill in Adobe Acrobat.`);
+        setSuccessMessage(`Created file in Google Drive: "${cleanFileName}"! Ready to open in Adobe Acrobat.`);
       } else if (authExpired) {
         setSuccessMessage(`Created tracked copy: "${cleanFileName}" in PDF Vault! Ready to fill in Adobe Acrobat (Google Drive cloud sync skipped due to expired session).`);
       } else {
@@ -378,44 +421,105 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
   // ----------------------------------------------------
   // STEP 3 & 4: OPEN IN ADOBE ACROBAT
   // ----------------------------------------------------
-  const handleOpenInDriveAcrobat = () => {
+  const handleOpenInDriveAcrobat = async () => {
     if (!activeRecord) return;
-    // Google Drive native viewer with "Open with" -> Adobe Acrobat
-    const driveViewUrl = activeRecord.webViewLink || `https://drive.google.com/file/d/${activeRecord.driveFileId}/view`;
-    window.open(driveViewUrl, '_blank', 'noopener,noreferrer');
-    // Update record status to 'in_acrobat'
-    if (activeRecord) {
+
+    // Guard against opening a broken "drive.google.com/file/d/local-..." link!
+    if (activeRecord.driveFileId.startsWith('local-')) {
+      // If user has token, automatically sync to Google Drive now before opening!
+      if (token && !authExpired) {
+        try {
+          setIsProcessing(true);
+          const pdfBlob = await generateMasterPdfBlob({
+            templateName: activeRecord.name,
+            category: activeRecord.docCategory,
+            propertyName: activeRecord.propertyName,
+            roomName: activeRecord.roomName,
+            tenantName: activeRecord.tenantName,
+            notes: activeRecord.notes,
+          });
+
+          const uploadRes = await GoogleWorkspaceService.uploadDrivePdf(
+            pdfBlob,
+            activeRecord.name,
+            token
+          );
+
+          if (uploadRes?.id) {
+            const updatedRecord: DrivePdfRecord = {
+              ...activeRecord,
+              driveFileId: uploadRes.id,
+              webViewLink: uploadRes.webViewLink || `https://drive.google.com/file/d/${uploadRes.id}/view`,
+              webContentLink: uploadRes.webContentLink || '',
+              status: 'in_acrobat',
+            };
+            GoogleWorkspaceService.updateDrivePdfRecord(activeRecord.id, updatedRecord);
+            setActiveRecord(updatedRecord);
+            setSuccessMessage(`Synced "${activeRecord.name}" to Google Drive successfully! Opening in Drive...`);
+            window.open(updatedRecord.webViewLink, '_blank', 'noopener,noreferrer');
+            return;
+          }
+        } catch (syncErr: any) {
+          console.warn('Could not auto-sync local PDF to Drive:', syncErr);
+          if (GoogleWorkspaceService.isAuthError(syncErr)) {
+            setAuthExpired(true);
+          }
+        } finally {
+          setIsProcessing(false);
+        }
+      }
+
+      // If not yet synced to Drive, open the local PDF viewer or download directly
+      if (activeRecord.webViewLink && activeRecord.webViewLink.startsWith('blob:')) {
+        window.open(activeRecord.webViewLink, '_blank', 'noopener,noreferrer');
+      } else {
+        await handleDownloadForDesktopAcrobat();
+      }
+
       GoogleWorkspaceService.updateDrivePdfRecord(activeRecord.id, { status: 'in_acrobat' });
       setActiveRecord({ ...activeRecord, status: 'in_acrobat' });
+      return;
     }
+
+    // Google Drive native viewer with "Open with" -> Adobe Acrobat
+    const driveViewUrl =
+      activeRecord.webViewLink && !activeRecord.webViewLink.includes('/local-')
+        ? activeRecord.webViewLink
+        : `https://drive.google.com/file/d/${activeRecord.driveFileId}/view`;
+    window.open(driveViewUrl, '_blank', 'noopener,noreferrer');
+
+    // Update record status to 'in_acrobat'
+    GoogleWorkspaceService.updateDrivePdfRecord(activeRecord.id, { status: 'in_acrobat' });
+    setActiveRecord({ ...activeRecord, status: 'in_acrobat' });
   };
 
-  const handleDownloadForDesktopAcrobat = () => {
+  const handleDownloadForDesktopAcrobat = async () => {
     if (!activeRecord) return;
 
-    if (activeRecord.webContentLink) {
+    if (activeRecord.webContentLink && !activeRecord.driveFileId.startsWith('local-')) {
       window.open(activeRecord.webContentLink, '_blank');
-    } else if (activeRecord.webViewLink && !activeRecord.webViewLink.startsWith('blob:')) {
-      const exportUrl = `https://drive.google.com/uc?export=download&id=${activeRecord.driveFileId}`;
-      window.open(exportUrl, '_blank');
     } else {
-      // Create a mock downloadable blob for offline demonstration
-      const dummyPdfContent = `%PDF-1.4\n% Moyer Real Estate - ${activeRecord.name}\n1 0 obj\n<< /Title (${activeRecord.name}) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF`;
-      const blob = new Blob([dummyPdfContent], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
+      // Generate genuine authentic PDF blob for downloading
+      const pdfBlob = await generateMasterPdfBlob({
+        templateName: activeRecord.name,
+        category: activeRecord.docCategory,
+        propertyName: activeRecord.propertyName,
+        roomName: activeRecord.roomName,
+        tenantName: activeRecord.tenantName,
+        notes: activeRecord.notes,
+      });
+      const url = URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = activeRecord.name;
+      a.download = activeRecord.name.endsWith('.pdf') ? activeRecord.name : `${activeRecord.name}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }
 
-    if (activeRecord) {
-      GoogleWorkspaceService.updateDrivePdfRecord(activeRecord.id, { status: 'in_acrobat' });
-      setActiveRecord({ ...activeRecord, status: 'in_acrobat' });
-    }
+    GoogleWorkspaceService.updateDrivePdfRecord(activeRecord.id, { status: 'in_acrobat' });
+    setActiveRecord({ ...activeRecord, status: 'in_acrobat' });
   };
 
   const handleOpenAcrobatWeb = () => {
@@ -522,7 +626,7 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
   // ----------------------------------------------------
   // STEP 6: PRINT FORM IN CHROME
   // ----------------------------------------------------
-  const handlePrintInChrome = () => {
+  const handlePrintInChrome = async () => {
     if (!activeRecord) return;
 
     setIsPrinted(true);
@@ -541,6 +645,28 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
         printWin.print();
       }
       return;
+    }
+
+    if (activeRecord.driveFileId.startsWith('local-')) {
+      try {
+        const pdfBlob = await generateMasterPdfBlob({
+          templateName: activeRecord.name,
+          category: activeRecord.docCategory,
+          propertyName: activeRecord.propertyName,
+          roomName: activeRecord.roomName,
+          tenantName: activeRecord.tenantName,
+          notes: activeRecord.notes,
+        });
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        const printWin = window.open(blobUrl, '_blank');
+        if (printWin) {
+          printWin.focus();
+          printWin.print();
+        }
+        return;
+      } catch (printBlobErr) {
+        console.warn('Could not generate print blob for local PDF:', printBlobErr);
+      }
     }
 
     const printUrl = `https://drive.google.com/file/d/${activeRecord.driveFileId}/preview`;
@@ -929,15 +1055,35 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
                       <div className="p-2 rounded-lg bg-rose-100 text-rose-700 group-hover:bg-rose-600 group-hover:text-white transition">
                         <ExternalLink className="w-5 h-5" />
                       </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800">
-                        Google Drive App
-                      </span>
+                      {activeRecord.driveFileId.startsWith('local-') ? (
+                        token && !authExpired ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+                            Auto-Sync & Open
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-zinc-200 text-zinc-700">
+                            Local PDF Preview
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800">
+                          Google Drive App
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs font-bold text-zinc-900">
-                      Open with Adobe Acrobat in Google Drive
+                      {activeRecord.driveFileId.startsWith('local-')
+                        ? token && !authExpired
+                          ? 'Sync & Open in Google Drive'
+                          : 'Open PDF in Chrome'
+                        : 'Open with Adobe Acrobat in Google Drive'}
                     </div>
                     <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">
-                      Opens the file directly in Google Drive. Click "Open with" &rarr; "Adobe Acrobat for Google Drive" to edit and autosave online.
+                      {activeRecord.driveFileId.startsWith('local-')
+                        ? token && !authExpired
+                          ? 'Uploads this customized form into your Google Drive and opens it directly with Adobe Acrobat.'
+                          : 'Opens this generated document in your browser viewer. Reconnect Google Drive to sync to cloud.'
+                        : 'Opens the file directly in Google Drive. Click "Open with" → "Adobe Acrobat for Google Drive" to edit and autosave online.'}
                     </p>
                   </button>
 

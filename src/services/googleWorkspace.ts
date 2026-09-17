@@ -965,10 +965,10 @@ Management: ___________________________ Date: {{today_date}}
   // ==========================================
 
   /**
-   * Uploads a PDF file directly to Google Drive via server proxy (bypassing browser CORS).
+   * Uploads a PDF file or Blob directly to Google Drive via server proxy (bypassing browser CORS).
    */
   static async uploadPdfToDrive(
-    file: File,
+    file: File | Blob,
     name: string,
     token: string
   ): Promise<{ id: string; name: string; webViewLink?: string; webContentLink?: string; size?: string }> {
@@ -977,7 +977,7 @@ Management: ___________________________ Date: {{today_date}}
       throw new Error('Google Workspace OAuth access token is required to upload to Drive.');
     }
 
-    const cleanName = (name || file.name).trim();
+    const cleanName = (name || (file instanceof File ? file.name : 'document.pdf')).trim();
 
     // Read file as base64 string
     const base64Data = await new Promise<string>((resolve, reject) => {
@@ -1065,6 +1065,11 @@ Management: ___________________________ Date: {{today_date}}
 
     return data;
   }
+
+  /**
+   * Alias for uploadPdfToDrive
+   */
+  static uploadDrivePdf = GoogleWorkspaceService.uploadPdfToDrive;
 
   /**
    * Renames an existing file in Google Drive to reflect Unit and Tenant.
