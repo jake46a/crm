@@ -173,19 +173,19 @@ export const DrivePdfManager: React.FC<DrivePdfManagerProps> = ({
 
   const loadSavedPdfs = () => {
     let list = GoogleWorkspaceService.getSavedDrivePdfs();
-    // If empty, initialize with realistic sample records for 1070 Yank Street
+    // If empty, initialize with realistic records for 1070 Yank Street using real room occupants
     if (list.length === 0) {
       const initialSeed: DrivePdfRecord[] = [
         {
           id: 'pdf-seed-1',
           driveFileId: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',
-          name: '[1070 Yank - Room 1] [David King] jdf101 - Demand for Compliance.pdf',
+          name: '[1070 Yank - Sunny Bedroom Suite] [Daniel Oliveira] jdf101 - Demand for Compliance.pdf',
           originalName: 'jdf101-Master.pdf',
           propertyId: 'prop-1070-yank',
-          propertyName: '1070 Yank Street',
-          roomId: 'room-1-main',
-          roomName: 'Room 1 - Main Floor Master',
-          tenantName: 'David King',
+          propertyName: '1070 Yank St',
+          roomId: 'room-1788994917927',
+          roomName: 'Sunny Bedroom Suite',
+          tenantName: 'Daniel Oliveira',
           docCategory: 'Colorado Eviction / Demand Notice',
           uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
           webViewLink: 'https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view',
@@ -196,13 +196,13 @@ export const DrivePdfManager: React.FC<DrivePdfManagerProps> = ({
         {
           id: 'pdf-seed-2',
           driveFileId: '1zU3z4tP9m8Q7r6w5e4r3t2y1u0i9o8p',
-          name: '[1070 Yank - Room 2] [Sarah Jenkins] Move-In Condition Inspection.pdf',
+          name: '[1070 Yank - Lower North-West Bedroom] [Jordan Bends] Move-In Condition Inspection.pdf',
           originalName: 'Move-In-Condition-Checklist-Master.pdf',
           propertyId: 'prop-1070-yank',
-          propertyName: '1070 Yank Street',
-          roomId: 'room-2-upper',
-          roomName: 'Room 2 - Upper West',
-          tenantName: 'Sarah Jenkins',
+          propertyName: '1070 Yank St',
+          roomId: 'room-1789010716978',
+          roomName: 'Lower North-West Bedroom',
+          tenantName: 'Jordan Bends',
           docCategory: 'Move-In Inspection Report',
           uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
           webViewLink: 'https://drive.google.com/file/d/1zU3z4tP9m8Q7r6w5e4r3t2y1u0i9o8p/view',
@@ -213,13 +213,13 @@ export const DrivePdfManager: React.FC<DrivePdfManagerProps> = ({
         {
           id: 'pdf-seed-3',
           driveFileId: '1q2w3e4r5t6y7u8i9o0p_id_verification',
-          name: '[1070 Yank - Room 3] [Marcus Cole] Colorado Residential Lease.pdf',
+          name: '[1070 Yank - North Bedroom] [Carlos Adrian Rea] Colorado Residential Lease.pdf',
           originalName: 'Colorado-Residential-Lease-Master.pdf',
           propertyId: 'prop-1070-yank',
-          propertyName: '1070 Yank Street',
-          roomId: 'room-3-garden',
-          roomName: 'Room 3 - Garden Level Studio',
-          tenantName: 'Marcus Cole',
+          propertyName: '1070 Yank St',
+          roomId: 'room-1789010950929',
+          roomName: 'North Bedroom',
+          tenantName: 'Carlos Adrian Rea',
           docCategory: 'Standard Residential Lease',
           uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
           webViewLink: 'https://drive.google.com/file/d/1q2w3e4r5t6y7u8i9o0p_id_verification/view',

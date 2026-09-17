@@ -20,6 +20,7 @@ import {
   DrivePdfRecord,
   GoogleWorkspaceService,
 } from '../../services/googleWorkspace';
+import { getTenantFullName, formatFullName } from '../../utils/nameUtils';
 
 interface PdfTagRenameModalProps {
   isOpen: boolean;
@@ -52,6 +53,7 @@ export const PdfTagRenameModal: React.FC<PdfTagRenameModalProps> = ({
   pdfRecord,
   properties,
   rooms,
+  contacts = [],
   leads = [],
   token,
   onSuccess,
@@ -99,22 +101,83 @@ export const PdfTagRenameModal: React.FC<PdfTagRenameModalProps> = ({
 
   if (!isOpen || !pdfRecord) return null;
 
+  // Helper to resolve occupant tenant name and status for a room
+  const resolveRoomTenant = (
+    room?: Room | null
+  ): { name: string; isOccupied: boolean } => {
+    if (!room) return { name: '', isOccupied: false };
+
+    const directFullName = getTenantFullName(room);
+    if (
+      directFullName &&
+      !['vacant', 'available'].includes(directFullName.toLowerCase().trim())
+    ) {
+      return { name: directFullName, isOccupied: true };
+    }
+
+    if (room.currentTenantName && typeof room.currentTenantName === 'string') {
+      const trimmed = room.currentTenantName.trim();
+      if (trimmed && !['vacant', 'available'].includes(trimmed.toLowerCase())) {
+        return { name: trimmed, isOccupied: true };
+      }
+    }
+
+    const formatted = formatFullName(
+      room.currentTenantFirstName,
+      room.currentTenantLastName
+    );
+    if (formatted) {
+      return { name: formatted, isOccupied: true };
+    }
+
+    if (room.currentTenantId && contacts.length > 0) {
+      const matchedContact = contacts.find((c) => c.id === room.currentTenantId);
+      if (matchedContact) {
+        const cName = getTenantFullName(matchedContact);
+        if (cName) return { name: cName, isOccupied: true };
+      }
+    }
+
+    if (contacts.length > 0) {
+      const matchedContact = contacts.find(
+        (c) => c.roomId === room.id && (c.type === 'Tenant' || c.status === 'Active')
+      );
+      if (matchedContact) {
+        const cName = getTenantFullName(matchedContact);
+        if (cName) return { name: cName, isOccupied: true };
+      }
+    }
+
+    const isOccupied = room.status === 'Occupied';
+    return { name: isOccupied ? 'Occupied Resident' : '', isOccupied };
+  };
+
   // Filtered rooms for selected property
   const propertyRooms = rooms.filter(r => r.propertyId === selectedPropertyId);
   const currentProperty = properties.find(p => p.id === selectedPropertyId);
   const currentRoom = rooms.find(r => r.id === selectedRoomId);
+  const currentRoomOccupant = resolveRoomTenant(currentRoom);
 
-  // Suggested tenants from current room occupant + leads
+  // Suggested tenants from current room occupant + real CRM contacts + leads
   const suggestedTenants = new Set<string>();
-  if (currentRoom?.tenant?.name) {
-    suggestedTenants.add(currentRoom.tenant.name);
+  if (currentRoomOccupant.name) {
+    suggestedTenants.add(currentRoomOccupant.name);
   }
-  leads.forEach(l => {
-    if (l.name) suggestedTenants.add(l.name);
-  });
-  // Also collect tenants from all rooms of this property
   propertyRooms.forEach(r => {
-    if (r.tenant?.name) suggestedTenants.add(r.tenant.name);
+    const occ = resolveRoomTenant(r);
+    if (occ.name) suggestedTenants.add(occ.name);
+  });
+  contacts.forEach(c => {
+    if (c.type === 'Tenant' && (!selectedPropertyId || !c.propertyId || c.propertyId === selectedPropertyId)) {
+      const name = getTenantFullName(c);
+      if (name) suggestedTenants.add(name);
+    }
+  });
+  leads.forEach(l => {
+    if (!selectedPropertyId || !l.preferredPropertyIds?.length || l.preferredPropertyIds.includes(selectedPropertyId)) {
+      const name = getTenantFullName(l);
+      if (name) suggestedTenants.add(name);
+    }
   });
 
   // Calculate formatted standard filename
@@ -337,18 +400,24 @@ export const PdfTagRenameModal: React.FC<PdfTagRenameModalProps> = ({
                   const rId = e.target.value;
                   setSelectedRoomId(rId);
                   const roomObj = rooms.find(r => r.id === rId);
-                  if (roomObj?.tenant?.name && !tenantNameInput) {
-                    setTenantNameInput(roomObj.tenant.name);
+                  if (roomObj) {
+                    const occ = resolveRoomTenant(roomObj);
+                    if (occ.name && !tenantNameInput) {
+                      setTenantNameInput(occ.name);
+                    }
                   }
                 }}
                 className="w-full p-2.5 bg-white border border-zinc-300 rounded-lg text-xs text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               >
                 <option value="">-- Whole Property / Common Area --</option>
-                {propertyRooms.map(r => (
-                  <option key={r.id} value={r.id}>
-                    {r.name} {r.tenant?.name ? `(${r.tenant.name})` : '(Vacant)'}
-                  </option>
-                ))}
+                {propertyRooms.map(r => {
+                  const occ = resolveRoomTenant(r);
+                  return (
+                    <option key={r.id} value={r.id}>
+                      {r.name} {occ.name ? `(${occ.name})` : occ.isOccupied ? '(Occupied)' : '(Vacant)'}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>
@@ -360,13 +429,13 @@ export const PdfTagRenameModal: React.FC<PdfTagRenameModalProps> = ({
                 <User className="w-3.5 h-3.5 text-zinc-500" />
                 Resident / Tenant Name
               </span>
-              {currentRoom?.tenant?.name && (
+              {currentRoomOccupant.name && (
                 <button
                   type="button"
-                  onClick={() => setTenantNameInput(currentRoom.tenant.name)}
+                  onClick={() => setTenantNameInput(currentRoomOccupant.name)}
                   className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold"
                 >
-                  Use Room Resident: {currentRoom.tenant.name}
+                  Use Room Resident: {currentRoomOccupant.name}
                 </button>
               )}
             </label>
@@ -375,7 +444,7 @@ export const PdfTagRenameModal: React.FC<PdfTagRenameModalProps> = ({
               id="input-pdf-tenant-name"
               value={tenantNameInput}
               onChange={(e) => setTenantNameInput(e.target.value)}
-              placeholder="e.g. John Doe"
+              placeholder="e.g. Daniel Oliveira"
               className="w-full p-2.5 bg-white border border-zinc-300 rounded-lg text-xs text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
 

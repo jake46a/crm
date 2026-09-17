@@ -1257,9 +1257,24 @@ Management: ___________________________ Date: {{today_date}}
     try {
       const raw = localStorage.getItem(STORAGE_KEY_DRIVE_PDFS);
       if (!raw) return [];
-      return JSON.parse(raw);
+      const list: DrivePdfRecord[] = JSON.parse(raw);
+      // Clean out obsolete sample records
+      return list.filter(r => 
+        !['david king', 'sarah jenkins', 'marcus cole', 'elena rostova', 'tyler vance', 'jordan lee'].includes((r.tenantName || '').toLowerCase().trim())
+      );
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * Overwrites all saved Drive PDF records in localStorage
+   */
+  static setSavedDrivePdfs(records: DrivePdfRecord[]): void {
+    try {
+      localStorage.setItem(STORAGE_KEY_DRIVE_PDFS, JSON.stringify(records));
+    } catch (e) {
+      console.warn('Failed to save drive pdf records to localStorage:', e);
     }
   }
 

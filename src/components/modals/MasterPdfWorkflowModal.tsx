@@ -24,6 +24,7 @@ import {
   DrivePdfRecord,
   GoogleWorkspaceService,
 } from '../../services/googleWorkspace';
+import { getTenantFullName, formatFullName } from '../../utils/nameUtils';
 
 export interface MasterPdfTemplate {
   id: string;
@@ -55,6 +56,7 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
   existingRecord,
   properties,
   rooms,
+  contacts = [],
   leads = [],
   token,
   onConnectGoogle,
@@ -171,22 +173,98 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Helper to resolve the occupant tenant name and status for a room
+  const resolveRoomTenant = (
+    room?: Room | null
+  ): { name: string; isOccupied: boolean } => {
+    if (!room) return { name: '', isOccupied: false };
+
+    // 1. Direct name fields on room
+    const directFullName = getTenantFullName(room);
+    if (
+      directFullName &&
+      !['vacant', 'available'].includes(directFullName.toLowerCase().trim())
+    ) {
+      return { name: directFullName, isOccupied: true };
+    }
+
+    if (room.currentTenantName && typeof room.currentTenantName === 'string') {
+      const trimmed = room.currentTenantName.trim();
+      if (trimmed && !['vacant', 'available'].includes(trimmed.toLowerCase())) {
+        return { name: trimmed, isOccupied: true };
+      }
+    }
+
+    const formatted = formatFullName(
+      room.currentTenantFirstName,
+      room.currentTenantLastName
+    );
+    if (formatted) {
+      return { name: formatted, isOccupied: true };
+    }
+
+    // 2. Match via currentTenantId in contacts
+    if (room.currentTenantId && contacts.length > 0) {
+      const matchedContact = contacts.find((c) => c.id === room.currentTenantId);
+      if (matchedContact) {
+        const cName = getTenantFullName(matchedContact);
+        if (cName) return { name: cName, isOccupied: true };
+      }
+    }
+
+    // 3. Match via roomId in contacts
+    if (contacts.length > 0) {
+      const matchedContact = contacts.find(
+        (c) => c.roomId === room.id && (c.type === 'Tenant' || c.status === 'Active')
+      );
+      if (matchedContact) {
+        const cName = getTenantFullName(matchedContact);
+        if (cName) return { name: cName, isOccupied: true };
+      }
+    }
+
+    // 4. Room status indicator
+    const isOccupied = room.status === 'Occupied';
+    return { name: isOccupied ? 'Occupied Resident' : '', isOccupied };
+  };
+
   const currentPropertyRooms = rooms.filter(
     (r) => !selectedPropertyId || r.propertyId === selectedPropertyId
   );
 
-  // Available tenants from rooms or leads
+  // Available tenants strictly from actual rooms, CRM contacts, and leads
   const availableTenants: string[] = Array.from(
     new Set([
-      ...currentPropertyRooms.map((r) => r.currentTenant).filter(Boolean),
-      ...leads.map((l) => l.name).filter(Boolean),
-      'David King',
-      'Sarah Jenkins',
-      'Marcus Cole',
-      'Elena Rostova',
-      'Tyler Vance',
-      'Jordan Lee',
+      // Current property rooms occupants
+      ...currentPropertyRooms.map((r) => resolveRoomTenant(r).name).filter(Boolean),
+      // All real active contacts of type Tenant (filtered by property if selected)
+      ...contacts
+        .filter(
+          (c) =>
+            c.type === 'Tenant' &&
+            (!selectedPropertyId || !c.propertyId || c.propertyId === selectedPropertyId)
+        )
+        .map((c) => getTenantFullName(c))
+        .filter(Boolean),
+      // Active leads
+      ...leads
+        .filter(
+          (l) =>
+            !selectedPropertyId ||
+            !l.preferredPropertyIds?.length ||
+            l.preferredPropertyIds.includes(selectedPropertyId)
+        )
+        .map((l) => getTenantFullName(l))
+        .filter(Boolean),
+      // All room occupants across properties
+      ...rooms.map((r) => resolveRoomTenant(r).name).filter(Boolean),
     ])
+  ).filter(
+    (name) =>
+      Boolean(name) &&
+      !['david king', 'sarah jenkins', 'marcus cole', 'elena rostova', 'tyler vance', 'jordan lee', 'sample resident'].includes(
+        name.toLowerCase().trim()
+      )
   ) as string[];
 
   // ----------------------------------------------------
@@ -563,20 +641,27 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
                   <select
                     value={selectedRoomId}
                     onChange={(e) => {
-                      setSelectedRoomId(e.target.value);
-                      const room = rooms.find((r) => r.id === e.target.value);
-                      if (room?.currentTenant && !tenantNameInput) {
-                        setTenantNameInput(room.currentTenant);
+                      const newRoomId = e.target.value;
+                      setSelectedRoomId(newRoomId);
+                      const room = rooms.find((r) => r.id === newRoomId);
+                      if (room) {
+                        const occupant = resolveRoomTenant(room);
+                        if (occupant.name) {
+                          setTenantNameInput(occupant.name);
+                        }
                       }
                     }}
                     className="w-full p-2.5 bg-white border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 focus:ring-2 focus:ring-rose-500 focus:outline-none"
                   >
                     <option value="">-- General Property Level --</option>
-                    {currentPropertyRooms.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name} {r.currentTenant ? `(${r.currentTenant})` : '(Vacant)'}
-                      </option>
-                    ))}
+                    {currentPropertyRooms.map((r) => {
+                      const occupant = resolveRoomTenant(r);
+                      return (
+                        <option key={r.id} value={r.id}>
+                          {r.name} {occupant.name ? `(${occupant.name})` : occupant.isOccupied ? '(Occupied)' : '(Vacant)'}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -590,13 +675,13 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
                     type="text"
                     value={tenantNameInput}
                     onChange={(e) => setTenantNameInput(e.target.value)}
-                    placeholder="e.g. David King"
+                    placeholder="e.g. Daniel Oliveira"
                     className="w-full p-2.5 bg-white border border-zinc-300 rounded-lg text-xs text-zinc-900 font-medium focus:ring-2 focus:ring-rose-500 focus:outline-none"
                   />
                   {availableTenants.length > 0 && (
                     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                       <span className="text-[10px] text-zinc-400 font-semibold">Quick pick:</span>
-                      {availableTenants.slice(0, 4).map((t) => (
+                      {availableTenants.slice(0, 6).map((t) => (
                         <button
                           key={t}
                           type="button"
