@@ -1097,6 +1097,13 @@ app.post('/api/google/upload-pdf', async (req: Request, res: Response) => {
 
     if (!driveRes.ok) {
       console.warn('Google Drive API upload rejected:', driveRes.status, data);
+      if (driveRes.status === 401) {
+        return res.status(401).json({
+          error: 'Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.',
+          code: 'UNAUTHENTICATED',
+          details: data.error
+        });
+      }
       const errMsg = data.error?.message || `Google Drive upload error (${driveRes.status})`;
       return res.status(driveRes.status).json({
         error: errMsg,
@@ -1145,6 +1152,13 @@ app.patch('/api/google/rename-file', async (req: Request, res: Response) => {
     const data = (await driveRes.json().catch(() => ({}))) as any;
 
     if (!driveRes.ok) {
+      if (driveRes.status === 401) {
+        return res.status(401).json({
+          error: 'Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.',
+          code: 'UNAUTHENTICATED',
+          details: data.error
+        });
+      }
       return res.status(driveRes.status).json({
         error: data.error?.message || `Google Drive rename error (${driveRes.status})`,
         details: data.error
@@ -1225,6 +1239,13 @@ app.post('/api/google/copy-file', async (req: Request, res: Response) => {
     const data = (await driveRes.json().catch(() => ({}))) as any;
 
     if (!driveRes.ok) {
+      if (driveRes.status === 401) {
+        return res.status(401).json({
+          error: 'Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.',
+          code: 'UNAUTHENTICATED',
+          details: data.error
+        });
+      }
       return res.status(driveRes.status).json({
         error: data.error?.message || `Failed to copy Drive file (${driveRes.status})`
       });
@@ -1266,6 +1287,13 @@ app.get('/api/google/search-drive-pdfs', async (req: Request, res: Response) => 
     const data = (await driveRes.json().catch(() => ({}))) as any;
 
     if (!driveRes.ok) {
+      if (driveRes.status === 401) {
+        return res.status(401).json({
+          error: 'Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.',
+          code: 'UNAUTHENTICATED',
+          details: data.error
+        });
+      }
       return res.status(driveRes.status).json({
         error: data.error?.message || `Failed to search Google Drive (${driveRes.status})`
       });
@@ -1314,6 +1342,13 @@ app.patch('/api/google/replace-file-content', async (req: Request, res: Response
     const data = (await driveRes.json().catch(() => ({}))) as any;
 
     if (!driveRes.ok) {
+      if (driveRes.status === 401) {
+        return res.status(401).json({
+          error: 'Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.',
+          code: 'UNAUTHENTICATED',
+          details: data.error
+        });
+      }
       return res.status(driveRes.status).json({
         error: data.error?.message || `Failed to update file in Google Drive (${driveRes.status})`
       });

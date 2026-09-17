@@ -208,6 +208,42 @@ export class GoogleWorkspaceService {
   }
 
   /**
+   * Check if an error or status represents an expired or invalid OAuth token
+   */
+  static isAuthError(errOrMessage: any): boolean {
+    if (!errOrMessage) return false;
+    const msg = typeof errOrMessage === 'string'
+      ? errOrMessage
+      : (errOrMessage.message || errOrMessage.error || (typeof errOrMessage.details === 'string' ? errOrMessage.details : '') || JSON.stringify(errOrMessage));
+    const lower = msg.toLowerCase();
+    return (
+      lower.includes('invalid authentication credentials') ||
+      lower.includes('oauth 2 access token') ||
+      lower.includes('unauthenticated') ||
+      lower.includes('invalid_token') ||
+      lower.includes('status 401') ||
+      lower.includes(' 401') ||
+      lower.includes('"code":401') ||
+      lower.includes('unauthorized') ||
+      lower.includes('token has expired') ||
+      lower.includes('session has expired') ||
+      lower.includes('token expired') ||
+      lower.includes('login cookie or other valid authentication credential')
+    );
+  }
+
+  /**
+   * Handle an expired or invalid Google token: clear stale storage & dispatch event
+   */
+  static handleAuthExpired(err?: any) {
+    console.warn('[GoogleWorkspaceService] Google OAuth access token is expired or invalid (401). Purging stale token.');
+    this.disconnect();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('google-auth-expired', { detail: { error: err } }));
+    }
+  }
+
+  /**
    * Disconnect Workspace access
    */
   static disconnect() {
@@ -549,8 +585,16 @@ export class GoogleWorkspaceService {
       if (res.ok) {
         return data;
       }
+      if (res.status === 401 || this.isAuthError(data)) {
+        this.handleAuthExpired(data);
+        throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
+      }
       throw new Error(data.error || `Failed to copy Google Drive file (${res.status})`);
     } catch (err: any) {
+      if (this.isAuthError(err)) {
+        this.handleAuthExpired(err);
+        throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
+      }
       console.warn('Proxy copy failed, falling back to direct Google Drive API:', err);
       // Fallback to direct call if proxy fails
       const directRes = await fetch(
@@ -569,6 +613,10 @@ export class GoogleWorkspaceService {
 
       if (!directRes.ok) {
         const directErr = await directRes.json().catch(() => ({}));
+        if (directRes.status === 401 || this.isAuthError(directErr)) {
+          this.handleAuthExpired(directErr);
+          throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
+        }
         throw new Error(directErr.error?.message || err.message || `Failed to copy Google Drive file (${directRes.status})`);
       }
 
@@ -600,6 +648,10 @@ export class GoogleWorkspaceService {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      if (res.status === 401 || this.isAuthError(err)) {
+        this.handleAuthExpired(err);
+        throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
+      }
       throw new Error(err.error?.message || `Failed to create Google Doc (${res.status})`);
     }
 
@@ -678,6 +730,10 @@ export class GoogleWorkspaceService {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      if (res.status === 401 || this.isAuthError(err)) {
+        this.handleAuthExpired(err);
+        throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
+      }
       throw new Error(err.error?.message || `Failed to replace placeholders in Google Doc (${res.status})`);
     }
   }
@@ -704,6 +760,10 @@ export class GoogleWorkspaceService {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      if (res.status === 401 || this.isAuthError(err)) {
+        this.handleAuthExpired(err);
+        throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
+      }
       throw new Error(err.error?.message || `Failed to get Google Drive file (${res.status})`);
     }
 
@@ -952,15 +1012,17 @@ Management: ___________________________ Date: {{today_date}}
         data = await res.json().catch(() => ({}));
         proxySucceeded = true;
       } else if (res.status === 401) {
+        this.handleAuthExpired();
         throw new Error(
-          'Google Workspace OAuth session has expired or is unauthorized. Please click "Connect Google Drive" to re-authenticate.'
+          'Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.'
         );
       } else {
         console.warn(`Upload proxy returned HTTP ${res.status}. Falling back to direct Google Drive multipart upload...`);
       }
     } catch (networkErr: any) {
-      if (networkErr.message?.includes('OAuth') || networkErr.message?.includes('re-authenticate')) {
-        throw networkErr;
+      if (this.isAuthError(networkErr)) {
+        this.handleAuthExpired(networkErr);
+        throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
       }
       console.warn('Upload proxy failed, attempting direct Google Drive upload fallback:', networkErr);
     }
@@ -991,6 +1053,10 @@ Management: ___________________________ Date: {{today_date}}
 
       if (!directRes.ok) {
         const directErr = await directRes.json().catch(() => ({}));
+        if (directRes.status === 401 || this.isAuthError(directErr)) {
+          this.handleAuthExpired(directErr);
+          throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
+        }
         throw new Error(directErr.error?.message || `Failed to upload PDF to Google Drive (${directRes.status})`);
       }
 
@@ -1032,11 +1098,16 @@ Management: ___________________________ Date: {{today_date}}
       if (res.ok) {
         return data;
       }
-      if (res.status === 401) {
-        throw new Error('Google token expired. Please reconnect your Google account.');
+      if (res.status === 401 || this.isAuthError(data)) {
+        this.handleAuthExpired(data);
+        throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
       }
       throw new Error(data.error || `Failed to rename in Google Drive (${res.status})`);
     } catch (err: any) {
+      if (this.isAuthError(err)) {
+        this.handleAuthExpired(err);
+        throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
+      }
       // Direct fallback if proxy is unavailable
       const directRes = await fetch(`https://www.googleapis.com/drive/v3/files/${cleanFileId}?fields=id,name,webViewLink,webContentLink`, {
         method: 'PATCH',
@@ -1049,6 +1120,10 @@ Management: ___________________________ Date: {{today_date}}
 
       if (!directRes.ok) {
         const directErr = await directRes.json().catch(() => ({}));
+        if (directRes.status === 401 || this.isAuthError(directErr)) {
+          this.handleAuthExpired(directErr);
+          throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
+        }
         throw new Error(directErr.error?.message || err.message || `Failed to rename file in Google Drive (${directRes.status})`);
       }
 
@@ -1098,8 +1173,16 @@ Management: ___________________________ Date: {{today_date}}
         const data = await res.json();
         return data.files || [];
       }
+      if (res.status === 401) {
+        this.handleAuthExpired();
+        return [];
+      }
       throw new Error(`Drive search returned status ${res.status}`);
-    } catch (err) {
+    } catch (err: any) {
+      if (this.isAuthError(err)) {
+        this.handleAuthExpired(err);
+        return [];
+      }
       console.warn('Proxy search failed, falling back to direct:', err);
       try {
         let q = "mimeType = 'application/pdf' and trashed = false";
@@ -1114,6 +1197,10 @@ Management: ___________________________ Date: {{today_date}}
         if (directRes.ok) {
           const directData = await directRes.json();
           return directData.files || [];
+        }
+        if (directRes.status === 401) {
+          this.handleAuthExpired();
+          return [];
         }
       } catch (directErr) {
         console.warn('Direct search failed:', directErr);
@@ -1165,13 +1252,15 @@ Management: ___________________________ Date: {{today_date}}
         data = await res.json().catch(() => ({}));
         proxySucceeded = true;
       } else if (res.status === 401) {
-        throw new Error('Google Workspace OAuth session has expired. Please reconnect Google Drive.');
+        this.handleAuthExpired();
+        throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
       } else {
         console.warn(`Replace content proxy returned HTTP ${res.status}. Falling back to direct Google Drive media upload...`);
       }
     } catch (netErr: any) {
-      if (netErr.message?.includes('OAuth') || netErr.message?.includes('reconnect')) {
-        throw netErr;
+      if (this.isAuthError(netErr)) {
+        this.handleAuthExpired(netErr);
+        throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
       }
       console.warn('Replace content proxy failed, falling back to direct Google Drive media upload:', netErr);
     }
@@ -1192,6 +1281,10 @@ Management: ___________________________ Date: {{today_date}}
 
       if (!directRes.ok) {
         const directErr = await directRes.json().catch(() => ({}));
+        if (directRes.status === 401 || this.isAuthError(directErr)) {
+          this.handleAuthExpired(directErr);
+          throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
+        }
         throw new Error(directErr.error?.message || `Failed to replace PDF content in Google Drive (${directRes.status})`);
       }
 

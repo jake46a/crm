@@ -18,6 +18,8 @@ import {
   HelpCircle,
   Check,
   RotateCcw,
+  AlertTriangle,
+  Link2,
 } from 'lucide-react';
 import { Property, Room, Contact, TenantLead } from '../../types';
 import {
@@ -90,6 +92,23 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [authExpired, setAuthExpired] = useState<boolean>(false);
+  const [isReconnecting, setIsReconnecting] = useState<boolean>(false);
+
+  // Sync token state and listen for auth expiration events
+  useEffect(() => {
+    if (token) {
+      setAuthExpired(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    const handleAuthEvent = () => {
+      setAuthExpired(true);
+    };
+    window.addEventListener('google-auth-expired', handleAuthEvent);
+    return () => window.removeEventListener('google-auth-expired', handleAuthEvent);
+  }, []);
 
   // Replace file dropzone (Step 5)
   const [replaceFile, setReplaceFile] = useState<File | null>(null);
@@ -284,21 +303,30 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
       let driveFileId = 'local-' + Date.now();
       let webViewLink = `https://drive.google.com/file/d/${driveFileId}/view`;
       let webContentLink = '';
+      let cloudCopySuccess = false;
 
       // If user has token and template has a real Drive file ID, call /api/google/copy-file
-      if (token && selectedTemplate?.driveFileId) {
-        const copyRes = await GoogleWorkspaceService.copyDriveFile(
-          selectedTemplate.driveFileId,
-          cleanFileName,
-          token
-        );
-        driveFileId = copyRes.id || driveFileId;
-        webViewLink = copyRes.webViewLink || `https://drive.google.com/file/d/${driveFileId}/view`;
-        webContentLink = copyRes.webContentLink || '';
-      } else if (token) {
-        // If master is template, simulate cloud copy creation with real tracking
-        // In case there's an actual file in Drive matching the master name, we can also search or generate a copy record
-        console.log('Creating fresh renamed file tracking in Google Drive for master:', templateName);
+      if (token && selectedTemplate?.driveFileId && !selectedTemplate.driveFileId.startsWith('local-')) {
+        try {
+          const copyRes = await GoogleWorkspaceService.copyDriveFile(
+            selectedTemplate.driveFileId,
+            cleanFileName,
+            token
+          );
+          if (copyRes?.id) {
+            driveFileId = copyRes.id;
+            webViewLink = copyRes.webViewLink || `https://drive.google.com/file/d/${driveFileId}/view`;
+            webContentLink = copyRes.webContentLink || '';
+            cloudCopySuccess = true;
+          }
+        } catch (copyErr: any) {
+          console.warn('Could not copy file directly in Google Drive cloud:', copyErr);
+          if (GoogleWorkspaceService.isAuthError(copyErr)) {
+            setAuthExpired(true);
+          } else {
+            console.info('Master template remote file not accessible; creating tracked copy in PDF Vault.');
+          }
+        }
       }
 
       const newRecord: DrivePdfRecord = {
@@ -325,11 +353,23 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
       // Save into local storage vault
       GoogleWorkspaceService.saveDrivePdf(newRecord);
       setActiveRecord(newRecord);
-      setSuccessMessage(`Created copy in Google Drive: "${cleanFileName}"! Ready to fill in Adobe Acrobat.`);
+
+      if (cloudCopySuccess) {
+        setSuccessMessage(`Created copy in Google Drive: "${cleanFileName}"! Ready to fill in Adobe Acrobat.`);
+      } else if (authExpired) {
+        setSuccessMessage(`Created tracked copy: "${cleanFileName}" in PDF Vault! Ready to fill in Adobe Acrobat (Google Drive cloud sync skipped due to expired session).`);
+      } else {
+        setSuccessMessage(`Created tracked copy: "${cleanFileName}" in PDF Vault! Ready to fill in Adobe Acrobat.`);
+      }
       setCurrentStep(3); // Advance to Step 3 (Open in Adobe Acrobat)
     } catch (err: any) {
       console.error('Error copying master PDF:', err);
-      setErrorMessage(err.message || 'Failed to copy and rename master form in Google Drive.');
+      if (GoogleWorkspaceService.isAuthError(err)) {
+        setAuthExpired(true);
+        setErrorMessage('Your Google Workspace session has expired. You can reconnect below or continue in PDF Vault mode to fill and print right now.');
+      } else {
+        setErrorMessage(err.message || 'Failed to copy and rename master form in Google Drive.');
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -401,13 +441,22 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
     setSuccessMessage(null);
 
     try {
+      let remoteSynced = false;
       if (token && activeRecord.driveFileId && !activeRecord.driveFileId.startsWith('local-')) {
-        // Call /api/google/replace-file-content to update Drive file in-place
-        await GoogleWorkspaceService.replaceDrivePdfContent(
-          activeRecord.driveFileId,
-          replaceFile,
-          token
-        );
+        try {
+          // Call /api/google/replace-file-content to update Drive file in-place
+          await GoogleWorkspaceService.replaceDrivePdfContent(
+            activeRecord.driveFileId,
+            replaceFile,
+            token
+          );
+          remoteSynced = true;
+        } catch (syncErr: any) {
+          console.warn('Google Drive remote replacement failed:', syncErr);
+          if (GoogleWorkspaceService.isAuthError(syncErr)) {
+            setAuthExpired(true);
+          }
+        }
       }
 
       // Update local tracking
@@ -418,16 +467,38 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
         isFilled: true,
         sizeBytes: replaceFile.size,
         lastRenamedAt: new Date().toISOString(),
-        webViewLink: activeRecord.driveFileId.startsWith('local-') ? blobUrl : activeRecord.webViewLink,
+        webViewLink: activeRecord.driveFileId.startsWith('local-') || !remoteSynced ? blobUrl : activeRecord.webViewLink,
       };
 
       GoogleWorkspaceService.updateDrivePdfRecord(activeRecord.id, updated);
       setActiveRecord(updated);
-      setSuccessMessage(`Successfully replaced "${activeRecord.name}" with filled Adobe Acrobat version! Ready to print.`);
+      if (remoteSynced) {
+        setSuccessMessage(`Successfully replaced "${activeRecord.name}" with filled Adobe Acrobat version in Google Drive! Ready to print.`);
+      } else {
+        setSuccessMessage(`Filled PDF saved to your PDF Vault and ready to print!${authExpired ? ' (Google Drive cloud sync skipped due to expired session).' : ''}`);
+      }
       setCurrentStep(6); // Advance to Step 6 (Print)
     } catch (err: any) {
       console.error('Error replacing file content:', err);
-      setErrorMessage(err.message || 'Failed to replace file content in Google Drive.');
+      if (GoogleWorkspaceService.isAuthError(err)) {
+        setAuthExpired(true);
+        // Still save locally so user doesn't lose work!
+        const blobUrl = URL.createObjectURL(replaceFile);
+        const fallbackUpdated: DrivePdfRecord = {
+          ...activeRecord,
+          status: 'filled_and_saved',
+          isFilled: true,
+          sizeBytes: replaceFile.size,
+          lastRenamedAt: new Date().toISOString(),
+          webViewLink: blobUrl,
+        };
+        GoogleWorkspaceService.updateDrivePdfRecord(activeRecord.id, fallbackUpdated);
+        setActiveRecord(fallbackUpdated);
+        setSuccessMessage('Filled PDF saved to your PDF Vault and ready to print! (Google session expired).');
+        setCurrentStep(6);
+      } else {
+        setErrorMessage(err.message || 'Failed to replace file content in Google Drive.');
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -566,9 +637,37 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
 
         {/* Notifications */}
         {errorMessage && (
-          <div className="p-4 bg-rose-50 border-b border-rose-200 flex items-start gap-2.5 text-rose-800 text-xs font-medium">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
-            <div className="flex-1">{errorMessage}</div>
+          <div className="p-4 bg-rose-50 border-b border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-rose-800 text-xs font-medium">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+              <div className="flex-1">{errorMessage}</div>
+            </div>
+            {(authExpired || errorMessage.toLowerCase().includes('oauth') || errorMessage.toLowerCase().includes('reconnect') || errorMessage.toLowerCase().includes('credential')) && onConnectGoogle && (
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsReconnecting(true);
+                  try {
+                    await onConnectGoogle('jake@proweb.agency');
+                    setAuthExpired(false);
+                    setErrorMessage(null);
+                  } catch (e: any) {
+                    setErrorMessage(e.message || 'Failed to reconnect Google Drive.');
+                  } finally {
+                    setIsReconnecting(false);
+                  }
+                }}
+                disabled={isReconnecting}
+                className="px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded-lg font-bold text-[11px] shrink-0 transition flex items-center gap-1.5 shadow-xs"
+              >
+                {isReconnecting ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Link2 className="w-3.5 h-3.5" />
+                )}
+                <span>Reconnect Google Drive</span>
+              </button>
+            )}
           </div>
         )}
 
@@ -608,6 +707,39 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
                   </p>
                 </div>
               </div>
+
+              {(!token || authExpired) && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900 text-xs">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <div>
+                      <span className="font-bold">Google Drive Status:</span>{' '}
+                      {authExpired ? 'Session expired or needs re-authentication.' : 'Not currently connected.'}{' '}
+                      <span className="text-amber-800">You can reconnect or continue directly to fill and print right now.</span>
+                    </div>
+                  </div>
+                  {onConnectGoogle && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setIsReconnecting(true);
+                        try {
+                          await onConnectGoogle('jake@proweb.agency');
+                          setAuthExpired(false);
+                          setErrorMessage(null);
+                        } finally {
+                          setIsReconnecting(false);
+                        }
+                      }}
+                      disabled={isReconnecting}
+                      className="px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded-lg font-bold text-[11px] shrink-0 transition flex items-center gap-1.5 shadow-xs"
+                    >
+                      {isReconnecting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
+                      <span>Reconnect Google Drive</span>
+                    </button>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Property */}
