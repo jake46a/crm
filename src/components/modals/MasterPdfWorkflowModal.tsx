@@ -48,7 +48,7 @@ interface MasterPdfWorkflowModalProps {
   contacts?: Contact[];
   leads?: TenantLead[];
   token: string | null;
-  onConnectGoogle?: () => void;
+  onConnectGoogle?: (email?: string) => Promise<any> | void;
   onWorkflowComplete: (record: DrivePdfRecord) => void;
 }
 
@@ -95,6 +95,24 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [authExpired, setAuthExpired] = useState<boolean>(false);
   const [isReconnecting, setIsReconnecting] = useState<boolean>(false);
+  const [copiedOrigin, setCopiedOrigin] = useState<boolean>(false);
+  const [copiedHostname, setCopiedHostname] = useState<boolean>(false);
+
+  const handleCopyOrigin = () => {
+    if (typeof window !== 'undefined') {
+      navigator.clipboard.writeText(window.location.origin);
+      setCopiedOrigin(true);
+      setTimeout(() => setCopiedOrigin(false), 2500);
+    }
+  };
+
+  const handleCopyHostname = () => {
+    if (typeof window !== 'undefined') {
+      navigator.clipboard.writeText(window.location.hostname);
+      setCopiedHostname(true);
+      setTimeout(() => setCopiedHostname(false), 2500);
+    }
+  };
 
   // Sync token state and listen for auth expiration events
   useEffect(() => {
@@ -763,36 +781,102 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
 
         {/* Notifications */}
         {errorMessage && (
-          <div className="p-4 bg-rose-50 border-b border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-rose-800 text-xs font-medium">
-            <div className="flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
-              <div className="flex-1">{errorMessage}</div>
+          <div className="p-4 bg-rose-50 border-b border-rose-200 space-y-2 text-rose-800 text-xs font-medium">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+                <div className="flex-1">{errorMessage}</div>
+              </div>
+              {(authExpired || errorMessage.toLowerCase().includes('oauth') || errorMessage.toLowerCase().includes('reconnect') || errorMessage.toLowerCase().includes('credential') || errorMessage.toLowerCase().includes('origin')) && onConnectGoogle && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsReconnecting(true);
+                    try {
+                      await onConnectGoogle('info@1070yankstreet.com');
+                      setAuthExpired(false);
+                      setErrorMessage(null);
+                    } catch (e: any) {
+                      setErrorMessage(e.message || 'Failed to reconnect Google Drive.');
+                    } finally {
+                      setIsReconnecting(false);
+                    }
+                  }}
+                  disabled={isReconnecting}
+                  className="px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded-lg font-bold text-[11px] shrink-0 transition flex items-center gap-1.5 shadow-xs"
+                >
+                  {isReconnecting ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Link2 className="w-3.5 h-3.5" />
+                  )}
+                  <span>Sign In with Google</span>
+                </button>
+              )}
             </div>
-            {(authExpired || errorMessage.toLowerCase().includes('oauth') || errorMessage.toLowerCase().includes('reconnect') || errorMessage.toLowerCase().includes('credential')) && onConnectGoogle && (
-              <button
-                type="button"
-                onClick={async () => {
-                  setIsReconnecting(true);
-                  try {
-                    await onConnectGoogle('jake@proweb.agency');
-                    setAuthExpired(false);
-                    setErrorMessage(null);
-                  } catch (e: any) {
-                    setErrorMessage(e.message || 'Failed to reconnect Google Drive.');
-                  } finally {
-                    setIsReconnecting(false);
-                  }
-                }}
-                disabled={isReconnecting}
-                className="px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded-lg font-bold text-[11px] shrink-0 transition flex items-center gap-1.5 shadow-xs"
-              >
-                {isReconnecting ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Link2 className="w-3.5 h-3.5" />
-                )}
-                <span>Reconnect Google Drive</span>
-              </button>
+
+            {/* Error 400: origin_mismatch / Domain Authorization Quick Fix helper */}
+            {(errorMessage.toLowerCase().includes('origin_mismatch') ||
+              errorMessage.toLowerCase().includes('origin') ||
+              errorMessage.toLowerCase().includes('authorization needed') ||
+              errorMessage.toLowerCase().includes('unauthorized') ||
+              errorMessage.includes('400')) && (
+              <div className="bg-white p-3 rounded-lg border border-rose-300 text-zinc-800 space-y-2 mt-2">
+                <p className="font-bold text-rose-950 text-xs">Authorize Cloudflare / Custom Domain:</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="bg-rose-50/70 p-2.5 rounded border border-rose-200 flex flex-col justify-between gap-1.5">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-zinc-500">1. Domain for Firebase Console:</span>
+                      <p className="font-mono text-xs font-bold text-zinc-900 break-all">{typeof window !== 'undefined' ? window.location.hostname : ''}</p>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleCopyHostname}
+                        className="px-2.5 py-1 bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-300 rounded font-semibold text-xs shadow-2xs flex items-center gap-1 transition shrink-0"
+                      >
+                        {copiedHostname ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedHostname ? 'Copied!' : 'Copy Domain'}</span>
+                      </button>
+                      <a
+                        href="https://console.firebase.google.com/project/gen-lang-client-0724686590/authentication/settings"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] text-blue-600 hover:underline font-semibold inline-flex items-center gap-0.5"
+                      >
+                        <span>Firebase Settings</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="bg-rose-50/70 p-2.5 rounded border border-rose-200 flex flex-col justify-between gap-1.5">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-zinc-500">2. Origin for Google Cloud:</span>
+                      <p className="font-mono text-xs font-bold text-zinc-900 break-all">{typeof window !== 'undefined' ? window.location.origin : ''}</p>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleCopyOrigin}
+                        className="px-2.5 py-1 bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-300 rounded font-semibold text-xs shadow-2xs flex items-center gap-1 transition shrink-0"
+                      >
+                        {copiedOrigin ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedOrigin ? 'Copied!' : 'Copy Origin'}</span>
+                      </button>
+                      <a
+                        href="https://console.cloud.google.com/apis/credentials?project=gen-lang-client-0724686590"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] text-blue-600 hover:underline font-semibold inline-flex items-center gap-0.5"
+                      >
+                        <span>Google Credentials</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -850,7 +934,7 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
                       onClick={async () => {
                         setIsReconnecting(true);
                         try {
-                          await onConnectGoogle('jake@proweb.agency');
+                          await onConnectGoogle('info@1070yankstreet.com');
                           setAuthExpired(false);
                           setErrorMessage(null);
                         } finally {

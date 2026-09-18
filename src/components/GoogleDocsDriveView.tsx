@@ -78,6 +78,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
   const [customClientId, setCustomClientId] = useState<string>(GoogleWorkspaceService.getClientId());
   const [showSettings, setShowSettings] = useState(false);
   const [copiedOrigin, setCopiedOrigin] = useState(false);
+  const [copiedHostname, setCopiedHostname] = useState(false);
   const [centerTab, setCenterTab] = useState<'docs_generator' | 'drive_pdfs'>('docs_generator');
 
   const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
@@ -306,8 +307,32 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
     }
   };
 
-  // Connect via Google Identity Services (GIS Token Client)
+  // Smart Connect: Uses Firebase Auth as primary to avoid GIS origin_mismatch, falls back to GIS if needed
   const handleConnectGoogle = async (loginHint: string = 'info@1070yankstreet.com') => {
+    setIsConnecting(true);
+    setAuthError(null);
+    try {
+      const res = await GoogleWorkspaceService.requestAccessTokenSmart(loginHint, customClientId);
+      setToken(res.accessToken);
+      setUser(res.user || null);
+    } catch (err: any) {
+      console.error('Google Workspace Auth error:', err);
+      const errMsg = err.message || '';
+      if (errMsg.toLowerCase().includes('origin_mismatch') || errMsg.toLowerCase().includes('origin') || errMsg.includes('400')) {
+        setAuthError(
+          `Google OAuth Error 400: origin_mismatch. Origin "${currentOrigin}" must be added to Authorized JavaScript Origins in Google Cloud Console, or use Firebase Auth sign-in.`
+        );
+        setShowSettings(true);
+      } else {
+        setAuthError(errMsg || 'Failed to connect to Google Workspace.');
+      }
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  // Explicit Direct GIS Client
+  const handleConnectGIS = async (loginHint: string = 'info@1070yankstreet.com') => {
     setIsConnecting(true);
     setAuthError(null);
     try {
@@ -315,14 +340,15 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
       setToken(res.accessToken);
       setUser(res.user || null);
     } catch (err: any) {
-      console.error('Google Workspace Auth error:', err);
+      console.error('Google Workspace GIS Auth error:', err);
       const errMsg = err.message || '';
-      if (errMsg.toLowerCase().includes('origin_mismatch') || errMsg.toLowerCase().includes('origin')) {
+      if (errMsg.toLowerCase().includes('origin_mismatch') || errMsg.toLowerCase().includes('origin') || errMsg.includes('400')) {
         setAuthError(
-          `Google OAuth Error 400: origin_mismatch. Your current origin "${currentOrigin}" must be added to Authorized JavaScript Origins in Google Cloud Console, or connect via Firebase Auth.`
+          `Google OAuth Error 400: origin_mismatch. Origin "${currentOrigin}" is not registered in Google Cloud Console. Click "Copy Origin" below to register it, or click "Sign In with Google (Firebase)".`
         );
+        setShowSettings(true);
       } else {
-        setAuthError(errMsg || 'Failed to connect to Google Workspace. Please check your popup blocker.');
+        setAuthError(errMsg || 'Failed to connect via Google Identity Services.');
       }
     } finally {
       setIsConnecting(false);
@@ -334,6 +360,14 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
       navigator.clipboard.writeText(currentOrigin);
       setCopiedOrigin(true);
       setTimeout(() => setCopiedOrigin(false), 2500);
+    }
+  };
+
+  const handleCopyHostname = () => {
+    if (navigator.clipboard && currentHostname) {
+      navigator.clipboard.writeText(currentHostname);
+      setCopiedHostname(true);
+      setTimeout(() => setCopiedHostname(false), 2500);
     }
   };
 
@@ -414,7 +448,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
   // 1-Click Create Starter Template in Google Drive
   const handleCreateStarterTemplateInDrive = async (tpl: DocumentTemplateConfig) => {
     if (!token) {
-      handleConnectGoogle('jake@1070yankstreet.com');
+      handleConnectGoogle('info@1070yankstreet.com');
       return;
     }
 
@@ -459,7 +493,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
   // Execute Auto-Fill and Save Document in Google Drive
   const handleGenerateDocument = async () => {
     if (!token || !String(token).trim()) {
-      handleConnectGoogle('jake@1070yankstreet.com');
+      handleConnectGoogle('info@1070yankstreet.com');
       return;
     }
 
@@ -697,7 +731,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
 
                 {/* Secondary Button: Direct GIS Client */}
                 <button
-                  onClick={() => handleConnectGoogle('info@1070yankstreet.com')}
+                  onClick={() => handleConnectGIS('info@1070yankstreet.com')}
                   disabled={isConnecting}
                   className="px-3 py-2 text-xs font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 rounded-lg transition-colors flex items-center gap-1.5"
                   title="Direct Google Identity Services popup (requires origin registered in Google Cloud Console)"
@@ -737,42 +771,93 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
                 </div>
               </div>
 
-              {/* Current Detected Origin */}
-              <div className="bg-white p-3 rounded border border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400">Current Detected JavaScript Origin:</span>
-                  <div className="font-mono text-xs font-semibold text-zinc-800 break-all">{currentOrigin || 'Loading...'}</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleCopyOrigin}
-                  className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-semibold text-xs rounded border border-zinc-300 transition flex items-center gap-1.5 shrink-0"
-                >
-                  {copiedOrigin ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-zinc-600" />}
-                  <span>{copiedOrigin ? 'Copied!' : 'Copy Origin'}</span>
-                </button>
-              </div>
-
-              {/* Instructions list */}
-              <div className="text-[11px] text-zinc-600 space-y-1 bg-blue-50/60 p-3 rounded border border-blue-100">
-                <p className="font-bold text-blue-900">How to resolve Error 400: origin_mismatch in Google Cloud Console:</p>
-                <ol className="list-decimal list-inside space-y-1 text-zinc-700">
-                  <li>Copy your current origin above (<span className="font-mono font-medium">{currentOrigin}</span>).</li>
-                  <li>
-                    Open{' '}
+              {/* Current Detected Origin and Domain for Cloudflare / Custom Domains */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="bg-white p-3 rounded border border-zinc-200 flex flex-col justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-blue-700">1. Domain for Firebase Console:</span>
+                    <div className="font-mono text-xs font-semibold text-zinc-900 break-all mt-0.5">{currentHostname || 'Loading...'}</div>
+                    <p className="text-[10px] text-zinc-500 mt-1">Required for Firebase Google sign-in</p>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleCopyHostname}
+                      className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 font-semibold text-xs rounded border border-blue-200 transition flex items-center gap-1.5"
+                    >
+                      {copiedHostname ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-blue-600" />}
+                      <span>{copiedHostname ? 'Copied!' : 'Copy Domain'}</span>
+                    </button>
                     <a
-                      href="https://console.cloud.google.com/apis/credentials"
+                      href="https://console.firebase.google.com/project/gen-lang-client-0724686590/authentication/settings"
                       target="_blank"
                       rel="noreferrer"
-                      className="text-blue-600 hover:underline font-semibold inline-flex items-center gap-0.5"
+                      className="text-[11px] text-blue-600 hover:underline font-semibold inline-flex items-center gap-0.5"
                     >
-                      Google Cloud Console Credentials <ExternalLink className="w-3 h-3" />
-                    </a>.
-                  </li>
-                  <li>Click on your <strong>OAuth 2.0 Client ID</strong> (Web application).</li>
-                  <li>Scroll to <strong>Authorized JavaScript origins</strong>, click <strong>+ ADD URI</strong>, and paste your origin.</li>
-                  <li>Click <strong>Save</strong> (allow 2-5 minutes for Google to propagate changes).</li>
-                </ol>
+                      <span>Firebase Settings</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+
+                <div className="bg-white p-3 rounded border border-zinc-200 flex flex-col justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-600">2. Origin for Google Cloud Console:</span>
+                    <div className="font-mono text-xs font-semibold text-zinc-900 break-all mt-0.5">{currentOrigin || 'Loading...'}</div>
+                    <p className="text-[10px] text-zinc-500 mt-1">Required for Google Identity Services popup</p>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleCopyOrigin}
+                      className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-semibold text-xs rounded border border-zinc-300 transition flex items-center gap-1.5"
+                    >
+                      {copiedOrigin ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-zinc-600" />}
+                      <span>{copiedOrigin ? 'Copied!' : 'Copy Origin'}</span>
+                    </button>
+                    <a
+                      href="https://console.cloud.google.com/apis/credentials?project=gen-lang-client-0724686590"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] text-blue-600 hover:underline font-semibold inline-flex items-center gap-0.5"
+                    >
+                      <span>Google Credentials</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step by Step Instructions */}
+              <div className="text-[11px] text-zinc-600 space-y-2 bg-blue-50/70 p-3 rounded-lg border border-blue-200">
+                <p className="font-bold text-blue-950">Resolving Cloudflare Workers (`{currentHostname}`) OAuth setup:</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  <div className="bg-white/90 p-2.5 rounded border border-blue-200 text-zinc-700 space-y-1">
+                    <p className="font-bold text-blue-900 flex items-center gap-1">
+                      <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center">A</span>
+                      <span>Fastest: Firebase Authorized Domain (30 sec)</span>
+                    </p>
+                    <ol className="list-decimal list-inside space-y-0.5 text-[11px]">
+                      <li>Click <strong>Copy Domain</strong> above (<span className="font-mono font-medium">{currentHostname}</span>).</li>
+                      <li>Open <a href="https://console.firebase.google.com/project/gen-lang-client-0724686590/authentication/settings" target="_blank" rel="noreferrer" className="text-blue-600 underline font-semibold">Firebase Authentication Settings</a>.</li>
+                      <li>Scroll down to <strong>Authorized domains</strong> and click <strong>Add domain</strong>.</li>
+                      <li>Paste <span className="font-mono font-bold text-zinc-800">{currentHostname}</span> and save.</li>
+                    </ol>
+                  </div>
+
+                  <div className="bg-white/90 p-2.5 rounded border border-blue-200 text-zinc-700 space-y-1">
+                    <p className="font-bold text-blue-900 flex items-center gap-1">
+                      <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center">B</span>
+                      <span>Google Cloud JavaScript Origin (2 min)</span>
+                    </p>
+                    <ol className="list-decimal list-inside space-y-0.5 text-[11px]">
+                      <li>Click <strong>Copy Origin</strong> above (<span className="font-mono font-medium">{currentOrigin}</span>).</li>
+                      <li>Open <a href="https://console.cloud.google.com/apis/credentials?project=gen-lang-client-0724686590" target="_blank" rel="noreferrer" className="text-blue-600 underline font-semibold">Google Cloud Credentials</a>.</li>
+                      <li>Click the Web Client ID <span className="font-mono text-[10px] font-semibold">548380806773-hdq24r...</span></li>
+                      <li>Under <strong>Authorized JavaScript origins</strong>, click <strong>+ ADD URI</strong>, paste and save.</li>
+                    </ol>
+                  </div>
+                </div>
               </div>
 
               {/* Custom Client ID Input */}
@@ -805,40 +890,82 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
               </div>
             </div>
 
-            {(authError.toLowerCase().includes('origin_mismatch') || authError.toLowerCase().includes('origin') || authError.includes('400')) && (
-              <div className="bg-white/80 p-3 rounded border border-rose-200 space-y-2 text-zinc-700">
-                <p className="font-bold text-rose-950">Quick Fix for Cloudflare & Custom Domains:</p>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-rose-100/50 p-2 rounded border border-rose-200">
-                  <div>
-                    <span className="text-[10px] font-bold uppercase text-zinc-500">Origin to Register in Google Cloud Console:</span>
-                    <p className="font-mono text-xs font-bold text-zinc-900">{currentOrigin}</p>
+            {(authError.toLowerCase().includes('origin_mismatch') ||
+              authError.toLowerCase().includes('origin') ||
+              authError.toLowerCase().includes('authorization needed') ||
+              authError.toLowerCase().includes('unauthorized') ||
+              authError.includes('400')) && (
+              <div className="bg-white/90 p-3.5 rounded border border-rose-200 space-y-3 text-zinc-700">
+                <p className="font-bold text-rose-950">Domain Authorization for Cloudflare (`{currentHostname}`):</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="bg-rose-100/40 p-2.5 rounded border border-rose-200 flex flex-col justify-between gap-1.5">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-zinc-500">A. Domain for Firebase Console:</span>
+                      <p className="font-mono text-xs font-bold text-zinc-900 break-all">{currentHostname}</p>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleCopyHostname}
+                        className="px-2.5 py-1 bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-300 rounded font-semibold text-xs shadow-2xs flex items-center gap-1 transition shrink-0"
+                      >
+                        {copiedHostname ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedHostname ? 'Copied!' : 'Copy Domain'}</span>
+                      </button>
+                      <a
+                        href="https://console.firebase.google.com/project/gen-lang-client-0724686590/authentication/settings"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] text-blue-600 hover:underline font-semibold inline-flex items-center gap-0.5"
+                      >
+                        <span>Firebase Settings</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
                   </div>
-                  <button
-                    onClick={handleCopyOrigin}
-                    className="px-3 py-1 bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-300 rounded font-semibold text-xs shadow-2xs flex items-center gap-1.5 transition shrink-0"
-                  >
-                    {copiedOrigin ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedOrigin ? 'Copied!' : 'Copy Origin'}</span>
-                  </button>
+
+                  <div className="bg-rose-100/40 p-2.5 rounded border border-rose-200 flex flex-col justify-between gap-1.5">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-zinc-500">B. Origin for Google Cloud:</span>
+                      <p className="font-mono text-xs font-bold text-zinc-900 break-all">{currentOrigin}</p>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleCopyOrigin}
+                        className="px-2.5 py-1 bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-300 rounded font-semibold text-xs shadow-2xs flex items-center gap-1 transition shrink-0"
+                      >
+                        {copiedOrigin ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedOrigin ? 'Copied!' : 'Copy Origin'}</span>
+                      </button>
+                      <a
+                        href="https://console.cloud.google.com/apis/credentials?project=gen-lang-client-0724686590"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] text-blue-600 hover:underline font-semibold inline-flex items-center gap-0.5"
+                      >
+                        <span>Google Credentials</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2 pt-1 flex-wrap">
                   <button
                     onClick={() => handleConnectFirebase('info@1070yankstreet.com')}
                     disabled={isConnecting}
-                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs shadow-xs transition"
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs shadow-xs transition flex items-center gap-1.5"
                   >
-                    Try Sign-In via Firebase Auth
+                    <span>Retry via Firebase Auth</span>
                   </button>
-                  <a
-                    href="https://console.cloud.google.com/apis/credentials"
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    onClick={() => handleConnectGIS('info@1070yankstreet.com')}
+                    disabled={isConnecting}
                     className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded font-semibold text-xs border border-zinc-300 transition flex items-center gap-1"
                   >
-                    <span>Open Google Cloud Credentials</span>
-                    <ExternalLink className="w-3 h-3 text-zinc-500" />
-                  </a>
+                    <span>Retry via Google GIS</span>
+                  </button>
                 </div>
               </div>
             )}
@@ -898,7 +1025,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
           contacts={contacts}
           leads={leads}
           token={token}
-          onConnectGoogle={() => handleConnectGoogle('jake@1070yankstreet.com')}
+          onConnectGoogle={() => handleConnectGoogle('info@1070yankstreet.com')}
           userEmail={user?.email}
         />
       ) : (
@@ -1930,7 +2057,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
         editingTemplate={templateToEdit}
         onDelete={handleDeleteTemplate}
         token={token}
-        onConnectGoogle={() => handleConnectGoogle('jake@1070yankstreet.com')}
+        onConnectGoogle={() => handleConnectGoogle('info@1070yankstreet.com')}
       />
     </div>
   );

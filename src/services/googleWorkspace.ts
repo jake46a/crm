@@ -289,7 +289,7 @@ export class GoogleWorkspaceService {
     loginHint?: string
   ): Promise<{ accessToken: string; user?: GoogleWorkspaceUser }> {
     const provider = new GoogleAuthProvider();
-    // Add Google Docs & Drive scopes
+    // Add Google Docs, Drive & Contacts scopes
     SCOPES.forEach(scope => provider.addScope(scope));
 
     // Prompt consent so access tokens and offline scopes are granted
@@ -309,10 +309,10 @@ export class GoogleWorkspaceService {
       }
 
       const token = credential.accessToken;
-      this.saveToken(token, 3600, result.user.email || loginHint);
+      this.saveToken(token, 3600, result.user.email || loginHint || 'info@1070yankstreet.com');
 
       const profile: GoogleWorkspaceUser = {
-        email: result.user.email || loginHint || 'Connected Account',
+        email: result.user.email || loginHint || 'info@1070yankstreet.com',
         name: result.user.displayName || result.user.email?.split('@')[0] || 'Google User',
         picture: result.user.photoURL || undefined,
         connectedAt: new Date().toISOString(),
@@ -338,7 +338,7 @@ export class GoogleWorkspaceService {
    * Request Access Token via Google Identity Services popup
    */
   static requestAccessToken(
-    loginHint: string = 'jake@1070yankstreet.com',
+    loginHint: string = 'info@1070yankstreet.com',
     clientId: string = DEFAULT_OAUTH_CLIENT_ID
   ): Promise<{ accessToken: string; user?: GoogleWorkspaceUser }> {
     return new Promise((resolve, reject) => {
@@ -355,7 +355,13 @@ export class GoogleWorkspaceService {
           hint: loginHint || undefined,
           callback: async (response: any) => {
             if (response.error) {
-              return reject(new Error(response.error_description || response.error));
+              const errDesc = response.error_description || response.error;
+              if (errDesc.includes('origin_mismatch') || response.error === 'origin_mismatch') {
+                return reject(
+                  new Error(`Google OAuth Error 400: origin_mismatch. Register "${window.location.origin}" in Google Cloud Console -> APIs & Services -> Credentials -> OAuth 2.0 Client IDs -> Authorized JavaScript origins.`)
+                );
+              }
+              return reject(new Error(errDesc));
             }
             if (!response.access_token) {
               return reject(new Error('No access token returned from Google.'));
@@ -401,6 +407,44 @@ export class GoogleWorkspaceService {
         reject(err);
       }
     });
+  }
+
+  /**
+   * Smart token requester that uses Firebase Auth as primary to avoid GIS origin_mismatch,
+   * with graceful fallback to GIS when needed.
+   */
+  static async requestAccessTokenSmart(
+    loginHint: string = 'info@1070yankstreet.com',
+    clientId?: string
+  ): Promise<{ accessToken: string; user?: GoogleWorkspaceUser }> {
+    try {
+      const fbResult = await this.requestAccessTokenViaFirebaseAuth(loginHint);
+      return fbResult;
+    } catch (fbErr: any) {
+      console.warn('Firebase Auth request attempt failed, checking fallback:', fbErr);
+      if (fbErr.code === 'auth/popup-closed-by-user' || fbErr.message?.includes('closed-by-user')) {
+        throw fbErr;
+      }
+      // If Firebase Auth throws unauthorized domain or fails, try GIS
+      try {
+        return await this.requestAccessToken(loginHint, clientId || DEFAULT_OAUTH_CLIENT_ID);
+      } catch (gisErr: any) {
+        const currentHost = typeof window !== 'undefined' ? window.location.hostname : '';
+        const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+        const isDomainError =
+          fbErr.code === 'auth/unauthorized-domain' ||
+          fbErr.message?.includes('unauthorized-domain') ||
+          gisErr.message?.includes('origin_mismatch') ||
+          gisErr.message?.includes('400');
+
+        if (isDomainError) {
+          throw new Error(
+            `Authorization Needed for "${currentHost}". Cloudflare/custom domains require adding "${currentHost}" to Firebase Console (Authentication > Settings > Authorized domains) OR adding "${currentOrigin}" to Google Cloud Console (APIs & Services > Credentials > Authorized JavaScript origins).`
+          );
+        }
+        throw gisErr;
+      }
+    }
   }
 
   /**

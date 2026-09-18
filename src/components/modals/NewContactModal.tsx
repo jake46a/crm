@@ -122,7 +122,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
     setIsConnectingGoogle(true);
     setGoogleSyncStatus(null);
     try {
-      await GoogleWorkspaceService.requestAccessTokenViaFirebaseAuth();
+      await GoogleWorkspaceService.requestAccessTokenSmart('info@1070yankstreet.com');
       setIsGoogleConnected(true);
       setGoogleEmail(GoogleWorkspaceService.getConnectedEmail() || '');
       setGoogleSyncStatus({
@@ -130,18 +130,10 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
         message: 'Google account connected! Contacts will sync directly.'
       });
     } catch (err: any) {
-      try {
-        await GoogleWorkspaceService.requestAccessToken();
-        setIsGoogleConnected(true);
-        setGoogleEmail(GoogleWorkspaceService.getConnectedEmail() || '');
-        setGoogleSyncStatus({
-          type: 'success',
-          message: 'Google account connected! Contacts will sync directly.'
-        });
-      } catch (gisErr: any) {
+      if (err.code !== 'auth/popup-closed-by-user' && !err.message?.includes('closed-by-user')) {
         setGoogleSyncStatus({
           type: 'error',
-          message: err.message || gisErr.message || 'Could not connect Google account.'
+          message: err.message || 'Could not connect Google account.'
         });
       }
     } finally {

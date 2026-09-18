@@ -81,18 +81,13 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
     setIsConnectingGoogle(true);
     setSyncFeedback(null);
     try {
-      await GoogleWorkspaceService.requestAccessTokenViaFirebaseAuth();
+      await GoogleWorkspaceService.requestAccessTokenSmart('info@1070yankstreet.com');
       setIsGoogleConnected(true);
       setConnectedEmail(GoogleWorkspaceService.getConnectedEmail() || '');
       setSyncFeedback('Google Contacts connected successfully.');
     } catch (err: any) {
-      try {
-        await GoogleWorkspaceService.requestAccessToken();
-        setIsGoogleConnected(true);
-        setConnectedEmail(GoogleWorkspaceService.getConnectedEmail() || '');
-        setSyncFeedback('Google Contacts connected successfully.');
-      } catch (fallbackErr: any) {
-        setSyncFeedback(err.message || fallbackErr.message || 'Failed to connect Google account.');
+      if (err.code !== 'auth/popup-closed-by-user' && !err.message?.includes('closed-by-user')) {
+        setSyncFeedback(err.message || 'Failed to connect Google account.');
       }
     } finally {
       setIsConnectingGoogle(false);
