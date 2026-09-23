@@ -147,9 +147,20 @@ export async function loginWithGoogle(): Promise<User | null> {
     const result = await signInWithPopup(auth, provider);
     return result.user;
   } catch (error: any) {
+    const isCancelledByUser =
+      error?.code === 'auth/popup-closed-by-user' ||
+      error?.code === 'auth/cancelled-popup-request' ||
+      error?.message?.includes('popup-closed-by-user') ||
+      error?.message?.includes('closed-by-user');
+
+    if (isCancelledByUser) {
+      // User cancelled or closed the sign-in popup - gracefully return null without error
+      return null;
+    }
+
     console.error('Google Sign In Error:', error);
     // If popup was blocked by browser or COOP headers, fall back to redirect if appropriate
-    if (error?.code === 'auth/popup-blocked' || error?.code === 'auth/cancelled-popup-request') {
+    if (error?.code === 'auth/popup-blocked') {
       try {
         const provider = new GoogleAuthProvider();
         provider.setCustomParameters({ prompt: 'select_account' });

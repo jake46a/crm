@@ -101,8 +101,16 @@ export default function App() {
 
   // Modal State
   const [isAssistantOpen, setIsAssistantOpen] = useState<boolean>(false);
+  const [assistantInitialTool, setAssistantInitialTool] = useState<'renewal' | 'matcher' | 'triage' | 'marketing'>('renewal');
+  const [assistantInitialWorkOrderId, setAssistantInitialWorkOrderId] = useState<string | undefined>(undefined);
   const [isExportImportOpen, setIsExportImportOpen] = useState<boolean>(false);
   const [isPrintSchemaOpen, setIsPrintSchemaOpen] = useState<boolean>(false);
+
+  const handleOpenTriageForWorkOrder = (wo?: WorkOrder) => {
+    setAssistantInitialTool('triage');
+    setAssistantInitialWorkOrderId(wo?.id);
+    setIsAssistantOpen(true);
+  };
 
   // Work Order Modal & Print
   const [isNewWorkOrderModalOpen, setIsNewWorkOrderModalOpen] = useState<boolean>(false);
@@ -1351,6 +1359,7 @@ export default function App() {
               setWorkOrderForVendorAssign(wo);
               setIsAssignVendorModalOpen(true);
             }}
+            onOpenTriage={handleOpenTriageForWorkOrder}
           />
         )}
 
@@ -1400,13 +1409,20 @@ export default function App() {
       {/* AI Assistant Modal */}
       <AiAssistantModal
         isOpen={isAssistantOpen}
-        onClose={() => setIsAssistantOpen(false)}
+        onClose={() => {
+          setIsAssistantOpen(false);
+          setAssistantInitialWorkOrderId(undefined);
+          setAssistantInitialTool('renewal');
+        }}
         properties={properties}
         rooms={rooms}
         renewals={renewals}
         workOrders={workOrders}
         leads={leads}
         contacts={contacts}
+        onSaveWorkOrder={handleSaveWorkOrder}
+        initialTool={assistantInitialTool}
+        initialWorkOrderId={assistantInitialWorkOrderId}
       />
 
       {/* New / Edit Work Order Modal */}

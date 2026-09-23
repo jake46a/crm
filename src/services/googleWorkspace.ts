@@ -323,6 +323,16 @@ export class GoogleWorkspaceService {
 
       return { accessToken: token, user: profile };
     } catch (err: any) {
+      const isCancelled =
+        err?.code === 'auth/popup-closed-by-user' ||
+        err?.code === 'auth/cancelled-popup-request' ||
+        err?.message?.includes('popup-closed-by-user') ||
+        err?.message?.includes('closed-by-user');
+
+      if (isCancelled) {
+        throw err;
+      }
+
       console.error('Firebase Workspace Auth error:', err);
       if (err.code === 'auth/unauthorized-domain') {
         const currentDomain = window.location.hostname;
@@ -421,10 +431,16 @@ export class GoogleWorkspaceService {
       const fbResult = await this.requestAccessTokenViaFirebaseAuth(loginHint);
       return fbResult;
     } catch (fbErr: any) {
-      console.warn('Firebase Auth request attempt failed, checking fallback:', fbErr);
-      if (fbErr.code === 'auth/popup-closed-by-user' || fbErr.message?.includes('closed-by-user')) {
+      const isCancelled =
+        fbErr?.code === 'auth/popup-closed-by-user' ||
+        fbErr?.code === 'auth/cancelled-popup-request' ||
+        fbErr?.message?.includes('popup-closed-by-user') ||
+        fbErr?.message?.includes('closed-by-user');
+
+      if (isCancelled) {
         throw fbErr;
       }
+      console.warn('Firebase Auth request attempt failed, checking fallback:', fbErr);
       // If Firebase Auth throws unauthorized domain or fails, try GIS
       try {
         return await this.requestAccessToken(loginHint, clientId || DEFAULT_OAUTH_CLIENT_ID);

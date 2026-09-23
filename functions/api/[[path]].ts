@@ -1210,6 +1210,146 @@ export async function onRequest(context: { request: Request; env: Env; params: a
     }
   }
 
+  // 13. AI Smart Operations Assistant (Triage & Multi-Tool)
+  if (pathname === '/api/ai/status' && request.method === 'GET') {
+    const geminiKey = (env.GEMINI_API_KEY || '').trim();
+    return jsonResponse({
+      status: 'online',
+      hasGeminiKey: Boolean(geminiKey),
+      model: 'gemini-3.8-flash',
+      platform: 'cloudflare-pages'
+    });
+  }
+
+  if (pathname === '/api/ai/triage-work-order' && request.method === 'POST') {
+    try {
+      const body = await request.json().catch(() => ({})) as any;
+      const { problemDescription, workOrder, property, room, vendors, authorizedLimit = 350 } = body || {};
+      const cleanProblem = (problemDescription || workOrder?.description || workOrder?.title || '').trim();
+
+      if (!cleanProblem) {
+        return jsonResponse({ error: 'Maintenance problem description is required for triage.' }, 400);
+      }
+
+      const geminiKey = (env.GEMINI_API_KEY || '').trim();
+      if (geminiKey) {
+        try {
+          const propName = property?.name || workOrder?.propertyName || 'Moyer Coliving Property';
+          const propAddress = [property?.address, property?.city, property?.state].filter(Boolean).join(', ') || 'Denver, CO';
+          const keycode = property?.keypadMasterCode || '5829';
+          const roomName = room?.name || workOrder?.roomName || 'Shared Common Space';
+          const ticketNum = workOrder?.ticketNumber || 'WO-NEW';
+          const tenantContact = workOrder?.reportedByName ? `${workOrder.reportedByName} (${workOrder.reportedByPhone || 'No Phone'})` : 'Coliving Resident';
+
+          const vendorSummaries = (vendors && Array.isArray(vendors) && vendors.length > 0)
+            ? vendors.slice(0, 10).map((v: any) => `- ${v.name} | Company: ${v.company || 'Independent'} | Specialty: ${v.roleOrSpecialty || 'General'} | Phone: ${v.phone}`).join('\n')
+            : '- Steve Kowalski | Front Range Rapid Plumbing | Master Plumber | (303) 555-0144\n- Mark Henderson | Mile High Heating & Cooling | HVAC Tech | (303) 555-0199';
+
+          const systemPrompt = `You are Senior Maintenance Operations Specialist for Moyer Property Management coliving homes in Colorado.
+Triage this maintenance issue:
+PROBLEM: "${cleanProblem}"
+Property: ${propName} (${propAddress})
+Room: ${roomName}
+Ticket: ${ticketNum}
+Keycode: ${keycode}
+Resident: ${tenantContact}
+Initial Budget Cap: $${authorizedLimit}
+Available Contractors:
+${vendorSummaries}
+
+Provide JSON:
+{
+  "priority": string,
+  "urgencyLevel": "Emergency" | "High" | "Medium" | "Low",
+  "category": string,
+  "recommendedTrade": string,
+  "assignedVendorName": string,
+  "assignedVendorPhone": string,
+  "safetyTips": string,
+  "vendorText": string,
+  "tenantText": string,
+  "costEstimate": string,
+  "preventativeAdvice": string
+}`;
+
+          const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: systemPrompt }] }],
+              generationConfig: { responseMimeType: 'application/json' }
+            })
+          });
+
+          if (geminiRes.ok) {
+            const gData = await geminiRes.json() as any;
+            const text = gData?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              const parsed = JSON.parse(text);
+              return jsonResponse({ success: true, ...parsed, source: 'cloudflare_gemini_api' });
+            }
+          }
+        } catch (gErr) {
+          console.warn('Cloudflare Gemini fetch error:', gErr);
+        }
+      }
+
+      // Edge Rule-Based Fallback
+      const pLower = cleanProblem.toLowerCase();
+      let category = 'General Maintenance';
+      let recommendedTrade = 'General Handyman';
+      let urgencyLevel: 'Emergency' | 'High' | 'Medium' | 'Low' = 'Medium';
+      let priority = 'Standard Priority (Dispatch within 24-48 Hours)';
+      let costEstimate = '$150 - $300';
+      let safetyTips = 'Advise all housemates to exercise caution around the affected area.';
+      let preventativeAdvice = 'Perform routine monthly inspections of high-traffic shared appliances.';
+
+      if (pLower.includes('fire') || pLower.includes('gas') || pLower.includes('smoke') || pLower.includes('flood') || pLower.includes('freezing') || (pLower.includes('leak') && pLower.includes('ceiling')) || (pLower.includes('heat') && (pLower.includes('cold') || pLower.includes('winter')))) {
+        urgencyLevel = 'Emergency';
+        priority = 'Immediate Emergency Dispatch (Within 1-2 Hours)';
+        costEstimate = '$250 - $600';
+      } else if (pLower.includes('stopped') || pLower.includes('humming') || pLower.includes('clog') || pLower.includes('overflow') || pLower.includes('lockout') || pLower.includes('fridge')) {
+        urgencyLevel = 'High';
+        priority = 'High Priority (Dispatch within 4-6 Hours)';
+        costEstimate = '$180 - $350';
+      }
+
+      if (pLower.includes('drain') || pLower.includes('disposal') || pLower.includes('sink') || pLower.includes('toilet') || pLower.includes('plumb') || pLower.includes('leak')) {
+        category = 'Plumbing & Kitchen Fixtures';
+        recommendedTrade = 'Master Plumber';
+        safetyTips = 'Notify housemates: Do NOT run the dishwasher or pour chemicals into sink. Turn off water shutoff valve under sink if active leak.';
+        preventativeAdvice = 'Provide coliving residents with drain strainers and remind everyone never to pour cooking grease into sinks.';
+      } else if (pLower.includes('furnace') || pLower.includes('heat') || pLower.includes('hvac') || pLower.includes('cold air')) {
+        category = 'HVAC & Climate Control';
+        recommendedTrade = 'HVAC Specialist';
+        safetyTips = 'Keep exterior windows/doors closed. Do NOT use cooking stoves or ovens for heating due to carbon monoxide risk.';
+        preventativeAdvice = 'Replace furnace filters every 30 days in multi-room houses.';
+      }
+
+      const matchedVendor = (vendors && vendors[0]) || { name: 'Steve Kowalski', company: 'Front Range Rapid Contracting', phone: '(303) 555-0144' };
+      const propName = property?.name || workOrder?.propertyName || 'Speer Coliving House';
+      const keycode = property?.keypadMasterCode || '5829';
+
+      return jsonResponse({
+        success: true,
+        priority,
+        urgencyLevel,
+        category,
+        recommendedTrade,
+        assignedVendorName: matchedVendor.name,
+        assignedVendorPhone: matchedVendor.phone || '(303) 555-0100',
+        safetyTips,
+        vendorText: `DISPATCH - Moyer PM\nVendor: ${matchedVendor.name}\nProperty: ${propName}\nAccess Keycode: ${keycode}\nIssue: ${cleanProblem}\nLimit: $${authorizedLimit}. Call dispatch: (303) 555-0100.`,
+        tenantText: `Hi ${propName} residents, Moyer PM received the maintenance report regarding "${cleanProblem.slice(0, 50)}...". Triaged as ${priority}. We are dispatching ${matchedVendor.name}.`,
+        costEstimate,
+        preventativeAdvice,
+        source: 'cloudflare_edge_engine'
+      });
+    } catch (err: any) {
+      return jsonResponse({ error: err.message || 'Edge triage error', source: 'cloudflare_pages_api' }, 500);
+    }
+  }
+
   // 404 for other API routes
   return jsonResponse({ error: 'Endpoint not found on Cloudflare Pages API', pathname }, 404);
 }

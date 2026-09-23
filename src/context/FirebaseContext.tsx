@@ -89,6 +89,17 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setSyncStatus('connected');
       }
     } catch (err: any) {
+      const isCancelledByUser =
+        err?.code === 'auth/popup-closed-by-user' ||
+        err?.code === 'auth/cancelled-popup-request' ||
+        err?.message?.includes('popup-closed-by-user') ||
+        err?.message?.includes('closed-by-user');
+
+      if (isCancelledByUser) {
+        // User closed or dismissed the popup - don't show an error toast or modal
+        return;
+      }
+
       console.error("Sign in failed:", err);
       const currentHost = typeof window !== 'undefined' ? window.location.hostname : '';
       const errorCode = err?.code || '';

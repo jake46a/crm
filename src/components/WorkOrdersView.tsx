@@ -18,7 +18,8 @@ import {
   MessageSquare,
   Printer,
   UserCheck,
-  ListChecks
+  ListChecks,
+  Zap
 } from 'lucide-react';
 import { WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderCategory, Property, Room, Contact } from '../types';
 import { PriorityBadge, WorkOrderStatusBadge } from './common/Badges';
@@ -33,6 +34,7 @@ interface WorkOrdersViewProps {
   onOpenEditWorkOrderModal: (workOrder: WorkOrder) => void;
   onPrintWorkOrder?: (workOrder: WorkOrder) => void;
   onOpenAssignVendorModal?: (workOrder: WorkOrder) => void;
+  onOpenTriage?: (workOrder?: WorkOrder) => void;
 }
 
 export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
@@ -44,7 +46,8 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
   onOpenNewWorkOrderModal,
   onOpenEditWorkOrderModal,
   onPrintWorkOrder,
-  onOpenAssignVendorModal
+  onOpenAssignVendorModal,
+  onOpenTriage
 }) => {
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
@@ -145,6 +148,17 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
               <span>List</span>
             </button>
           </div>
+
+          {onOpenTriage && (
+            <button
+              onClick={() => onOpenTriage()}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold uppercase tracking-wider transition-colors shadow-xs"
+              title="Open Smart Operations AI Triage"
+            >
+              <Zap className="w-3.5 h-3.5 fill-current" />
+              <span>AI Triage</span>
+            </button>
+          )}
 
           <button
             onClick={() => onOpenNewWorkOrderModal()}
@@ -286,6 +300,18 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                         <div className="flex items-center justify-between">
                           <span className="font-mono text-xs font-semibold text-zinc-600">{wo.ticketNumber}</span>
                           <div className="flex items-center gap-1.5">
+                            {onOpenTriage && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onOpenTriage(wo);
+                                }}
+                                title="Smart Operations AI Triage & Contractor SMS Dispatch"
+                                className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded transition"
+                              >
+                                <Zap className="w-3.5 h-3.5 fill-current" />
+                              </button>
+                            )}
                             {onPrintWorkOrder && (
                               <button
                                 onClick={(e) => {
@@ -490,6 +516,16 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                           >
                             <Printer className="w-3 h-3 text-amber-700" />
                             <span>Print</span>
+                          </button>
+                        )}
+                        {onOpenTriage && (
+                          <button
+                            onClick={() => onOpenTriage(wo)}
+                            className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-sm font-semibold text-[11px] flex items-center gap-1 transition"
+                            title="Smart Operations AI Triage"
+                          >
+                            <Zap className="w-3 h-3 text-rose-600 fill-current" />
+                            <span>Triage</span>
                           </button>
                         )}
                         <button

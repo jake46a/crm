@@ -300,6 +300,14 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
       setToken(res.accessToken);
       setUser(res.user || null);
     } catch (err: any) {
+      const isCancelled =
+        err?.code === 'auth/popup-closed-by-user' ||
+        err?.code === 'auth/cancelled-popup-request' ||
+        err?.message?.includes('popup-closed-by-user') ||
+        err?.message?.includes('closed-by-user');
+      if (isCancelled) {
+        return;
+      }
       console.error('Firebase Workspace Auth error:', err);
       setAuthError(err.message || 'Failed to authenticate via Firebase Google Auth.');
     } finally {
@@ -316,6 +324,14 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
       setToken(res.accessToken);
       setUser(res.user || null);
     } catch (err: any) {
+      const isCancelled =
+        err?.code === 'auth/popup-closed-by-user' ||
+        err?.code === 'auth/cancelled-popup-request' ||
+        err?.message?.includes('popup-closed-by-user') ||
+        err?.message?.includes('closed-by-user');
+      if (isCancelled) {
+        return;
+      }
       console.error('Google Workspace Auth error:', err);
       const errMsg = err.message || '';
       if (errMsg.toLowerCase().includes('origin_mismatch') || errMsg.toLowerCase().includes('origin') || errMsg.includes('400')) {
@@ -340,6 +356,16 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
       setToken(res.accessToken);
       setUser(res.user || null);
     } catch (err: any) {
+      const isCancelled =
+        err?.code === 'auth/popup-closed-by-user' ||
+        err?.code === 'auth/cancelled-popup-request' ||
+        err?.message?.includes('popup-closed-by-user') ||
+        err?.message?.includes('closed-by-user') ||
+        err?.type === 'popup_closed' ||
+        err?.message?.includes('popup_closed');
+      if (isCancelled) {
+        return;
+      }
       console.error('Google Workspace GIS Auth error:', err);
       const errMsg = err.message || '';
       if (errMsg.toLowerCase().includes('origin_mismatch') || errMsg.toLowerCase().includes('origin') || errMsg.includes('400')) {

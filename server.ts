@@ -3,6 +3,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { randomUUID } from 'crypto';
+import { GoogleGenAI } from '@google/genai';
 
 dotenv.config();
 
@@ -1418,6 +1419,291 @@ app.post('/api/google/create-contact', async (req, res) => {
   } catch (err: any) {
     return res.status(500).json({ error: err.message || 'Failed to create Google Contact.' });
   }
+});
+
+// ----------------------------------------------------
+// GEMINI AI SMART OPERATIONS ASSISTANT ENDPOINTS
+// Backed by @google/genai (model: gemini-3.8-flash)
+// ----------------------------------------------------
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+let aiClient: GoogleGenAI | null = null;
+if (GEMINI_API_KEY) {
+  try {
+    aiClient = new GoogleGenAI({
+      apiKey: GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build'
+        }
+      }
+    });
+  } catch (e) {
+    console.warn('[Gemini AI] Initialization warning:', e);
+  }
+}
+
+// 1. AI Assistant Health Status
+app.get('/api/ai/status', (req: Request, res: Response) => {
+  res.json({
+    status: 'online',
+    hasGeminiKey: Boolean(GEMINI_API_KEY),
+    model: 'gemini-3.8-flash',
+    features: ['work-order-triage', 'lease-renewal', 'roommate-compatibility', 'marketing-copy']
+  });
+});
+
+// Helper for rule-based triage heuristic fallback
+function generateRuleBasedTriage(problem: string, property: any, room: any, vendors: any[], workOrder: any) {
+  const pLower = (problem || '').toLowerCase();
+  
+  let category = 'General Maintenance';
+  let recommendedTrade = 'General Handyman';
+  let urgencyLevel: 'Emergency' | 'High' | 'Medium' | 'Low' = 'Medium';
+  let priority = 'Standard Priority (Dispatch within 24-48 Hours)';
+  let costEstimate = '$150 - $300';
+  let safetyTips = 'Advise all housemates to exercise caution around the affected area. Avoid forcing stuck mechanisms.';
+  let preventativeAdvice = 'Perform routine monthly inspections of high-traffic shared appliances and fixtures.';
+
+  if (pLower.includes('fire') || pLower.includes('gas') || pLower.includes('smoke') || pLower.includes('flood') || pLower.includes('freezing') || (pLower.includes('leak') && pLower.includes('ceiling')) || (pLower.includes('heat') && (pLower.includes('cold') || pLower.includes('winter') || pLower.includes('degree')))) {
+    urgencyLevel = 'Emergency';
+    priority = 'Immediate Emergency Dispatch (Within 1-2 Hours)';
+    costEstimate = '$250 - $600';
+  } else if (pLower.includes('stopped') || pLower.includes('humming') || pLower.includes('clog') || pLower.includes('overflow') || pLower.includes('lockout') || pLower.includes('refrigerator') || pLower.includes('fridge') || pLower.includes('water heater')) {
+    urgencyLevel = 'High';
+    priority = 'High Priority (Dispatch within 4-6 Hours)';
+    costEstimate = '$180 - $350';
+  } else if (pLower.includes('squeak') || pLower.includes('paint') || pLower.includes('blind') || pLower.includes('bulb') || pLower.includes('cosmetic')) {
+    urgencyLevel = 'Low';
+    priority = 'Routine Maintenance (Next Scheduled Turnover/Visit)';
+    costEstimate = '$75 - $150';
+  }
+
+  if (pLower.includes('drain') || pLower.includes('disposal') || pLower.includes('sink') || pLower.includes('toilet') || pLower.includes('pipe') || pLower.includes('faucet') || pLower.includes('plumb') || pLower.includes('shower') || pLower.includes('leak')) {
+    category = 'Plumbing & Kitchen Fixtures';
+    recommendedTrade = 'Master Plumber';
+    safetyTips = 'Notify housemates immediately: Do NOT run the dishwasher, garbage disposal, or adjacent taps. Shut off local angle-stop valve under the sink or main water shutoff if water is active. Place catch buckets and towels down.';
+    preventativeAdvice = 'Provide coliving residents with drain strainers and remind everyone never to pour cooking oil, fibrous celery, or eggshells into the disposal.';
+  } else if (pLower.includes('furnace') || pLower.includes('heat') || pLower.includes('ac') || pLower.includes('air conditioning') || pLower.includes('thermostat') || pLower.includes('hvac') || pLower.includes('cold air')) {
+    category = 'HVAC & Climate Control';
+    recommendedTrade = 'HVAC Specialist';
+    safetyTips = 'Keep all exterior windows and doors closed. Do NOT attempt to heat the home with cooking appliances or ovens due to carbon monoxide danger. Open cabinet doors under sinks to keep ambient heat around water lines.';
+    preventativeAdvice = 'Replace high-efficiency furnace air filters every 30-45 days in multi-tenant homes and schedule annual pre-winter burner tune-ups.';
+  } else if (pLower.includes('spark') || pLower.includes('breaker') || pLower.includes('outlet') || pLower.includes('power') || pLower.includes('electric') || pLower.includes('wiring') || pLower.includes('switch')) {
+    category = 'Electrical & Lighting';
+    recommendedTrade = 'Licensed Electrician';
+    safetyTips = 'Do NOT touch or plug anything into the affected outlet. Turn off the corresponding circuit breaker in the basement panel immediately. Never touch electrical equipment with wet hands.';
+    preventativeAdvice = 'Avoid daisy-chaining multiple high-draw space heaters or microwave appliances into the same 15A branch circuit.';
+  } else if (pLower.includes('lock') || pLower.includes('key') || pLower.includes('keypad') || pLower.includes('deadbolt') || pLower.includes('door') || pLower.includes('access')) {
+    category = 'Locks, Security & Access';
+    recommendedTrade = 'Locksmith / Access Control';
+    safetyTips = 'Ensure alternative secure exterior entry is accessible for housemates. Do not prop open exterior security doors unattended.';
+    preventativeAdvice = 'Change digital smart keypad batteries every 6 months during daylight savings turnover checks.';
+  } else if (pLower.includes('washer') || pLower.includes('dryer') || pLower.includes('refrigerator') || pLower.includes('fridge') || pLower.includes('stove') || pLower.includes('oven') || pLower.includes('dishwasher')) {
+    category = 'Appliance Repair';
+    recommendedTrade = 'Appliance Repair Specialist';
+    safetyTips = 'Disconnect power cord if safe to do so. If the refrigerator is warm, keep doors sealed to maintain internal cold. Do not run washer if leaking.';
+    preventativeAdvice = 'Inspect rubber washer supply hoses annually and vacuum refrigerator compressor coils twice a year.';
+  }
+
+  // Best matched vendor
+  let matchedVendor = (vendors || []).find((v: any) => {
+    const role = (v.roleOrSpecialty || v.company || '').toLowerCase();
+    if (category.includes('Plumbing') && (role.includes('plumb') || role.includes('pipe'))) return true;
+    if (category.includes('HVAC') && (role.includes('hvac') || role.includes('heat') || role.includes('cool'))) return true;
+    if (category.includes('Electrical') && (role.includes('elect') || role.includes('spark'))) return true;
+    if (category.includes('Lock') && (role.includes('lock') || role.includes('access'))) return true;
+    return false;
+  }) || (vendors && vendors[0]) || {
+    name: 'Steve Kowalski',
+    company: 'Front Range Rapid Contracting',
+    phone: '(303) 555-0144'
+  };
+
+  const propName = property?.name || workOrder?.propertyName || 'Speer Coliving House';
+  const propAddress = property?.address || '1424 Speer Blvd, Denver, CO';
+  const keycode = property?.keypadMasterCode || '5829';
+  const roomName = room?.name || workOrder?.roomName || 'Common Area';
+  const ticketId = workOrder?.ticketNumber || 'WO-URGENT';
+
+  const vendorText = `${urgencyLevel === 'Emergency' ? 'EMERGENCY DISPATCH' : 'SERVICE DISPATCH'} - Moyer Property Management\nVendor: ${matchedVendor.name} (${matchedVendor.company || 'Service Contractor'})\nProperty: ${propName} (${propAddress})\nLocation: ${roomName}\nKeycode Access: ${keycode}\nTicket: ${ticketId}\nIssue: ${problem}\nAuthorized Spending Cap: $350 (Call if exceeding).\nPlease reply with your estimated arrival time or call dispatch at (303) 555-0100.`;
+
+  const tenantText = `Hi ${propName} residents, this is Moyer Operations Desk. We received the report regarding "${problem.slice(0, 60)}..." and have triaged it as ${priority}. ${matchedVendor.name} from ${matchedVendor.company || 'our contractor team'} has been notified for dispatch. In the meantime, please note: ${safetyTips} We will text updates as soon as the technician is onsite.`;
+
+  return {
+    priority,
+    urgencyLevel,
+    category,
+    recommendedTrade,
+    assignedVendorName: matchedVendor.name,
+    assignedVendorPhone: matchedVendor.phone || '(303) 555-0100',
+    safetyTips,
+    vendorText,
+    tenantText,
+    costEstimate,
+    preventativeAdvice,
+    source: 'rule_based_engine'
+  };
+}
+
+// 2. Work Order AI Triage Endpoint
+app.post('/api/ai/triage-work-order', async (req: Request, res: Response) => {
+  const { problemDescription, workOrder, property, room, vendors, authorizedLimit = 350 } = req.body || {};
+
+  const cleanProblem = (problemDescription || workOrder?.description || workOrder?.title || '').trim();
+
+  if (!cleanProblem) {
+    return res.status(400).json({ error: 'Maintenance problem description is required for triage.' });
+  }
+
+  // Attempt Gemini API call via @google/genai
+  if (aiClient) {
+    try {
+      const propName = property?.name || workOrder?.propertyName || 'Moyer Coliving Property';
+      const propAddress = [property?.address, property?.city, property?.state].filter(Boolean).join(', ') || 'Denver, CO';
+      const keycode = property?.keypadMasterCode || '5829';
+      const roomName = room?.name || workOrder?.roomName || 'Shared Common Space';
+      const ticketNum = workOrder?.ticketNumber || 'WO-NEW';
+      const tenantContact = workOrder?.reportedByName ? `${workOrder.reportedByName} (${workOrder.reportedByPhone || 'No Phone'})` : 'Coliving Resident';
+
+      const vendorSummaries = (vendors && Array.isArray(vendors) && vendors.length > 0)
+        ? vendors.slice(0, 10).map((v: any) => `- ${v.name} | Company: ${v.company || 'Independent'} | Specialty: ${v.roleOrSpecialty || 'General'} | Phone: ${v.phone}`).join('\n')
+        : '- Steve Kowalski | Front Range Rapid Plumbing | Master Plumber | (303) 555-0144\n- Mark Henderson | Mile High Heating & Cooling | HVAC Tech | (303) 555-0199\n- Denver Electric Pro | Master Electrician | (303) 555-0182';
+
+      const systemPrompt = `You are the Senior Maintenance Operations Specialist for Moyer Property Management, a high-end room rental and coliving property management company in Colorado.
+
+Analyze this maintenance issue and perform comprehensive property operations triage:
+
+MAINTENANCE PROBLEM:
+"${cleanProblem}"
+
+CONTEXT:
+- Property: ${propName} (${propAddress})
+- Room/Area: ${roomName}
+- Ticket ID: ${ticketNum}
+- Keycode Access: ${keycode}
+- Resident: ${tenantContact}
+- Authorized Initial Budget Cap: $${authorizedLimit}
+
+AVAILABLE CONTRACTORS IN DIRECTORY:
+${vendorSummaries}
+
+Provide a JSON response with the following fields:
+1. "priority": string (e.g., "Immediate Emergency Dispatch (Within 1-2 Hours)", "High Priority (Dispatch within 4-6 Hours)", "Standard Priority (Dispatch within 24-48 Hours)", or "Routine Maintenance")
+2. "urgencyLevel": "Emergency" | "High" | "Medium" | "Low"
+3. "category": string (e.g., "Plumbing & Kitchen Fixtures", "HVAC & Climate Control", "Electrical & Lighting", "Appliance Repair", "Locks, Security & Access", "Roofing & Water Intrusion", "Pest Control", or "General Handyman")
+4. "recommendedTrade": string (e.g. "Master Plumber", "HVAC Technician", "Electrician", "Appliance Specialist", "Locksmith", "General Contractor")
+5. "assignedVendorName": string (best matched contractor from the directory, or name from directory)
+6. "assignedVendorPhone": string (phone of matched contractor)
+7. "safetyTips": string (actionable, immediate safety and loss-prevention instructions for coliving housemates, including water shutoff valves, breaker switches, appliance disconnect, ventilation, etc.)
+8. "vendorText": string (a concise, professional ready-to-send SMS dispatch message to the vendor with property name, address, keycode, exact problem, unit/room, NTE spending cap, and callback number)
+9. "tenantText": string (a reassuring, courteous SMS notification for the resident acknowledging the issue, ETA expectations, and safety instructions)
+10. "costEstimate": string (realistic market repair cost range, e.g. "$175 - $325")
+11. "preventativeAdvice": string (actionable preventative tips to avoid recurrence in high-occupancy room rentals)
+`;
+
+      const response = await aiClient.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: systemPrompt,
+        config: {
+          responseMimeType: 'application/json'
+        }
+      });
+
+      const responseText = response.text || '';
+      const parsed = JSON.parse(responseText);
+
+      return res.json({
+        success: true,
+        priority: parsed.priority || 'High Priority (Dispatch within 4-6 Hours)',
+        urgencyLevel: parsed.urgencyLevel || 'High',
+        category: parsed.category || 'General Maintenance',
+        recommendedTrade: parsed.recommendedTrade || 'Contractor',
+        assignedVendorName: parsed.assignedVendorName || 'Moyer Dispatch',
+        assignedVendorPhone: parsed.assignedVendorPhone || '(303) 555-0100',
+        safetyTips: parsed.safetyTips || 'Advise housemates to avoid the affected area and do not force mechanisms.',
+        vendorText: parsed.vendorText || `DISPATCH - Moyer PM: ${cleanProblem}`,
+        tenantText: parsed.tenantText || `Moyer PM received your request regarding: ${cleanProblem}`,
+        costEstimate: parsed.costEstimate || '$150 - $300',
+        preventativeAdvice: parsed.preventativeAdvice || 'Inspect fixture during quarterly turnover maintenance.',
+        source: 'gemini-3.8-flash'
+      });
+    } catch (err: any) {
+      console.warn('[Gemini AI] Triage generation failed, using rule-based fallback:', err.message);
+    }
+  }
+
+  // Graceful heuristic fallback
+  const fallback = generateRuleBasedTriage(cleanProblem, property, room, vendors || [], workOrder);
+  return res.json({
+    success: true,
+    ...fallback
+  });
+});
+
+// 3. Multi-Tool AI Operations Assistant Endpoint (Renewal, Matcher, Marketing)
+app.post('/api/ai/operations-assistant', async (req: Request, res: Response) => {
+  const { tool, payload } = req.body || {};
+
+  if (!tool) {
+    return res.status(400).json({ error: 'Missing tool parameter' });
+  }
+
+  if (aiClient) {
+    try {
+      let prompt = '';
+      if (tool === 'renewal') {
+        prompt = `You are Principal Property Manager Jake Moyer at Moyer Property Management in Colorado.
+Draft a coliving room rental lease renewal notice:
+Tenant: ${payload.tenantName}
+Property: ${payload.propertyName}
+Room: ${payload.roomName} (${payload.bathroomType || 'Private Ensuite'})
+Current Rent: $${payload.currentRent}/mo
+Proposed Renewal Rent: $${payload.proposedRent}/mo
+Current Lease End Date: ${payload.currentLeaseEndDate}
+Decision Deadline: ${payload.decisionDeadline}
+Tone: ${payload.tone} (warm community, incentive offer, or formal notice)
+Return JSON: { "letter": "complete formatted text of the letter" }`;
+      } else if (tool === 'matcher') {
+        prompt = `You are a coliving room rental community curator for Moyer Property Management.
+Evaluate roommate compatibility:
+Lead: ${payload.leadName} (Occupation: ${payload.occupation}, Cleanliness: ${payload.cleanliness}, Schedule: ${payload.schedule}, Social: ${payload.social}, Pets: ${payload.pets}, Smoke: ${payload.smoke})
+Target Property: ${payload.propertyName}
+Room: ${payload.roomName} ($${payload.monthlyRent}/mo)
+Existing Housemates Count: ${payload.existingHousematesCount}
+Return JSON: {
+  "score": number (70-98),
+  "verdict": string,
+  "highlights": string[],
+  "considerations": string[]
+}`;
+      } else if (tool === 'marketing') {
+        prompt = `You are an expert real estate copywriter specializing in high-converting coliving room rental listings.
+Create an engaging listing ready to post to Zillow, Roomies, Craigslist, and Facebook Marketplace:
+Property: ${payload.propertyName} (${payload.city}, CO)
+Room: ${payload.roomName} (${payload.sqft} sqft, ${payload.bathroomType}, ${payload.isFurnished ? 'Furnished' : 'Unfurnished'})
+Monthly Rent: $${payload.monthlyRent}/mo (includes Wi-Fi, utilities, cleaning)
+Deposit: $${payload.securityDeposit}
+Amenities: ${(payload.amenities || []).join(', ')}
+House Rules: Non-smoking, quiet hours 10pm-7am, background checked professionals/students.
+Return JSON: { "listing": "full formatted listing text with emojis, bullet points, and call to action" }`;
+      }
+
+      if (prompt) {
+        const response = await aiClient.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: prompt,
+          config: { responseMimeType: 'application/json' }
+        });
+        const parsed = JSON.parse(response.text || '{}');
+        return res.json({ success: true, ...parsed, source: 'gemini-3.8-flash' });
+      }
+    } catch (err: any) {
+      console.warn('[Gemini AI] Operations assistant call failed, falling back:', err.message);
+    }
+  }
+
+  // Fast response fallback if offline
+  return res.json({ success: true, source: 'offline_fallback' });
 });
 
 // ----------------------------------------------------

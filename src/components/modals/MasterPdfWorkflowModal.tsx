@@ -797,6 +797,14 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
                       setAuthExpired(false);
                       setErrorMessage(null);
                     } catch (e: any) {
+                      const isCancelled =
+                        e?.code === 'auth/popup-closed-by-user' ||
+                        e?.code === 'auth/cancelled-popup-request' ||
+                        e?.message?.includes('popup-closed-by-user') ||
+                        e?.message?.includes('closed-by-user');
+                      if (isCancelled) {
+                        return;
+                      }
                       setErrorMessage(e.message || 'Failed to reconnect Google Drive.');
                     } finally {
                       setIsReconnecting(false);
@@ -937,6 +945,16 @@ export const MasterPdfWorkflowModal: React.FC<MasterPdfWorkflowModalProps> = ({
                           await onConnectGoogle('info@1070yankstreet.com');
                           setAuthExpired(false);
                           setErrorMessage(null);
+                        } catch (e: any) {
+                          const isCancelled =
+                            e?.code === 'auth/popup-closed-by-user' ||
+                            e?.code === 'auth/cancelled-popup-request' ||
+                            e?.message?.includes('popup-closed-by-user') ||
+                            e?.message?.includes('closed-by-user');
+                          if (isCancelled) {
+                            return;
+                          }
+                          setErrorMessage(e.message || 'Failed to reconnect Google Drive.');
                         } finally {
                           setIsReconnecting(false);
                         }

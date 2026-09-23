@@ -734,7 +734,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <span className="font-bold text-indigo-900 block text-xs">How to fix in 1 minute:</span>
                     <ol className="list-decimal list-inside space-y-1.5 text-[11px] text-zinc-700 leading-normal">
                       <li>
-                        Go to <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-700 font-bold underline inline-flex items-center gap-0.5">Firebase Console <ExternalLink className="w-2.5 h-2.5" /></a> and select project <strong>data-terminus-489202-p9</strong>.
+                        Go to <a href="https://console.firebase.google.com/project/gen-lang-client-0724686590/authentication/settings" target="_blank" rel="noopener noreferrer" className="text-indigo-700 font-bold underline inline-flex items-center gap-0.5">Firebase Console Settings <ExternalLink className="w-2.5 h-2.5" /></a> (project <strong>gen-lang-client-0724686590</strong>).
                       </li>
                       <li>
                         Navigate to <strong>Authentication</strong> &rarr; <strong>Settings</strong> tab &rarr; <strong>Authorized domains</strong>.
