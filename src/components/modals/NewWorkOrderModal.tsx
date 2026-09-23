@@ -53,7 +53,8 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
       setErrorMessage('');
       setIsConfirmingDelete(false);
       
-      const initialPropId = editingWorkOrder?.propertyId || defaultRoom?.propertyId || (properties.length > 0 ? properties[0].id : '');
+      const yankProp = properties.find(p => p.id === 'prop-1070-yank' || p.name?.includes('1070 Yank')) || properties[0];
+      const initialPropId = editingWorkOrder?.propertyId || defaultRoom?.propertyId || (yankProp?.id || (properties.length > 0 ? properties[0].id : ''));
       const initialRoomId = editingWorkOrder?.roomId || defaultRoom?.id || 'common';
 
       if (editingWorkOrder) {
@@ -125,7 +126,7 @@ export const NewWorkOrderModal: React.FC<NewWorkOrderModalProps> = ({
       reportedByFirstName: roomObj?.currentTenantFirstName || editingWorkOrder?.reportedByFirstName,
       reportedByLastName: roomObj?.currentTenantLastName || editingWorkOrder?.reportedByLastName,
       reportedByName: roomObj ? getTenantFullName(roomObj) : (editingWorkOrder?.reportedByName || 'Moyer Operations Dispatch'),
-      reportedByPhone: roomObj?.currentTenantPhone || editingWorkOrder?.reportedByPhone || '(303) 555-0100',
+      reportedByPhone: roomObj?.currentTenantPhone || editingWorkOrder?.reportedByPhone || '(720) 432-5144',
       category,
       priority,
       status: status || (assignedVendorId ? 'Assigned' : 'New'),

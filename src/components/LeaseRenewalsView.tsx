@@ -1157,7 +1157,7 @@ export const LeaseRenewalsView: React.FC<LeaseRenewalsViewProps> = ({
           firstName: smsTargetRenewal.tenantFirstName,
           lastName: smsTargetRenewal.tenantLastName,
           name: smsTargetRenewal.tenantName,
-          phone: formatPhoneNumber(smsTargetRenewal.tenantPhone) || '(303) 555-0100',
+          phone: formatPhoneNumber(smsTargetRenewal.tenantPhone) || '(720) 432-5144',
           email: smsTargetRenewal.tenantEmail,
           roleOrType: 'Active Room Tenant',
           propertyName: smsTargetRenewal.propertyName,

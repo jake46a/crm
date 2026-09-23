@@ -385,7 +385,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
               <input
                 type="tel"
                 required
-                placeholder="(303) 555-0199"
+                placeholder="(720) 432-5144"
                 value={phone}
                 onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
                 className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -556,7 +556,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
                   <label className="block text-[11px] text-zinc-500">Emergency Phone</label>
                   <input
                     type="tel"
-                    placeholder="(303) 555-0144"
+                    placeholder="(720) 432-5144"
                     value={emergencyContactPhone}
                     onChange={(e) => setEmergencyContactPhone(formatPhoneInput(e.target.value))}
                     className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"

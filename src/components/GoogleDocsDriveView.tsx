@@ -106,7 +106,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
   const [customPropertyAddress, setCustomPropertyAddress] = useState<string>(
     defaultProperty && defaultProperty.address
       ? `${defaultProperty.address}, ${defaultProperty.city || ''}, ${defaultProperty.state || ''} ${defaultProperty.zip || ''}`
-      : '1070 Yank St, Golden, CO 80215'
+      : '1070 Yank St, Golden, CO 80401-4223'
   );
   const [showPropertyAddressEdit, setShowPropertyAddressEdit] = useState<boolean>(false);
 
@@ -562,9 +562,9 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
       const replacements: Record<string, string> = {
         '{{tenant_name}}': String(tenantClean || 'Resident'),
         '{{tenant_email}}': String((customTenantEmail || '').trim() || (activeRoom?.currentTenantEmail || '').trim() || 'resident@1070yankstreet.com'),
-        '{{tenant_phone}}': formatPhoneNumber((customTenantPhone || '').trim() || (activeRoom?.currentTenantPhone || '').trim() || '(303) 555-0100') || '(303) 555-0100',
+        '{{tenant_phone}}': formatPhoneNumber((customTenantPhone || '').trim() || (activeRoom?.currentTenantPhone || '').trim() || '(720) 432-5144') || '(720) 432-5144',
         '{{property_name}}': String(propertyClean || '1070 Yank St'),
-        '{{property_address}}': String(addressClean || '1070 Yank St, Golden, CO 80215'),
+        '{{property_address}}': String(addressClean || '1070 Yank St, Golden, CO 80401-4223'),
         '{{room_name}}': String(roomClean || 'Room 1'),
         '{{monthly_rent}}': `$${(Number(customMonthlyRent) || 0).toLocaleString()}`,
         '{{security_deposit}}': `$${(Number(customSecurityDeposit) || 0).toLocaleString()}`,
@@ -581,7 +581,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
         '{{violation_reason}}': String(customViolationReason || 'Non-payment of past due rent balance and failure to cure within statutory grace period.'),
         '{{key_return_instructions}}': 'Return room key and mailbox key to property manager lockbox located in the main foyer.',
         '{{manager_name}}': String(activeProperty?.ownerName || 'Jake Moyer, 1070 Yank Street Coliving'),
-        '{{manager_phone}}': formatPhoneNumber(activeProperty?.ownerPhone || '(303) 555-0199') || '(303) 555-0199',
+        '{{manager_phone}}': formatPhoneNumber(activeProperty?.ownerPhone || '(720) 432-5144') || '(720) 432-5144',
         '{{manager_email}}': String(activeProperty?.ownerEmail || 'jake@1070yankstreet.com'),
         '{{today_date}}': todayStr,
         '{{billing_period}}': new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
@@ -1495,7 +1495,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
                       type="tel"
                       value={customTenantPhone || ''}
                       onChange={(e) => setCustomTenantPhone(formatPhoneInput(e.target.value))}
-                      placeholder="e.g. (303) 555-0100"
+                      placeholder="e.g. (720) 432-5144"
                       className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     />
                   </div>

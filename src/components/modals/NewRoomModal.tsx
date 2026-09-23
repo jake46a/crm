@@ -485,7 +485,7 @@ export const NewRoomModal: React.FC<NewRoomModalProps> = ({
                   <label className="block text-[11px] text-zinc-500">Tenant Phone</label>
                   <input
                     type="tel"
-                    placeholder="e.g. (303) 555-0145"
+                    placeholder="e.g. (720) 432-5144"
                     value={currentTenantPhone}
                     onChange={(e) => setCurrentTenantPhone(formatPhoneInput(e.target.value))}
                     className="w-full p-2 bg-white border border-zinc-300 rounded-md text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-none"

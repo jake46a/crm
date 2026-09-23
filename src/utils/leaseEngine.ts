@@ -207,7 +207,7 @@ export function generateAnnualRateAdjustmentNoticeText(params: {
 
   return `MOYER PROPERTY MANAGEMENT
 Coliving & Room Rental Operations
-1000 Speer Blvd, Denver, CO 80204 • Operations Hotline: (303) 555-0100
+1070 Yank St, Golden, CO 80401 • Operations Hotline: (720) 432-5144
 
 ================================================================================
 NOTICE OF ANNUAL RENT RATE ADJUSTMENT (1-YEAR LEASE ANNIVERSARY)
@@ -266,7 +266,7 @@ export function generate21DayVacateNoticeText(params: {
 
   return `MOYER PROPERTY MANAGEMENT
 Coliving & Room Rental Operations
-1000 Speer Blvd, Denver, CO 80204 • Operations Hotline: (303) 555-0100
+1070 Yank St, Golden, CO 80401 • Operations Hotline: (720) 432-5144
 
 ================================================================================
 FORMAL NOTICE TO VACATE & LEASE TERMINATION (21-DAY NOTICE RULE)

@@ -1447,7 +1447,7 @@ app.get('/api/ai/status', (req: Request, res: Response) => {
   res.json({
     status: 'online',
     hasGeminiKey: Boolean(GEMINI_API_KEY),
-    model: 'gemini-3.8-flash',
+    model: 'gemini-2.5-flash',
     features: ['work-order-triage', 'lease-renewal', 'roommate-compatibility', 'marketing-copy']
   });
 });
@@ -1519,12 +1519,12 @@ function generateRuleBasedTriage(problem: string, property: any, room: any, vend
     phone: '(303) 555-0144'
   };
 
-  const propName = property?.name || workOrder?.propertyName || 'Speer Coliving House';
-  const propAddress = property?.address || '1424 Speer Blvd, Denver, CO';
-  const keycode = property?.keypadMasterCode || '5829';
+  const propName = property?.name || workOrder?.propertyName || '1070 Yank St';
+  const propAddress = property?.address || '1070 Yank St, Golden, CO 80401-4223';
+  const keycode = property?.keypadMasterCode || 'Manual Key';
   const roomName = room?.name || workOrder?.roomName || 'Common Area';
   const ticketId = workOrder?.ticketNumber || 'WO-URGENT';
-  const managerPhone = property?.ownerPhone || '(303) 555-0100';
+  const managerPhone = property?.ownerPhone || '(720) 432-5144';
 
   const vendorText = `${urgencyLevel === 'Emergency' ? 'EMERGENCY DISPATCH' : 'SERVICE DISPATCH'} - Moyer Property Management\nVendor: ${matchedVendor.name} (${matchedVendor.company || 'Service Contractor'})\nProperty: ${propName} (${propAddress})\nLocation: ${roomName}\nKeycode Access: ${keycode}\nTicket: ${ticketId}\nIssue: ${problem}\nAuthorized Spending Cap: $350 (Call if exceeding).\nPlease reply with your estimated arrival time or call dispatch at ${managerPhone}.`;
 
@@ -1536,7 +1536,7 @@ function generateRuleBasedTriage(problem: string, property: any, room: any, vend
     category,
     recommendedTrade,
     assignedVendorName: matchedVendor.name,
-    assignedVendorPhone: matchedVendor.phone || '(303) 555-0100',
+    assignedVendorPhone: matchedVendor.phone || '(720) 432-5144',
     safetyTips,
     vendorText,
     tenantText,
@@ -1565,12 +1565,12 @@ app.post('/api/ai/triage-work-order', async (req: Request, res: Response) => {
       const roomName = room?.name || workOrder?.roomName || 'Shared Common Space';
       const ticketNum = workOrder?.ticketNumber || 'WO-NEW';
       const tenantContact = workOrder?.reportedByName ? `${workOrder.reportedByName} (${workOrder.reportedByPhone || 'No Phone'})` : 'Coliving Resident';
-      const managerPhone = property?.ownerPhone || '(303) 555-0100';
+      const managerPhone = property?.ownerPhone || '(720) 432-5144';
       const managerName = property?.ownerName || 'Jake Moyer';
 
       const vendorSummaries = (vendors && Array.isArray(vendors) && vendors.length > 0)
         ? vendors.slice(0, 10).map((v: any) => `- ${v.name} | Company: ${v.company || 'Independent'} | Specialty: ${v.roleOrSpecialty || 'General'} | Phone: ${v.phone}`).join('\n')
-        : '- Steve Kowalski | Front Range Rapid Plumbing | Master Plumber | (303) 555-0144\n- Mark Henderson | Mile High Heating & Cooling | HVAC Tech | (303) 555-0199\n- Denver Electric Pro | Master Electrician | (303) 555-0182';
+        : '- Steve Kowalski | Front Range Rapid Plumbing | Master Plumber | (720) 432-5144\n- Mark Henderson | Mile High Heating & Cooling | HVAC Tech | (720) 432-5144\n- Denver Electric Pro | Master Electrician | (720) 432-5144';
 
       const systemPrompt = `You are the Senior Maintenance Operations Specialist for Moyer Property Management, a high-end room rental and coliving property management company in Colorado.
 
@@ -1606,7 +1606,7 @@ Provide a JSON response with the following fields:
 `;
 
       const response = await aiClient.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-2.5-flash',
         contents: systemPrompt,
         config: {
           responseMimeType: 'application/json'
@@ -1623,13 +1623,13 @@ Provide a JSON response with the following fields:
         category: parsed.category || 'General Maintenance',
         recommendedTrade: parsed.recommendedTrade || 'Contractor',
         assignedVendorName: parsed.assignedVendorName || 'Moyer Dispatch',
-        assignedVendorPhone: parsed.assignedVendorPhone || '(303) 555-0100',
+        assignedVendorPhone: parsed.assignedVendorPhone || '(720) 432-5144',
         safetyTips: parsed.safetyTips || 'Advise housemates to avoid the affected area and do not force mechanisms.',
         vendorText: parsed.vendorText || `DISPATCH - Moyer PM: ${cleanProblem}`,
         tenantText: parsed.tenantText || `Moyer PM received your request regarding: ${cleanProblem}`,
         costEstimate: parsed.costEstimate || '$150 - $300',
         preventativeAdvice: parsed.preventativeAdvice || 'Inspect fixture during quarterly turnover maintenance.',
-        source: 'gemini-3.8-flash'
+        source: 'gemini-2.5-flash'
       });
     } catch (err: any) {
       console.warn('[Gemini AI] Triage generation failed, using rule-based fallback:', err.message);
@@ -1694,12 +1694,12 @@ Return JSON: { "listing": "full formatted listing text with emojis, bullet point
 
       if (prompt) {
         const response = await aiClient.models.generateContent({
-          model: 'gemini-3.8-flash',
+          model: 'gemini-2.5-flash',
           contents: prompt,
           config: { responseMimeType: 'application/json' }
         });
         const parsed = JSON.parse(response.text || '{}');
-        return res.json({ success: true, ...parsed, source: 'gemini-3.8-flash' });
+        return res.json({ success: true, ...parsed, source: 'gemini-2.5-flash' });
       }
     } catch (err: any) {
       console.warn('[Gemini AI] Operations assistant call failed, falling back:', err.message);

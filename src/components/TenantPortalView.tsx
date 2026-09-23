@@ -125,7 +125,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
     const tenantFirstName = currentRoom?.currentTenantFirstName || (currentRoom?.currentTenantName ? splitFullName(currentRoom.currentTenantName).firstName : 'Resident');
     const tenantLastName = currentRoom?.currentTenantLastName || (currentRoom?.currentTenantName ? splitFullName(currentRoom.currentTenantName).lastName : 'Tenant');
     const tenantName = getTenantFullName(currentRoom) || `${tenantFirstName} ${tenantLastName}`.trim();
-    const tenantPhone = currentRoom?.currentTenantPhone || '(303) 555-0100';
+    const tenantPhone = currentRoom?.currentTenantPhone || '(720) 432-5144';
     const tenantEmail = currentRoom?.currentTenantEmail || `${tenantFirstName.toLowerCase()}.${tenantLastName.toLowerCase()}@example.com`;
 
     const newTicket: WorkOrder = {
@@ -679,7 +679,7 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
                 For active uncontrolled water leaks, gas odor, or total winter furnace loss, please submit this form and call the 24/7 dispatch line immediately:
               </p>
               <div className="bg-white/80 p-2.5 rounded-sm border border-rose-300 font-mono font-bold text-rose-700 text-center text-sm">
-                📞 (303) 555-0199 (Ext 1)
+                📞 (720) 432-5144 (Operations Hotline)
               </div>
             </div>
 
@@ -1069,19 +1069,19 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
               <div className="p-3 bg-zinc-50 rounded-sm border border-zinc-200">
                 <p className="font-bold text-zinc-900">{currentProperty?.ownerName || 'Jake Moyer'} (Property Manager)</p>
                 <p className="text-[11px] text-zinc-600">Operations & Lease Renewals</p>
-                <p className="font-mono text-indigo-600 text-[11px]">{currentProperty?.ownerPhone || '(303) 555-0100'} • {currentProperty?.ownerEmail || 'jake@moyerpm.com'}</p>
+                <p className="font-mono text-indigo-600 text-[11px]">{currentProperty?.ownerPhone || '(720) 432-5144'} • {currentProperty?.ownerEmail || 'info@1070yankstreet.com'}</p>
               </div>
 
               <div className="p-3 bg-zinc-50 rounded-sm border border-zinc-200">
-                <p className="font-bold text-zinc-900">Sarah Jenkins (Resident Coordinator)</p>
+                <p className="font-bold text-zinc-900">Operations Desk (Resident Services)</p>
                 <p className="text-[11px] text-zinc-600">Showing schedules & Move-in inspections</p>
-                <p className="font-mono text-indigo-600 text-[11px]">(303) 555-0102 • sarah@moyerpm.com</p>
+                <p className="font-mono text-indigo-600 text-[11px]">(720) 432-5144 • info@1070yankstreet.com</p>
               </div>
 
               <div className="p-3 bg-rose-50 rounded-sm border border-rose-200">
                 <p className="font-bold text-rose-900">24/7 Emergency Dispatch</p>
                 <p className="text-[11px] text-rose-700">Immediate dispatch for gas, water flood, or heating failure</p>
-                <p className="font-mono font-bold text-rose-800 text-[11px]">(303) 555-0199 (Option 1)</p>
+                <p className="font-mono font-bold text-rose-800 text-[11px]">(720) 432-5144 (Emergency Hotline)</p>
               </div>
             </div>
           </div>

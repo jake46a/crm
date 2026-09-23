@@ -122,7 +122,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
       lastName: lName || undefined,
       name: fullName,
       email: email.trim(),
-      phone: formatPhoneNumber(phone.trim()) || '(303) 555-0199',
+      phone: formatPhoneNumber(phone.trim()) || '(720) 432-5144',
       source: source as any,
       stage,
       assignedAgent: assignedAgent.trim() || (leasingAgentContacts[0]?.name || 'Jake Moyer'),
@@ -228,7 +228,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
               <label className="block font-bold text-zinc-700 mb-1">Phone Number</label>
               <input
                 type="tel"
-                placeholder="(303) 555-0182"
+                placeholder="(720) 432-5144"
                 value={phone}
                 onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
                 className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono"

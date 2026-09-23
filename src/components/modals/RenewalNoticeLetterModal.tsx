@@ -77,7 +77,7 @@ export const RenewalNoticeLetterModal: React.FC<RenewalNoticeLetterModalProps> =
           <div>
             <h1 style="font-size: 18px; font-weight: 900; margin: 0; color: #09090b;">MOYER PROPERTY MANAGEMENT</h1>
             <p style="font-size: 11px; color: #71717a; margin: 2px 0 0 0;">Coliving & Room Rental Operations</p>
-            <p style="font-size: 10px; color: #a1a1aa; margin: 2px 0 0 0;">1000 Speer Blvd, Suite 400, Denver, CO 80204 • (303) 555-0100</p>
+            <p style="font-size: 10px; color: #a1a1aa; margin: 2px 0 0 0;">1070 Yank St, Golden, CO 80401 • (720) 432-5144</p>
           </div>
           <div style="text-align: right; font-size: 11px; color: #52525b;">
             <p style="font-weight: bold; margin: 0;">Date: ${formattedDate}</p>

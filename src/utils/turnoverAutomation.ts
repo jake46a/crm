@@ -82,7 +82,7 @@ Target: Complete within 48-72 hours for next resident move-in.`;
     roomName: room.name,
     isCommonArea: false,
     reportedByName: 'Turnover Automation System',
-    reportedByPhone: '(303) 555-0100',
+    reportedByPhone: '(720) 432-5144',
     category: 'Turnover & Prep',
     priority: 'High',
     status: 'New',

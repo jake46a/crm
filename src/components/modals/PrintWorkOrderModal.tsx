@@ -67,7 +67,7 @@ export const PrintWorkOrderModal: React.FC<PrintWorkOrderModalProps> = ({
               Coliving & Residential Maintenance Dispatch Ticket
             </div>
             <div style="font-size: 10px; color: #71717a; margin-top: 2px;">
-              1000 Speer Blvd, Denver, CO 80204 • Operations Hotline: (303) 555-0100
+              1070 Yank St, Golden, CO 80401 • Operations Hotline: (720) 432-5144
             </div>
           </div>
           <div style="text-align: right; background-color: #f4f4f5; padding: 8px 12px; border: 1px solid #e4e4e7; border-radius: 4px;">
@@ -98,7 +98,7 @@ export const PrintWorkOrderModal: React.FC<PrintWorkOrderModalProps> = ({
             </div>
             <div style="font-size: 13px; font-weight: bold; color: #0f172a;">${workOrder.propertyName}</div>
             <div style="font-size: 11px; color: #475569;">
-              ${prop?.address || '1000 Speer Blvd'}, ${prop?.city || 'Denver'}, ${prop?.state || 'CO'} ${prop?.zip || '80204'}
+              ${prop?.address || '1070 Yank St'}, ${prop?.city || 'Golden'}, ${prop?.state || 'CO'} ${prop?.zip || '80401-4223'}
             </div>
             <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; font-size: 11px;">
               <span style="color: #64748b;">Assigned Area / Unit:</span>
@@ -123,7 +123,7 @@ export const PrintWorkOrderModal: React.FC<PrintWorkOrderModalProps> = ({
             <div style="font-size: 11px; margin-bottom: 4px;">
               <span style="color: #64748b;">Master Keypad Code:</span>
               <strong style="font-family: monospace; background-color: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 3px; border: 1px solid #fde68a;">
-                ${prop?.keypadMasterCode ? prop.keypadMasterCode : 'Lockbox on Site'}
+                ${prop?.keypadMasterCode ? prop.keypadMasterCode : 'Manual Key'}
               </strong>
             </div>
             <div style="font-size: 10px; color: #475569; background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 3px; padding: 4px 6px; margin-top: 4px;">
@@ -141,7 +141,7 @@ export const PrintWorkOrderModal: React.FC<PrintWorkOrderModalProps> = ({
               👤 Resident / Reporter Information
             </div>
             <div style="font-size: 11px; font-weight: bold; color: #18181b;">${workOrder.reportedByName || 'Moyer Operations Dispatch'}</div>
-            <div style="font-size: 11px; font-family: monospace; color: #52525b;">${workOrder.reportedByPhone || '(303) 555-0100'}</div>
+            <div style="font-size: 11px; font-family: monospace; color: #52525b;">${workOrder.reportedByPhone || '(720) 432-5144'}</div>
           </div>
         </div>
 
@@ -151,7 +151,7 @@ export const PrintWorkOrderModal: React.FC<PrintWorkOrderModalProps> = ({
               🛠️ Assigned Contractor / Technician
             </div>
             <div style="font-size: 11px; font-weight: bold; color: #18181b;">${workOrder.assignedVendorName || 'In-House Maintenance Team'}</div>
-            <div style="font-size: 11px; font-family: monospace; color: #52525b;">${workOrder.assignedVendorPhone || vendor?.phone || '(303) 555-0100'}</div>
+            <div style="font-size: 11px; font-family: monospace; color: #52525b;">${workOrder.assignedVendorPhone || vendor?.phone || '(720) 432-5144'}</div>
           </div>
         </div>
       </div>
@@ -277,20 +277,20 @@ CATEGORY: ${workOrder.category}
 LOCATION & PROPERTY:
 --------------------
 Property: ${workOrder.propertyName}
-Address: ${prop?.address || '1000 Speer Blvd'}, ${prop?.city || 'Denver'}, ${prop?.state || 'CO'} ${prop?.zip || '80204'}
+Address: ${prop?.address || '1070 Yank St'}, ${prop?.city || 'Golden'}, ${prop?.state || 'CO'} ${prop?.zip || '80401-4223'}
 Unit / Area: ${workOrder.roomName || 'Common Area'}
 Property Type: ${prop?.type || 'Coliving Residence'}
 
 ACCESS & SECURITY INSTRUCTIONS:
 -------------------------------
 Entry Permission: ${workOrder.entryPermission ? 'YES - Permission Granted to Enter if Unoccupied' : 'NO - Call First / Resident Must Be Present'}
-Master Keypad Code: ${prop?.keypadMasterCode ? prop.keypadMasterCode : 'N/A (Keys via Lockbox)'}
+Master Keypad Code: ${prop?.keypadMasterCode ? prop.keypadMasterCode : 'Manual Key'}
 Access Notes: ${workOrder.accessInstructions || 'Standard tenant notice given. Ring buzzer / knock before entry.'}
 
 RESIDENT CONTACT:
 -----------------
 Reported By: ${workOrder.reportedByName || 'Management Dispatch'}
-Resident Phone: ${workOrder.reportedByPhone || '(303) 555-0100'}
+Resident Phone: ${workOrder.reportedByPhone || '(720) 432-5144'}
 
 ISSUE DESCRIPTION & SCOPE:
 --------------------------
@@ -301,7 +301,7 @@ Estimated Budget: $${workOrder.estimatedCost}
 ASSIGNED TECHNICIAN / VENDOR:
 -----------------------------
 Assigned To: ${workOrder.assignedVendorName || 'In-House Maintenance Dispatch'}
-Contractor Phone: ${workOrder.assignedVendorPhone || vendor?.phone || '(303) 555-0100'}
+Contractor Phone: ${workOrder.assignedVendorPhone || vendor?.phone || '(720) 432-5144'}
 
 ------------------------------------------------------
 FIELD COMPLETION & MAINTENANCE SIGN-OFF (PAPER COPY)
@@ -405,7 +405,7 @@ Tenant Acknowledgment: ________________ Date: ________
                   </span>
                 </div>
                 <p className="text-[11px] text-zinc-500 mt-0.5">Coliving & Residential Maintenance Dispatch</p>
-                <p className="text-[10px] text-zinc-400 mt-0.5">1000 Speer Blvd, Denver, CO 80204 • Operations: (303) 555-0100</p>
+                <p className="text-[10px] text-zinc-400 mt-0.5">1070 Yank St, Golden, CO 80401 • Operations: (720) 432-5144</p>
               </div>
 
               <div className="text-left sm:text-right bg-zinc-50 p-2.5 rounded-sm border border-zinc-200 min-w-[200px]">
@@ -442,7 +442,7 @@ Tenant Acknowledgment: ________________ Date: ________
                 <div>
                   <p className="font-bold text-zinc-900 text-sm">{workOrder.propertyName}</p>
                   <p className="text-zinc-600 text-[11px]">
-                    {prop?.address || '1000 Speer Blvd'}, {prop?.city || 'Denver'}, {prop?.state || 'CO'} {prop?.zip || '80204'}
+                    {prop?.address || '1070 Yank St'}, {prop?.city || 'Golden'}, {prop?.state || 'CO'} {prop?.zip || '80401-4223'}
                   </p>
                   <div className="mt-2 pt-1 border-t border-zinc-200/80 flex items-center justify-between">
                     <span className="text-zinc-500 font-medium">Specific Area / Unit:</span>
@@ -475,7 +475,7 @@ Tenant Acknowledgment: ________________ Date: ________
                   <div className="flex items-center justify-between">
                     <span className="text-zinc-500">Master Keypad Code:</span>
                     <span className="font-mono font-bold text-zinc-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                      {prop?.keypadMasterCode ? prop.keypadMasterCode : 'Lockbox on Site'}
+                      ${prop?.keypadMasterCode ? prop.keypadMasterCode : 'Manual Key'}
                     </span>
                   </div>
 
@@ -495,7 +495,7 @@ Tenant Acknowledgment: ________________ Date: ________
                 <p className="font-bold text-zinc-800">{workOrder.reportedByName || 'Moyer Operations Dispatch'}</p>
                 <p className="text-zinc-600 font-mono flex items-center gap-1 mt-0.5">
                   <Phone className="w-3 h-3 text-zinc-400" />
-                  {workOrder.reportedByPhone || '(303) 555-0100'}
+                  {workOrder.reportedByPhone || '(720) 432-5144'}
                 </p>
               </div>
 
@@ -506,7 +506,7 @@ Tenant Acknowledgment: ________________ Date: ________
                 <p className="font-bold text-zinc-800">{workOrder.assignedVendorName || 'In-House Maintenance Team'}</p>
                 <p className="text-zinc-600 font-mono flex items-center gap-1 mt-0.5">
                   <Phone className="w-3 h-3 text-zinc-400" />
-                  {workOrder.assignedVendorPhone || vendor?.phone || '(303) 555-0100'}
+                  {workOrder.assignedVendorPhone || vendor?.phone || '(720) 432-5144'}
                 </p>
               </div>
             </div>

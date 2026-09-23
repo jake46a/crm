@@ -27,7 +27,7 @@ export const NewPropertyModal: React.FC<NewPropertyModalProps> = ({
   const [propertyType, setPropertyType] = useState<string>('Coliving Single-Family');
   const [yearBuilt, setYearBuilt] = useState<number>(2018);
   const [ownerName, setOwnerName] = useState<string>('Jake Moyer');
-  const [ownerPhone, setOwnerPhone] = useState<string>('(303) 555-0100');
+  const [ownerPhone, setOwnerPhone] = useState<string>('(720) 432-5144');
   const [ownerEmail, setOwnerEmail] = useState<string>('jmoyer@moyerpm.com');
   const [wifiNetwork, setWifiNetwork] = useState<string>('MoyerColiving_Guest');
   const [wifiPassword, setWifiPassword] = useState<string>('StayClean2026!');
@@ -55,7 +55,7 @@ export const NewPropertyModal: React.FC<NewPropertyModalProps> = ({
         setPropertyType(editingProperty.propertyType || 'Coliving Single-Family');
         setYearBuilt(editingProperty.yearBuilt || 2020);
         setOwnerName(editingProperty.ownerName || 'Jake Moyer');
-        setOwnerPhone(formatPhoneNumber(editingProperty.ownerPhone) || '(303) 555-0100');
+        setOwnerPhone(formatPhoneNumber(editingProperty.ownerPhone) || '(720) 432-5144');
         setOwnerEmail(editingProperty.ownerEmail || 'jmoyer@moyerpm.com');
         setWifiNetwork(editingProperty.wifiNetwork || 'MoyerColiving_Guest');
         setWifiPassword(editingProperty.wifiPassword || 'StayClean2026!');
@@ -78,7 +78,7 @@ export const NewPropertyModal: React.FC<NewPropertyModalProps> = ({
         setPropertyType('Coliving Single-Family');
         setYearBuilt(2021);
         setOwnerName('Jake Moyer');
-        setOwnerPhone('(303) 555-0100');
+        setOwnerPhone('(720) 432-5144');
         setOwnerEmail('jmoyer@moyerpm.com');
         setWifiNetwork('MoyerColiving_Guest');
         setWifiPassword('StayClean2026!');

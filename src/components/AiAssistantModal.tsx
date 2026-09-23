@@ -95,16 +95,22 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   const [matchOutput, setMatchOutput] = useState<{ score: number; verdict: string; highlights: string[]; considerations: string[] } | null>(null);
 
   // Tool 3 State: Work Order Triage
+  const defaultProp = properties.find(p => p.id === 'prop-1070-yank' || p.name?.includes('1070 Yank')) || properties[0];
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string>(initialWorkOrderId || (workOrders[0]?.id || 'custom'));
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string>(properties[0]?.id || '');
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>(defaultProp?.id || properties[0]?.id || '');
   const [triageRoomId, setTriageRoomId] = useState<string>('');
   const [selectedVendorId, setSelectedVendorId] = useState<string>('auto');
   const [authorizedBudget, setAuthorizedBudget] = useState<number>(350);
-  const [triageProblem, setTriageProblem] = useState<string>(
-    workOrders[0] 
-      ? `${workOrders[0].title}: ${workOrders[0].description}`
-      : 'Kitchen sink drain is backed up with standing water, and the garbage disposal hums loudly without rotating.'
-  );
+  const [triageProblem, setTriageProblem] = useState<string>(() => {
+    if (initialWorkOrderId) {
+      const found = workOrders.find(w => w.id === initialWorkOrderId);
+      if (found) return `${found.title}: ${found.description}`;
+    }
+    if (workOrders[0]) {
+      return `${workOrders[0].title}: ${workOrders[0].description}`;
+    }
+    return '';
+  });
   const [triageOutput, setTriageOutput] = useState<TriageOutput | null>(null);
   const [triageSavedNotice, setTriageSavedNotice] = useState<string | null>(null);
 
@@ -132,7 +138,10 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     setSelectedWorkOrderId(woId);
     setTriageSavedNotice(null);
     if (woId === 'custom') {
-      setTriageProblem('Describe the maintenance issue or select an active work order ticket above...');
+      setTriageProblem('');
+      const defaultYank = properties.find(p => p.id === 'prop-1070-yank' || p.name?.includes('1070 Yank')) || properties[0];
+      if (defaultYank) setSelectedPropertyId(defaultYank.id);
+      setTriageRoomId('');
       return;
     }
     const wo = workOrders.find(w => w.id === woId);
@@ -195,7 +204,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     // High quality client fallback
     let text = '';
     if (renewalTone === 'warm') {
-      text = `MOYER PROPERTY MANAGEMENT\nRoom Rentals & Coliving Community\nDate: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}\n\nDear ${ren.tenantName},\n\nWe would like to express our sincere gratitude for having you as part of our house community at ${ren.propertyName}. Your current lease for ${ren.roomName} concludes on ${ren.currentLeaseEndDate}.\n\nAs a valued resident, we are pleased to present your 12-Month Lease Renewal Offer:\n\n• Property: ${ren.propertyName}\n• Room: ${ren.roomName} (${room?.bathroomType || 'Private Ensuite'})\n• Current Monthly Rent: $${ren.currentMonthlyRent}.00\n• Proposed Renewal Rent: $${ren.proposedMonthlyRent}.00/month (Includes all high-speed Wi-Fi, commons cleaning, water & trash)\n• New Term: ${ren.currentLeaseEndDate} through September 30, 2027\n• Confirmation Deadline: ${ren.decisionDeadline}\n\nPlease reply to this notice or click in the Moyer Resident Portal to confirm your renewal.\n\nWarm regards,\nMoyer Property Management Team\nOperations Desk: (303) 555-0100 | contact@moyerpm.com`;
+      text = `MOYER PROPERTY MANAGEMENT\nRoom Rentals & Coliving Community\nDate: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}\n\nDear ${ren.tenantName},\n\nWe would like to express our sincere gratitude for having you as part of our house community at ${ren.propertyName}. Your current lease for ${ren.roomName} concludes on ${ren.currentLeaseEndDate}.\n\nAs a valued resident, we are pleased to present your 12-Month Lease Renewal Offer:\n\n• Property: ${ren.propertyName}\n• Room: ${ren.roomName} (${room?.bathroomType || 'Private Ensuite'})\n• Current Monthly Rent: $${ren.currentMonthlyRent}.00\n• Proposed Renewal Rent: $${ren.proposedMonthlyRent}.00/month (Includes all high-speed Wi-Fi, commons cleaning, water & trash)\n• New Term: ${ren.currentLeaseEndDate} through September 30, 2027\n• Confirmation Deadline: ${ren.decisionDeadline}\n\nPlease reply to this notice or click in the Moyer Resident Portal to confirm your renewal.\n\nWarm regards,\nMoyer Property Management Team\nOperations Desk: (720) 432-5144 | info@1070yankstreet.com`;
     } else if (renewalTone === 'incentive') {
       text = `MOYER PROPERTY MANAGEMENT - PREFERRED RESIDENT RENEWAL OFFER\nDate: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}\n\nDear ${ren.tenantName},\n\nBecause of your exemplary record and great relationship with your housemates at ${ren.propertyName}, Moyer Property Management is offering you a Preferred Renewal Incentive:\n\n• Guaranteed Fixed Rate: $${ren.proposedMonthlyRent}.00/month for 12 months (Below market comp of $${ren.proposedMonthlyRent + 75}/mo)\n• FREE Annual Room Deep Clean & Carpet Refresh included upon renewal\n• Flexible 30-Day Sublet Authorization if travel required\n\nTo lock in this preferred rate for ${ren.roomName}, please confirm prior to ${ren.decisionDeadline}.\n\nBest,\nJake Moyer, Principal Property Manager`;
     } else {
@@ -300,9 +309,9 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
             city: activeProp.city,
             state: activeProp.state,
             ownerName: activeProp.ownerName || 'Jake Moyer',
-            ownerPhone: activeProp.ownerPhone || '(303) 555-0100',
-            ownerEmail: activeProp.ownerEmail || 'jmoyer@moyerpm.com',
-            keypadMasterCode: activeProp.keypadMasterCode || '5829'
+            ownerPhone: activeProp.ownerPhone || '(720) 432-5144',
+            ownerEmail: activeProp.ownerEmail || 'info@1070yankstreet.com',
+            keypadMasterCode: activeProp.keypadMasterCode || 'Manual Key'
           } : undefined,
           room: activeRoom ? {
             name: activeRoom.name,
@@ -322,7 +331,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
           category: data.category || 'General Maintenance',
           recommendedTrade: data.recommendedTrade || 'Contractor',
           assignedVendorName: data.assignedVendorName || 'Moyer Operations Dispatch',
-          assignedVendorPhone: data.assignedVendorPhone || '(303) 555-0100',
+          assignedVendorPhone: data.assignedVendorPhone || '(720) 432-5144',
           safetyTips: data.safetyTips,
           vendorText: data.vendorText,
           tenantText: data.tenantText,
@@ -336,19 +345,20 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     } catch (err: any) {
       console.warn('Triage call error, generating local emergency triage:', err);
       // Fail-safe rich triage
-      const propName = activeProp?.name || 'Speer Coliving House';
-      const keycode = activeProp?.keypadMasterCode || '5829';
-      const managerPhone = activeProp?.ownerPhone || '(303) 555-0100';
+      const propName = activeProp?.name || '1070 Yank St';
+      const keycode = activeProp?.keypadMasterCode || 'Manual Key';
+      const managerPhone = activeProp?.ownerPhone || '(720) 432-5144';
+      const propAddress = activeProp?.address ? `${activeProp.address}, ${activeProp.city || 'Golden'}, ${activeProp.state || 'CO'} ${activeProp.zip || '80401-4223'}` : '1070 Yank St, Golden, CO 80401';
       setTriageOutput({
         priority: 'High Priority (Dispatch within 4-6 Hours)',
         urgencyLevel: 'High',
         category: 'Plumbing & Kitchen Fixtures',
         recommendedTrade: 'Master Plumber',
         assignedVendorName: 'Steve Kowalski (Front Range Rapid Plumbing)',
-        assignedVendorPhone: '(303) 555-0144',
+        assignedVendorPhone: '(720) 432-5144',
         safetyTips: 'Notify housemates: Do NOT run dishwasher or pour chemical drain cleaners into sink. Turn off power switch under the sink to prevent motor burnout. Shut off angle-stop supply valves if active leak.',
-        vendorText: `URGENT DISPATCH - Moyer Property Management\nVendor: Steve Kowalski (Front Range Rapid Plumbing)\nProperty: ${propName} (${activeProp?.address || '1424 Speer Blvd'})\nAccess: Keycode ${keycode}\nIssue: ${triageProblem}\nAuthorized initial NTE: $${authorizedBudget}. Please call dispatch when onsite: ${managerPhone}.`,
-        tenantText: `Hi ${propName} residents, Moyer Operations received your report regarding "${triageProblem.slice(0, 50)}...". Triaged as High Priority. A licensed contractor has been dispatched. Please observe safety warnings: do not use the fixture until cleared.`,
+        vendorText: `URGENT DISPATCH - Moyer Property Management\nVendor: Steve Kowalski (Front Range Rapid Plumbing)\nProperty: ${propName} (${propAddress})\nAccess: Keycode ${keycode}\nIssue: ${triageProblem || 'Maintenance request'}\nAuthorized initial NTE: $${authorizedBudget}. Please call dispatch when onsite: ${managerPhone}.`,
+        tenantText: `Hi ${propName} residents, Moyer Operations received your report regarding "${(triageProblem || 'Maintenance report').slice(0, 50)}...". Triaged as High Priority. A licensed contractor has been dispatched. Please observe safety warnings: do not use the fixture until cleared.`,
         costEstimate: '$175 - $325',
         preventativeAdvice: 'Install drain strainers and review kitchen sink coliving guidelines with residents during onboarding.',
         source: 'local_failsafe'
@@ -399,7 +409,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
       console.warn('AI marketing API fallback:', e);
     }
 
-    const listing = `🌟 FURNISHED ROOM FOR RENT: ${room.name} @ ${room.propertyName}\nRent: $${room.monthlyRent}/mo | Deposit: $${room.securityDeposit} | Move-in Ready!\n\nLooking for clean, friendly, and respectful co-living in ${prop?.city || 'Denver'}? Moyer Property Management has an opening in our premier room rental home.\n\n✨ YOUR PRIVATE ROOM:\n• ${room.sqft} sqft with ${room.bathroomType}\n• ${room.isFurnished ? 'Fully furnished (Queen bed, desk, chair, wardrobe, blackout shades)' : 'Spacious unfurnished bedroom'}\n• Keyless digital keypad entry on your private bedroom door\n• High-speed fiber Wi-Fi included!\n\n🏡 SHARED HOUSE AMENITIES:\n${prop?.sharedAmenities.slice(0, 5).map(a => `• ${a}`).join('\n')}\n\n📋 HOUSE RULES & CULTURE:\n• Working professionals & graduate students\n• Quiet hours 10 PM - 7 AM\n• Non-smoking house\n\n📞 Schedule a tour today with Moyer Property Management: (303) 555-0100 or apply online!`;
+    const listing = `🌟 FURNISHED ROOM FOR RENT: ${room.name} @ ${room.propertyName}\nRent: $${room.monthlyRent}/mo | Deposit: $${room.securityDeposit} | Move-in Ready!\n\nLooking for clean, friendly, and respectful co-living in ${prop?.city || 'Golden'}? Moyer Property Management has an opening in our premier room rental home.\n\n✨ YOUR PRIVATE ROOM:\n• ${room.sqft} sqft with ${room.bathroomType}\n• ${room.isFurnished ? 'Fully furnished (Queen bed, desk, chair, wardrobe, blackout shades)' : 'Spacious unfurnished bedroom'}\n• Keyless digital keypad entry on your private bedroom door\n• High-speed fiber Wi-Fi included!\n\n🏡 SHARED HOUSE AMENITIES:\n${prop?.sharedAmenities.slice(0, 5).map(a => `• ${a}`).join('\n')}\n\n📋 HOUSE RULES & CULTURE:\n• Working professionals & graduate students\n• Quiet hours 10 PM - 7 AM\n• Non-smoking house\n\n📞 Schedule a tour today with Moyer Property Management: (720) 432-5144 or apply online!`;
     setMarketingOutput(listing);
     setIsGenerating(false);
   };
@@ -450,7 +460,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
           assignedVendorPhone: triageOutput.assignedVendorPhone || existingWO.assignedVendorPhone,
           assignedVendorId: matchedContractor?.id || existingWO.assignedVendorId,
           status: existingWO.status === 'New' ? 'Assigned' : existingWO.status,
-          internalNotes: `${existingWO.internalNotes ? existingWO.internalNotes + '\n\n' : ''}[AI Operations Triage (${new Date().toLocaleDateString()} - Gemini 3.8 Flash)]:\n${triageOutput.priority}\nRecommended Trade: ${triageOutput.recommendedTrade}\nSafety Protocol: ${triageOutput.safetyTips}\nDispatch SMS Draft:\n${triageOutput.vendorText}`
+          internalNotes: `${existingWO.internalNotes ? existingWO.internalNotes + '\n\n' : ''}[AI Operations Triage (${new Date().toLocaleDateString()} - Gemini 2.5 Flash)]:\n${triageOutput.priority}\nRecommended Trade: ${triageOutput.recommendedTrade}\nSafety Protocol: ${triageOutput.safetyTips}\nDispatch SMS Draft:\n${triageOutput.vendorText}`
         };
         onSaveWorkOrder(updatedWO);
         setTriageSavedNotice(`✅ Updated Ticket ${existingWO.ticketNumber} with AI triage severity, contractor dispatch & safety protocols!`);
@@ -459,20 +469,21 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     }
 
     // Create a new work order from triage
-    const targetProp = properties.find(p => p.id === selectedPropertyId) || properties[0];
+    const yankFallback = properties.find(p => p.id === 'prop-1070-yank' || p.name?.includes('1070 Yank')) || properties[0];
+    const targetProp = properties.find(p => p.id === selectedPropertyId) || yankFallback;
     const newTicketNum = `WO-${Math.floor(1000 + Math.random() * 9000)}`;
     const newWO: WorkOrder = {
       id: `wo_${Date.now()}`,
       ticketNumber: newTicketNum,
-      title: triageProblem.slice(0, 60),
-      description: triageProblem,
-      propertyId: targetProp?.id || 'prop_speer',
-      propertyName: targetProp?.name || 'Moyer Coliving House',
+      title: (triageProblem || 'Maintenance Request').slice(0, 60),
+      description: triageProblem || 'Maintenance Request',
+      propertyId: targetProp?.id || 'prop-1070-yank',
+      propertyName: targetProp?.name || '1070 Yank St',
       roomId: triageRoomId || undefined,
       roomName: rooms.find(r => r.id === triageRoomId)?.name || 'Common Area',
       isCommonArea: !triageRoomId,
       reportedByName: 'Moyer Operations Triage',
-      reportedByPhone: '(303) 555-0100',
+      reportedByPhone: '(720) 432-5144',
       category: mapCategory(triageOutput.category),
       priority: targetPriority,
       status: 'Assigned',
@@ -481,7 +492,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
       assignedVendorId: matchedContractor?.id,
       estimatedCost: parsedCost,
       dateReported: new Date().toISOString().split('T')[0],
-      internalNotes: `[AI Operations Triage - Gemini 3.8 Flash]:\n${triageOutput.priority}\nSafety Protocol: ${triageOutput.safetyTips}\nVendor SMS:\n${triageOutput.vendorText}`
+      internalNotes: `[AI Operations Triage - Gemini 2.5 Flash]:\n${triageOutput.priority}\nSafety Protocol: ${triageOutput.safetyTips}\nVendor SMS:\n${triageOutput.vendorText}`
     };
     onSaveWorkOrder(newWO);
     setTriageSavedNotice(`✅ Created new Ticket ${newTicketNum} in CRM with AI triage recommendations!`);
