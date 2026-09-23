@@ -299,6 +299,9 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
             address: activeProp.address,
             city: activeProp.city,
             state: activeProp.state,
+            ownerName: activeProp.ownerName || 'Jake Moyer',
+            ownerPhone: activeProp.ownerPhone || '(303) 555-0100',
+            ownerEmail: activeProp.ownerEmail || 'jmoyer@moyerpm.com',
             keypadMasterCode: activeProp.keypadMasterCode || '5829'
           } : undefined,
           room: activeRoom ? {
@@ -335,6 +338,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
       // Fail-safe rich triage
       const propName = activeProp?.name || 'Speer Coliving House';
       const keycode = activeProp?.keypadMasterCode || '5829';
+      const managerPhone = activeProp?.ownerPhone || '(303) 555-0100';
       setTriageOutput({
         priority: 'High Priority (Dispatch within 4-6 Hours)',
         urgencyLevel: 'High',
@@ -343,7 +347,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
         assignedVendorName: 'Steve Kowalski (Front Range Rapid Plumbing)',
         assignedVendorPhone: '(303) 555-0144',
         safetyTips: 'Notify housemates: Do NOT run dishwasher or pour chemical drain cleaners into sink. Turn off power switch under the sink to prevent motor burnout. Shut off angle-stop supply valves if active leak.',
-        vendorText: `URGENT DISPATCH - Moyer Property Management\nVendor: Steve Kowalski (Front Range Rapid Plumbing)\nProperty: ${propName} (${activeProp?.address || '1424 Speer Blvd'})\nAccess: Keycode ${keycode}\nIssue: ${triageProblem}\nAuthorized initial NTE: $${authorizedBudget}. Please call dispatch when onsite: (303) 555-0100.`,
+        vendorText: `URGENT DISPATCH - Moyer Property Management\nVendor: Steve Kowalski (Front Range Rapid Plumbing)\nProperty: ${propName} (${activeProp?.address || '1424 Speer Blvd'})\nAccess: Keycode ${keycode}\nIssue: ${triageProblem}\nAuthorized initial NTE: $${authorizedBudget}. Please call dispatch when onsite: ${managerPhone}.`,
         tenantText: `Hi ${propName} residents, Moyer Operations received your report regarding "${triageProblem.slice(0, 50)}...". Triaged as High Priority. A licensed contractor has been dispatched. Please observe safety warnings: do not use the fixture until cleared.`,
         costEstimate: '$175 - $325',
         preventativeAdvice: 'Install drain strainers and review kitchen sink coliving guidelines with residents during onboarding.',

@@ -1524,8 +1524,9 @@ function generateRuleBasedTriage(problem: string, property: any, room: any, vend
   const keycode = property?.keypadMasterCode || '5829';
   const roomName = room?.name || workOrder?.roomName || 'Common Area';
   const ticketId = workOrder?.ticketNumber || 'WO-URGENT';
+  const managerPhone = property?.ownerPhone || '(303) 555-0100';
 
-  const vendorText = `${urgencyLevel === 'Emergency' ? 'EMERGENCY DISPATCH' : 'SERVICE DISPATCH'} - Moyer Property Management\nVendor: ${matchedVendor.name} (${matchedVendor.company || 'Service Contractor'})\nProperty: ${propName} (${propAddress})\nLocation: ${roomName}\nKeycode Access: ${keycode}\nTicket: ${ticketId}\nIssue: ${problem}\nAuthorized Spending Cap: $350 (Call if exceeding).\nPlease reply with your estimated arrival time or call dispatch at (303) 555-0100.`;
+  const vendorText = `${urgencyLevel === 'Emergency' ? 'EMERGENCY DISPATCH' : 'SERVICE DISPATCH'} - Moyer Property Management\nVendor: ${matchedVendor.name} (${matchedVendor.company || 'Service Contractor'})\nProperty: ${propName} (${propAddress})\nLocation: ${roomName}\nKeycode Access: ${keycode}\nTicket: ${ticketId}\nIssue: ${problem}\nAuthorized Spending Cap: $350 (Call if exceeding).\nPlease reply with your estimated arrival time or call dispatch at ${managerPhone}.`;
 
   const tenantText = `Hi ${propName} residents, this is Moyer Operations Desk. We received the report regarding "${problem.slice(0, 60)}..." and have triaged it as ${priority}. ${matchedVendor.name} from ${matchedVendor.company || 'our contractor team'} has been notified for dispatch. In the meantime, please note: ${safetyTips} We will text updates as soon as the technician is onsite.`;
 
@@ -1564,6 +1565,8 @@ app.post('/api/ai/triage-work-order', async (req: Request, res: Response) => {
       const roomName = room?.name || workOrder?.roomName || 'Shared Common Space';
       const ticketNum = workOrder?.ticketNumber || 'WO-NEW';
       const tenantContact = workOrder?.reportedByName ? `${workOrder.reportedByName} (${workOrder.reportedByPhone || 'No Phone'})` : 'Coliving Resident';
+      const managerPhone = property?.ownerPhone || '(303) 555-0100';
+      const managerName = property?.ownerName || 'Jake Moyer';
 
       const vendorSummaries = (vendors && Array.isArray(vendors) && vendors.length > 0)
         ? vendors.slice(0, 10).map((v: any) => `- ${v.name} | Company: ${v.company || 'Independent'} | Specialty: ${v.roleOrSpecialty || 'General'} | Phone: ${v.phone}`).join('\n')
@@ -1582,6 +1585,7 @@ CONTEXT:
 - Ticket ID: ${ticketNum}
 - Keycode Access: ${keycode}
 - Resident: ${tenantContact}
+- Management Dispatch Callback: ${managerName} at ${managerPhone}
 - Authorized Initial Budget Cap: $${authorizedLimit}
 
 AVAILABLE CONTRACTORS IN DIRECTORY:
@@ -1595,7 +1599,7 @@ Provide a JSON response with the following fields:
 5. "assignedVendorName": string (best matched contractor from the directory, or name from directory)
 6. "assignedVendorPhone": string (phone of matched contractor)
 7. "safetyTips": string (actionable, immediate safety and loss-prevention instructions for coliving housemates, including water shutoff valves, breaker switches, appliance disconnect, ventilation, etc.)
-8. "vendorText": string (a concise, professional ready-to-send SMS dispatch message to the vendor with property name, address, keycode, exact problem, unit/room, NTE spending cap, and callback number)
+8. "vendorText": string (a concise, professional ready-to-send SMS dispatch message to the vendor with property name, address, keycode, exact problem, unit/room, NTE spending cap, and manager callback number: ${managerPhone})
 9. "tenantText": string (a reassuring, courteous SMS notification for the resident acknowledging the issue, ETA expectations, and safety instructions)
 10. "costEstimate": string (realistic market repair cost range, e.g. "$175 - $325")
 11. "preventativeAdvice": string (actionable preventative tips to avoid recurrence in high-occupancy room rentals)

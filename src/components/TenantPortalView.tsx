@@ -1067,9 +1067,9 @@ export const TenantPortalView: React.FC<TenantPortalViewProps> = ({
 
             <div className="space-y-2.5">
               <div className="p-3 bg-zinc-50 rounded-sm border border-zinc-200">
-                <p className="font-bold text-zinc-900">Jake Moyer (Managing Director)</p>
+                <p className="font-bold text-zinc-900">{currentProperty?.ownerName || 'Jake Moyer'} (Property Manager)</p>
                 <p className="text-[11px] text-zinc-600">Operations & Lease Renewals</p>
-                <p className="font-mono text-indigo-600 text-[11px]">(303) 555-0100 • jake@moyerpm.com</p>
+                <p className="font-mono text-indigo-600 text-[11px]">{currentProperty?.ownerPhone || '(303) 555-0100'} • {currentProperty?.ownerEmail || 'jake@moyerpm.com'}</p>
               </div>
 
               <div className="p-3 bg-zinc-50 rounded-sm border border-zinc-200">
