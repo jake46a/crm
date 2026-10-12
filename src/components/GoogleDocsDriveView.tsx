@@ -676,8 +676,68 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
       setDocHistory(prev => [record, ...prev.slice(0, 49)]); // Keep last 50
     } catch (err: any) {
       console.error('Generation failed:', err);
-      const errMsg = GoogleWorkspaceService.extractErrorMessage(err, 'An error occurred during Google Docs generation.');
-      setGenerationError(errMsg);
+      const rawErrMsg = GoogleWorkspaceService.extractErrorMessage(err, 'An error occurred during Google Docs generation.');
+      const isDocsApiDisabled = rawErrMsg.toLowerCase().includes('docs.googleapis.com') || 
+        rawErrMsg.toLowerCase().includes('has not been used in project') ||
+        rawErrMsg.toLowerCase().includes('api is disabled') ||
+        rawErrMsg.toLowerCase().includes('enable it by visiting');
+
+      // If Docs API is disabled in GCP project, attempt auto-fallback: generate populated PDF and save directly to Google Drive!
+      if (isDocsApiDisabled && token) {
+        try {
+          console.info('Docs API is not enabled in GCP project. Auto-falling back to generating populated PDF and saving directly to Drive...');
+          const activeTemplate = templates.find(t => t.id === selectedTemplateId) || templates[0] || GoogleWorkspaceService.getTemplates()[0];
+          const activeRoom = rooms.find(r => r.id === selectedRoomId);
+          const activeProperty = properties.find(p => p.id === selectedPropertyId) || properties.find(p => p.id === activeRoom?.propertyId) || defaultProperty;
+          const tenantClean = (customTenantName || '').trim() || (activeRoom?.currentTenantName || '').trim() || 'Resident';
+          const roomClean = (customRoomName || '').trim() || (activeRoom?.name || '').trim() || 'Room 1';
+          const propertyClean = (customPropertyName || '').trim() || (activeProperty?.name || '').trim() || '1070 Yank St';
+          const addressClean = (customPropertyAddress || '').trim() || (activeProperty && activeProperty.address ? `${activeProperty.address}, ${activeProperty.city || ''}, ${activeProperty.state || ''} ${activeProperty.zip || ''}` : '1070 Yank St, Golden, CO 80401-4223');
+
+          const termsSummary = `1. Monthly Rent: $${(Number(customMonthlyRent) || 0).toLocaleString()} | Security Deposit: $${(Number(customSecurityDeposit) || 0).toLocaleString()}\n` +
+            `2. Term: ${customStartDate} through ${customEndDate} (strictly due on the 1st of each month).\n` +
+            `3. Premises: ${roomClean} at ${propertyClean} (${addressClean}).\n` +
+            `4. Utilities: Shared variable utilities (electric, gas, water) divided by ${utilityDivisor || 7}.\n` +
+            `5. House Rules: Quiet hours 10:00 PM - 7:00 AM daily. Clean kitchen immediately after use. No indoor smoking.`;
+
+          const pdfBlob = await generateMasterPdfBlob({
+            templateName: activeTemplate?.name || 'Residential Room Rental Lease Agreement',
+            category: activeTemplate?.type === 'lease' ? 'Residential Lease Agreement' : 'Document Notice',
+            propertyName: propertyClean,
+            roomName: roomClean,
+            tenantName: tenantClean,
+            notes: termsSummary,
+          });
+
+          const cleanFileName = `${propertyClean.replace(/[^a-zA-Z0-9]/g, '_')}_Lease_${tenantClean.replace(/[^a-zA-Z0-9]/g, '_')}_${roomClean.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+          const uploadRes = await GoogleWorkspaceService.uploadPdfToDrive(pdfBlob, cleanFileName, token);
+
+          if (uploadRes?.id) {
+            const record: GeneratedDocRecord = {
+              id: `gen_pdf_${Date.now()}`,
+              templateType: activeTemplate?.type || 'lease',
+              documentId: uploadRes.id,
+              documentTitle: cleanFileName,
+              webViewLink: uploadRes.webViewLink || `https://drive.google.com/file/d/${uploadRes.id}/view`,
+              tenantName: tenantClean,
+              tenantId: activeRoom?.currentTenantId,
+              roomName: roomClean,
+              propertyName: propertyClean,
+              createdAt: new Date().toISOString(),
+              status: 'saved_to_drive',
+              fallbackNote: 'Google Docs API is pending activation in Google Cloud Console. Generated a fully populated official PDF agreement and saved directly to your Google Drive folder.',
+            };
+
+            setGenerationSuccess(record);
+            setDocHistory(prev => [record, ...prev.slice(0, 49)]);
+            return;
+          }
+        } catch (pdfFallbackErr) {
+          console.warn('PDF auto-fallback to Drive upload failed:', pdfFallbackErr);
+        }
+      }
+
+      setGenerationError(rawErrMsg);
     } finally {
       setIsGenerating(false);
     }
@@ -1902,6 +1962,19 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
                         <RefreshCw className="w-3.5 h-3.5" />
                         Reconnect Google Drive (info@1070yankstreet.com)
                       </button>
+                    )}
+                    {(generationError.toLowerCase().includes('docs.googleapis.com') ||
+                      generationError.toLowerCase().includes('has not been used in project') ||
+                      generationError.toLowerCase().includes('api is disabled')) && (
+                      <a
+                        href="https://console.developers.google.com/apis/api/docs.googleapis.com/overview?project=548380806773"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-md shadow-xs transition-colors flex items-center gap-1.5"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Enable Google Docs API in Console
+                      </a>
                     )}
                     <button
                       type="button"
