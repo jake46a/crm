@@ -46,6 +46,7 @@ import {
 } from '../services/googleWorkspace';
 import { DocTemplateModal } from './modals/DocTemplateModal';
 import { DrivePdfManager } from './DrivePdfManager';
+import { generateMasterPdfBlob } from '../utils/pdfGenerator';
 
 interface GoogleDocsDriveViewProps {
   properties: Property[];
@@ -142,6 +143,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
 
   // Generation execution state
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
   const [generationSuccess, setGenerationSuccess] = useState<GeneratedDocRecord | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [copiedPlaceholder, setCopiedPlaceholder] = useState<string | null>(null);
@@ -621,9 +623,56 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
       setDocHistory(prev => [record, ...prev.slice(0, 49)]); // Keep last 50
     } catch (err: any) {
       console.error('Generation failed:', err);
-      setGenerationError(err.message || 'An error occurred during Google Docs generation.');
+      const errMsg = GoogleWorkspaceService.extractErrorMessage(err, 'An error occurred during Google Docs generation.');
+      setGenerationError(errMsg);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // Instant Download of Populated Agreement PDF (Offline / No Drive connection required)
+  const handleDownloadInstantPdf = async () => {
+    setIsGeneratingPdf(true);
+    setGenerationError(null);
+    try {
+      const activeTemplate = templates.find(t => t.id === selectedTemplateId) || templates[0] || GoogleWorkspaceService.getTemplates()[0];
+      const activeRoom = rooms.find(r => r.id === selectedRoomId);
+      const activeProperty = properties.find(p => p.id === selectedPropertyId) || properties.find(p => p.id === activeRoom?.propertyId) || defaultProperty;
+
+      const tenantClean = (customTenantName || '').trim() || (activeRoom?.currentTenantName || '').trim() || 'Resident';
+      const roomClean = (customRoomName || '').trim() || (activeRoom?.name || '').trim() || 'Room 1';
+      const propertyClean = (customPropertyName || '').trim() || (activeProperty?.name || '').trim() || '1070 Yank St';
+      const addressClean = (customPropertyAddress || '').trim() || (activeProperty && activeProperty.address ? `${activeProperty.address}, ${activeProperty.city || ''}, ${activeProperty.state || ''} ${activeProperty.zip || ''}` : '1070 Yank St, Golden, CO 80401-4223');
+
+      const termsSummary = `1. Monthly Rent: $${(Number(customMonthlyRent) || 0).toLocaleString()} | Security Deposit: $${(Number(customSecurityDeposit) || 0).toLocaleString()}\n` +
+        `2. Term: ${customStartDate} through ${customEndDate} (strictly due on the 1st of each month).\n` +
+        `3. Premises: ${roomClean} at ${propertyClean} (${addressClean}).\n` +
+        `4. Utilities: Shared variable utilities (electric, gas, water) divided by ${utilityDivisor || 7}.\n` +
+        `5. House Rules: Quiet hours 10:00 PM - 7:00 AM daily. Clean kitchen immediately after use. No indoor smoking.`;
+
+      const blob = await generateMasterPdfBlob({
+        templateName: activeTemplate?.name || 'Residential Room Rental Lease Agreement',
+        category: activeTemplate?.type === 'lease' ? 'Residential Lease Agreement' : 'Document Notice',
+        propertyName: propertyClean,
+        roomName: roomClean,
+        tenantName: tenantClean,
+        notes: termsSummary,
+      });
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const cleanFileName = `${propertyClean.replace(/[^a-zA-Z0-9]/g, '_')}_Lease_${tenantClean.replace(/[^a-zA-Z0-9]/g, '_')}_${roomClean.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+      link.download = cleanFileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error('Instant PDF generation failed:', err);
+      setGenerationError(GoogleWorkspaceService.extractErrorMessage(err, 'Failed to generate PDF.'));
+    } finally {
+      setIsGeneratingPdf(false);
     }
   };
 
@@ -1648,11 +1697,11 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
               </div>
 
               {/* Generation Button & Actions */}
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <button
                   type="button"
                   onClick={handleGenerateDocument}
-                  disabled={isGenerating}
+                  disabled={isGenerating || isGeneratingPdf}
                   className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 text-white font-bold text-sm rounded-lg shadow-sm transition-all flex items-center justify-center gap-2"
                 >
                   {isGenerating ? (
@@ -1668,9 +1717,28 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
                   )}
                 </button>
 
+                <button
+                  type="button"
+                  onClick={handleDownloadInstantPdf}
+                  disabled={isGenerating || isGeneratingPdf}
+                  className="w-full py-2.5 px-4 bg-white hover:bg-zinc-50 active:bg-zinc-100 disabled:opacity-50 text-zinc-700 font-semibold text-xs rounded-lg border border-zinc-300 shadow-xs transition-all flex items-center justify-center gap-2"
+                >
+                  {isGeneratingPdf ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Generating Agreement PDF...
+                    </>
+                  ) : (
+                    <>
+                      <Printer className="w-3.5 h-3.5 text-zinc-600" />
+                      Download Populated Agreement PDF (Offline / No Drive Needed)
+                    </>
+                  )}
+                </button>
+
                 {!token && (
                   <p className="text-center text-xs text-zinc-500">
-                    Note: Clicking generate will prompt you to authenticate your Google Drive (<span className="font-medium text-zinc-700">1070yankstreet.com</span>).
+                    Note: Clicking Google Drive will prompt you to authenticate (<span className="font-medium text-zinc-700">info@1070yankstreet.com</span>), or download the PDF directly above.
                   </p>
                 )}
               </div>
@@ -1712,11 +1780,41 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
               )}
 
               {generationError && (
-                <div className="p-4 bg-rose-50 border border-rose-300 rounded-xl flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="text-sm font-bold text-rose-900">Generation Failed</h4>
-                    <p className="text-xs text-rose-700 mt-0.5">{generationError}</p>
+                <div className="p-4 bg-rose-50 border border-rose-300 rounded-xl space-y-3">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-sm font-bold text-rose-900">Generation Notice</h4>
+                      <p className="text-xs text-rose-700 mt-0.5 whitespace-pre-wrap">{generationError}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-rose-200">
+                    {(generationError.toLowerCase().includes('reconnect') ||
+                      generationError.toLowerCase().includes('expired') ||
+                      generationError.toLowerCase().includes('oauth') ||
+                      generationError.toLowerCase().includes('token') ||
+                      generationError.toLowerCase().includes('session') ||
+                      generationError.toLowerCase().includes('unauthenticated') ||
+                      generationError.toLowerCase().includes('401')) && (
+                      <button
+                        type="button"
+                        onClick={() => handleConnectGoogle('info@1070yankstreet.com')}
+                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-md shadow-xs transition-colors flex items-center gap-1.5"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        Reconnect Google Drive (info@1070yankstreet.com)
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleDownloadInstantPdf}
+                      disabled={isGeneratingPdf}
+                      className="px-3 py-1.5 bg-white hover:bg-rose-100 text-rose-800 border border-rose-300 font-semibold text-xs rounded-md transition-colors flex items-center gap-1.5"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      Download Populated PDF Directly
+                    </button>
                   </div>
                 </div>
               )}

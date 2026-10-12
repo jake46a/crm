@@ -208,14 +208,61 @@ export class GoogleWorkspaceService {
   }
 
   /**
+   * Safely extracts a human-readable string from any error object, string, or API response
+   */
+  static extractErrorMessage(err: any, fallback: string = 'An unexpected error occurred'): string {
+    if (!err) return fallback;
+    if (typeof err === 'string') return err.trim() || fallback;
+    if (err instanceof Error && typeof err.message === 'string' && err.message) return err.message.trim();
+    if (typeof err === 'object') {
+      if (typeof err.message === 'string' && err.message.trim()) return err.message.trim();
+      if (typeof err.error === 'string' && err.error.trim()) return err.error.trim();
+      if (err.error && typeof err.error === 'object' && typeof err.error.message === 'string' && err.error.message.trim()) {
+        return err.error.message.trim();
+      }
+      if (typeof err.details === 'string' && err.details.trim()) return err.details.trim();
+      try {
+        const str = JSON.stringify(err);
+        return str !== '{}' ? str : fallback;
+      } catch {
+        return fallback;
+      }
+    }
+    return String(err) || fallback;
+  }
+
+  /**
    * Check if an error or status represents an expired or invalid OAuth token
    */
   static isAuthError(errOrMessage: any): boolean {
     if (!errOrMessage) return false;
-    const msg = typeof errOrMessage === 'string'
-      ? errOrMessage
-      : (errOrMessage.message || errOrMessage.error || (typeof errOrMessage.details === 'string' ? errOrMessage.details : '') || JSON.stringify(errOrMessage));
-    const lower = msg.toLowerCase();
+    let msg = '';
+    if (typeof errOrMessage === 'string') {
+      msg = errOrMessage;
+    } else if (errOrMessage instanceof Error && typeof errOrMessage.message === 'string') {
+      msg = errOrMessage.message;
+    } else if (typeof errOrMessage === 'object') {
+      if (typeof errOrMessage.message === 'string') {
+        msg = errOrMessage.message;
+      } else if (typeof errOrMessage.error === 'string') {
+        msg = errOrMessage.error;
+      } else if (errOrMessage.error && typeof errOrMessage.error === 'object') {
+        msg = typeof errOrMessage.error.message === 'string'
+          ? errOrMessage.error.message
+          : JSON.stringify(errOrMessage.error);
+      } else if (typeof errOrMessage.details === 'string') {
+        msg = errOrMessage.details;
+      } else {
+        try {
+          msg = JSON.stringify(errOrMessage);
+        } catch {
+          msg = String(errOrMessage);
+        }
+      }
+    } else {
+      msg = String(errOrMessage);
+    }
+    const lower = (msg || '').toLowerCase();
     return (
       lower.includes('invalid authentication credentials') ||
       lower.includes('oauth 2 access token') ||
@@ -224,6 +271,7 @@ export class GoogleWorkspaceService {
       lower.includes('status 401') ||
       lower.includes(' 401') ||
       lower.includes('"code":401') ||
+      lower.includes('"code": 401') ||
       lower.includes('unauthorized') ||
       lower.includes('token has expired') ||
       lower.includes('session has expired') ||
@@ -677,7 +725,7 @@ export class GoogleWorkspaceService {
           this.handleAuthExpired(directErr);
           throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
         }
-        throw new Error(directErr.error?.message || err.message || `Failed to copy Google Drive file (${directRes.status})`);
+        throw new Error(this.extractErrorMessage(directErr, `Failed to copy Google Drive file (${directRes.status})`));
       }
 
       return await directRes.json();
@@ -694,7 +742,38 @@ export class GoogleWorkspaceService {
       throw new Error('Google Workspace OAuth access token is required.');
     }
 
-    // 1. Create document using Docs API
+    // Try backend proxy first to avoid any client CORS / adblocker interference
+    try {
+      const proxyRes = await fetch('/api/google/create-doc', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: cleanTitle,
+          content: contentText || '',
+        }),
+      });
+
+      const proxyData = await proxyRes.json().catch(() => ({}));
+      if (proxyRes.ok && proxyData.documentId) {
+        return { documentId: proxyData.documentId, title: proxyData.title || cleanTitle };
+      }
+
+      if (proxyRes.status === 401 || this.isAuthError(proxyData)) {
+        this.handleAuthExpired(proxyData);
+        throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
+      }
+    } catch (proxyErr: any) {
+      if (this.isAuthError(proxyErr)) {
+        this.handleAuthExpired(proxyErr);
+        throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
+      }
+      console.warn('Proxy create-doc attempt failed, falling back to direct Docs API:', proxyErr);
+    }
+
+    // Direct Google Docs API Fallback
     const res = await fetch('https://docs.googleapis.com/v1/documents', {
       method: 'POST',
       headers: {
@@ -712,7 +791,7 @@ export class GoogleWorkspaceService {
         this.handleAuthExpired(err);
         throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
       }
-      throw new Error(err.error?.message || `Failed to create Google Doc (${res.status})`);
+      throw new Error(this.extractErrorMessage(err, `Failed to create Google Doc (${res.status})`));
     }
 
     const doc = await res.json();
@@ -721,7 +800,7 @@ export class GoogleWorkspaceService {
       throw new Error('Google Docs API created the document, but did not return a valid documentId.');
     }
 
-    // 2. Insert text content into document
+    // Insert text content into document
     const cleanContent = (contentText || '').trim();
     if (cleanContent) {
       const batchRes = await fetch(`https://docs.googleapis.com/v1/documents/${documentId}:batchUpdate`, {
@@ -767,6 +846,37 @@ export class GoogleWorkspaceService {
       throw new Error('Google Workspace OAuth access token is required.');
     }
 
+    // Try backend proxy first
+    try {
+      const proxyRes = await fetch('/api/google/replace-placeholders', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          documentId: cleanDocId,
+          replacements: replacements || {},
+        }),
+      });
+
+      const proxyData = await proxyRes.json().catch(() => ({}));
+      if (proxyRes.ok) {
+        return;
+      }
+
+      if (proxyRes.status === 401 || this.isAuthError(proxyData)) {
+        this.handleAuthExpired(proxyData);
+        throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
+      }
+    } catch (proxyErr: any) {
+      if (this.isAuthError(proxyErr)) {
+        this.handleAuthExpired(proxyErr);
+        throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
+      }
+      console.warn('Proxy replace-placeholders attempt failed, falling back to direct API:', proxyErr);
+    }
+
     const requests = Object.entries(replacements || {}).map(([search, replace]) => ({
       replaceAllText: {
         containsText: {
@@ -794,7 +904,7 @@ export class GoogleWorkspaceService {
         this.handleAuthExpired(err);
         throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
       }
-      throw new Error(err.error?.message || `Failed to replace placeholders in Google Doc (${res.status})`);
+      throw new Error(this.extractErrorMessage(err, `Failed to replace placeholders in Google Doc (${res.status})`));
     }
   }
 
@@ -824,7 +934,7 @@ export class GoogleWorkspaceService {
         this.handleAuthExpired(err);
         throw new Error('Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.');
       }
-      throw new Error(err.error?.message || `Failed to get Google Drive file (${res.status})`);
+      throw new Error(this.extractErrorMessage(err, `Failed to get Google Drive file (${res.status})`));
     }
 
     return await res.json();

@@ -44,7 +44,9 @@ export async function generateMasterPdfBlob(options: GeneratePdfOptions): Promis
   let y = height - 50;
 
   // Header Bar
-  const isCourtForm = templateName.toLowerCase().includes('jdf') || category.toLowerCase().includes('court') || category.toLowerCase().includes('eviction');
+  const safeTemplate = String(templateName || '');
+  const safeCategory = String(category || '');
+  const isCourtForm = safeTemplate.toLowerCase().includes('jdf') || safeCategory.toLowerCase().includes('court') || safeCategory.toLowerCase().includes('eviction');
 
   if (isCourtForm) {
     page.drawText('STATE OF COLORADO - COUNTY OF JEFFERSON', {
@@ -56,13 +58,13 @@ export async function generateMasterPdfBlob(options: GeneratePdfOptions): Promis
     });
     y -= 14;
 
-    const formTitle = templateName.toLowerCase().includes('jdf101')
+    const formTitle = safeTemplate.toLowerCase().includes('jdf101')
       ? 'JDF 101 - DEMAND FOR COMPLIANCE OR RIGHT TO POSSESSION'
-      : templateName.toLowerCase().includes('jdf102')
+      : safeTemplate.toLowerCase().includes('jdf102')
       ? 'JDF 102 - NOTICE TO TERMINATE TENANCY'
-      : templateName.toLowerCase().includes('jdf99')
+      : safeTemplate.toLowerCase().includes('jdf99')
       ? 'JDF 99 - INCIDENT & COMPLIANCE VERIFICATION'
-      : templateName.replace(/\.pdf$/i, '').toUpperCase();
+      : safeTemplate.replace(/\.pdf$/i, '').toUpperCase();
 
     page.drawText(formTitle, {
       x: 50,
@@ -209,7 +211,7 @@ export async function generateMasterPdfBlob(options: GeneratePdfOptions): Promis
     });
     y -= 38;
 
-    page.drawText(`${propertyName}, ${roomName ? 'Unit: ' + roomName + ', ' : ''}Lakewood, CO 80215`, {
+    page.drawText(`${propertyName}, ${roomName ? 'Unit: ' + roomName + ', ' : ''}Golden, CO 80401-4223`, {
       x: 65,
       y,
       size: 10,

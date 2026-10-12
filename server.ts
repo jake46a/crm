@@ -1258,6 +1258,127 @@ app.post('/api/google/copy-file', async (req: Request, res: Response) => {
   }
 });
 
+// 4b. Proxy Create Google Doc
+app.post('/api/google/create-doc', async (req: Request, res: Response) => {
+  try {
+    const authHeader = (req.headers['authorization'] || '') as string;
+    const token = authHeader.replace(/^bearer\s+/i, '').trim();
+
+    if (!token) {
+      return res.status(401).json({ error: 'Google Workspace access token is required.' });
+    }
+
+    const { title, content } = req.body;
+    const cleanTitle = (title || 'New Document').trim();
+
+    const docRes = await fetch('https://docs.googleapis.com/v1/documents', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ title: cleanTitle })
+    });
+
+    const data = (await docRes.json().catch(() => ({}))) as any;
+    if (!docRes.ok) {
+      if (docRes.status === 401) {
+        return res.status(401).json({
+          error: 'Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.',
+          code: 'UNAUTHENTICATED',
+          details: data.error
+        });
+      }
+      return res.status(docRes.status).json({
+        error: data.error?.message || `Failed to create Google Doc (${docRes.status})`
+      });
+    }
+
+    const documentId = data.documentId;
+    if (content && typeof content === 'string' && content.trim() && documentId) {
+      await fetch(`https://docs.googleapis.com/v1/documents/${documentId}:batchUpdate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [
+            {
+              insertText: {
+                location: { index: 1 },
+                text: content.trim()
+              }
+            }
+          ]
+        })
+      }).catch((e) => console.warn('[create-doc] Initial text insertion warning:', e.message));
+    }
+
+    return res.json({ documentId, title: data.title || cleanTitle });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to create Google Doc.' });
+  }
+});
+
+// 4c. Proxy Replace Placeholders in Google Doc
+app.post('/api/google/replace-placeholders', async (req: Request, res: Response) => {
+  try {
+    const authHeader = (req.headers['authorization'] || '') as string;
+    const token = authHeader.replace(/^bearer\s+/i, '').trim();
+
+    if (!token) {
+      return res.status(401).json({ error: 'Google Workspace access token is required.' });
+    }
+
+    const { documentId, replacements } = req.body;
+    if (!documentId) {
+      return res.status(400).json({ error: 'documentId is required.' });
+    }
+
+    const requests = Object.entries(replacements || {}).map(([search, replace]) => ({
+      replaceAllText: {
+        containsText: {
+          text: String(search || ''),
+          matchCase: true,
+        },
+        replaceText: String(replace ?? ''),
+      },
+    }));
+
+    if (requests.length === 0) {
+      return res.json({ success: true, count: 0 });
+    }
+
+    const docRes = await fetch(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ requests })
+    });
+
+    const data = (await docRes.json().catch(() => ({}))) as any;
+    if (!docRes.ok) {
+      if (docRes.status === 401) {
+        return res.status(401).json({
+          error: 'Google Workspace OAuth session has expired or is invalid. Please reconnect your Google Drive account.',
+          code: 'UNAUTHENTICATED',
+          details: data.error
+        });
+      }
+      return res.status(docRes.status).json({
+        error: data.error?.message || `Failed to replace placeholders in Google Doc (${docRes.status})`
+      });
+    }
+
+    return res.json({ success: true, count: requests.length });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to replace placeholders.' });
+  }
+});
+
 // 5. Proxy Search Google Drive for PDFs
 app.get('/api/google/search-drive-pdfs', async (req: Request, res: Response) => {
   try {
