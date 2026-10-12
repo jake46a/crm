@@ -444,11 +444,10 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
   };
 
   const handleResetDefaultTemplates = () => {
-    if (window.confirm('Reset all templates to original system defaults? Custom templates will be cleared.')) {
-      const defaults = GoogleWorkspaceService.resetTemplatesToDefault();
-      setTemplates(defaults);
-      setSelectedTemplateId(defaults[0]?.id || 'tpl_lease');
-    }
+    const defaults = GoogleWorkspaceService.resetTemplatesToDefault();
+    setTemplates(defaults);
+    setSelectedTemplateId(defaults[0]?.id || 'tpl_lease');
+    setGenerationError(null);
   };
 
   // Quick inline document link save
@@ -471,6 +470,18 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
     handleSaveQuickDocLink(tplId, inputUrlOrId);
     setEditingTemplateId(null);
     setTemplateDocInput('');
+  };
+
+  // Generate directly using built-in standard template (bypasses any broken external Google Doc link)
+  const handleGenerateWithStarterTemplate = async () => {
+    const activeTemplate = templates.find(t => t.id === selectedTemplateId) || templates[0] || GoogleWorkspaceService.getTemplates()[0];
+    if (activeTemplate?.googleDocId) {
+      handleUnlinkTemplateDoc(activeTemplate.id);
+    }
+    setGenerationError(null);
+    setTimeout(() => {
+      handleGenerateDocument();
+    }, 50);
   };
 
   // 1-Click Create Starter Template in Google Drive
@@ -535,6 +546,8 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
 
     try {
       let targetDocId = '';
+      let usedStarterFallback = false;
+      let fallbackMessage = '';
       const todayStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
       const tenantClean = (customTenantName || '').trim() || (activeRoom?.currentTenantName || '').trim() || 'Resident';
       const roomClean = (customRoomName || '').trim() || (activeRoom?.name || '').trim() || 'Room 1';
@@ -542,13 +555,52 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
       const addressClean = (customPropertyAddress || '').trim() || (activeProperty && activeProperty.address ? `${activeProperty.address}, ${activeProperty.city || ''}, ${activeProperty.state || ''} ${activeProperty.zip || ''}` : '1070 Yank St, Golden, CO 80215');
       const newDocTitle = `${(activeTemplate?.name || 'Document').trim()} - ${tenantClean} (${roomClean}) - ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
 
-      // Step 1: Copy existing template OR create a clean formatted document
+      // Step 1: Copy existing template OR create a clean formatted document with graceful fallback
       const docTemplateId = (activeTemplate?.googleDocId || '').trim();
       if (docTemplateId) {
-        const copyResult = await GoogleWorkspaceService.copyDriveFile(docTemplateId, newDocTitle, token);
-        targetDocId = copyResult?.id;
-        if (!targetDocId) {
-          throw new Error('Drive file copied successfully, but no document ID was returned.');
+        try {
+          const copyResult = await GoogleWorkspaceService.copyDriveFile(docTemplateId, newDocTitle, token);
+          targetDocId = copyResult?.id;
+          if (!targetDocId) {
+            throw new Error('Drive file copied successfully, but no document ID was returned.');
+          }
+        } catch (copyErr: any) {
+          console.warn(`Template copy failed for doc ID ${docTemplateId}:`, copyErr);
+
+          if (GoogleWorkspaceService.isAuthError(copyErr)) {
+            throw copyErr;
+          }
+
+          const copyErrMsg = String(copyErr?.message || copyErr || '');
+          const isNotFoundOrInaccessible =
+            copyErrMsg.toLowerCase().includes('not found') ||
+            copyErrMsg.toLowerCase().includes('404') ||
+            copyErrMsg.toLowerCase().includes('permission') ||
+            copyErrMsg.toLowerCase().includes('forbidden') ||
+            copyErrMsg.toLowerCase().includes('403') ||
+            copyErrMsg.toLowerCase().includes('cannot access') ||
+            copyErrMsg.toLowerCase().includes('invalid');
+
+          if (isNotFoundOrInaccessible) {
+            console.info(`Auto-fallback: creating document directly from built-in starter template due to copy error (${copyErrMsg})`);
+            usedStarterFallback = true;
+            fallbackMessage = `Note: Linked template (${docTemplateId}) was not accessible in your Google Drive (${copyErrMsg}). Automatically generated a fresh document using the standard Coliving Lease starter template and saved to your Drive.`;
+
+            // Create from starter content directly
+            const starterContent = GoogleWorkspaceService.getStarterTemplateContent(activeTemplate?.type || 'lease');
+            const created = await GoogleWorkspaceService.createGoogleDoc(newDocTitle, starterContent, token);
+            targetDocId = created.documentId;
+
+            // Automatically unlink the missing doc ID so subsequent generations don't trigger the copy failure
+            try {
+              const updated = GoogleWorkspaceService.updateTemplate(activeTemplate.id, { googleDocId: '' });
+              setTemplates(updated);
+            } catch (e) {
+              console.warn('Could not auto-unlink broken template ID:', e);
+            }
+          } else {
+            throw copyErr;
+          }
         }
       } else {
         // Create from starter content directly
@@ -617,6 +669,7 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
         propertyName: propertyClean,
         createdAt: new Date().toISOString(),
         status: 'saved_to_drive',
+        fallbackNote: usedStarterFallback ? fallbackMessage : undefined,
       };
 
       setGenerationSuccess(record);
@@ -1250,6 +1303,15 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
                             <Edit3 className="w-3 h-3" />
                             <span>Edit Link</span>
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUnlinkTemplateDoc(activeTemplate.id)}
+                            className="px-2.5 py-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-zinc-200 rounded-md font-semibold text-xs flex items-center gap-1 transition shadow-2xs"
+                            title="Unlink Google Doc ID and return to standard built-in template"
+                          >
+                            <Unlink className="w-3 h-3" />
+                            <span>Unlink</span>
+                          </button>
                         </>
                       ) : (
                         <>
@@ -1748,11 +1810,17 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
                 <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl space-y-3">
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
+                    <div className="space-y-1">
                       <h4 className="text-sm font-bold text-emerald-900">Document Generated & Saved to Drive!</h4>
-                      <p className="text-xs text-emerald-700 mt-0.5">
+                      <p className="text-xs text-emerald-700">
                         "{generationSuccess.documentTitle}" is ready in your Google Drive with all live tenant data populated.
                       </p>
+                      {generationSuccess.fallbackNote && (
+                        <p className="text-xs text-amber-800 bg-amber-100/90 p-2 rounded-md mt-1.5 flex items-start gap-1.5 font-medium border border-amber-200">
+                          <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                          <span>{generationSuccess.fallbackNote}</span>
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -1790,6 +1858,35 @@ export const GoogleDocsDriveView: React.FC<GoogleDocsDriveViewProps> = ({
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-rose-200">
+                    {(generationError.toLowerCase().includes('not found') ||
+                      generationError.toLowerCase().includes('404') ||
+                      generationError.toLowerCase().includes('file not found') ||
+                      generationError.includes('1t_')) && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleGenerateWithStarterTemplate}
+                          disabled={isGenerating || isGeneratingPdf}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-md shadow-xs transition-colors flex items-center gap-1.5"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          Generate with Built-in Standard Template
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (activeTemplate?.id) {
+                              handleUnlinkTemplateDoc(activeTemplate.id);
+                            }
+                            setGenerationError(null);
+                          }}
+                          className="px-3 py-1.5 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-300 font-semibold text-xs rounded-md transition-colors flex items-center gap-1.5"
+                        >
+                          <Unlink className="w-3.5 h-3.5" />
+                          Unlink Missing Doc & Clear ID
+                        </button>
+                      </>
+                    )}
                     {(generationError.toLowerCase().includes('reconnect') ||
                       generationError.toLowerCase().includes('expired') ||
                       generationError.toLowerCase().includes('oauth') ||

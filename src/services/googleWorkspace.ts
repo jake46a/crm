@@ -118,6 +118,7 @@ export interface GeneratedDocRecord {
   propertyName?: string;
   createdAt: string;
   status: 'created' | 'saved_to_drive';
+  fallbackNote?: string;
 }
 
 export interface DrivePdfRecord {
